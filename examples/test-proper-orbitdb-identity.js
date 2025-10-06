@@ -21,6 +21,7 @@ import {
     generateMasterSeed,
     createOrbitDBIdentityFromSeed 
 } from './decontact-style-identity.js'
+import { logger } from '../lib/logger.js'
 
 // Basic libp2p config (simplified)
 const Libp2pOptions = {
@@ -28,30 +29,30 @@ const Libp2pOptions = {
 }
 
 async function testProperOrbitDBIdentity() {
-    console.log('🧪 Testing Proper OrbitDB Identity Creation')
-    console.log('=' .repeat(50))
+    logger.info('🧪 Testing Proper OrbitDB Identity Creation')
+    logger.info('=' .repeat(50))
     
     try {
-        console.log('\n🌱 Step 1: Generate seed phrase and master seed')
+        logger.info('\n🌱 Step 1: Generate seed phrase and master seed')
         
         // Generate test seed
         const seedPhrase = generateMnemonic(english)
         const masterSeed = generateMasterSeed(seedPhrase, 'password')
         
-        console.log(`   🔤 Seed phrase: ${seedPhrase}`)
-        console.log(`   🔑 Master seed: ${masterSeed.substring(0, 16)}...`)
+        logger.info(`   🔤 Seed phrase: ${seedPhrase}`)
+        logger.info(`   🔑 Master seed: ${masterSeed.substring(0, 16)}...`)
         
-        console.log('\n🆔 Step 2: Create proper OrbitDB identity from seed')
+        logger.info('\n🆔 Step 2: Create proper OrbitDB identity from seed')
         
         // Create proper OrbitDB identity (this should now work correctly)
         const orbitdbResult = await createOrbitDBIdentityFromSeed(masterSeed)
         
-        console.log('\n✅ Identity Creation Results:')
-        console.log(`   🔵 OrbitDB Identity ID: ${orbitdbResult.identity.id}`)
-        console.log(`   🔑 Identity Type: ${orbitdbResult.identity.type}`)
-        console.log(`   📋 Identity Hash: ${orbitdbResult.identity.hash}`)
+        logger.info('\n✅ Identity Creation Results:')
+        logger.info(`   🔵 OrbitDB Identity ID: ${orbitdbResult.identity.id}`)
+        logger.info(`   🔑 Identity Type: ${orbitdbResult.identity.type}`)
+        logger.info(`   📋 Identity Hash: ${orbitdbResult.identity.hash}`)
         
-        console.log('\n🚀 Step 3: Test OrbitDB integration with custom identity')
+        logger.info('\n🚀 Step 3: Test OrbitDB integration with custom identity')
         
         // Initialize IPFS/Helia with minimal config
         const blockstore = new LevelBlockstore('./test-identity/ipfs')
@@ -80,16 +81,16 @@ async function testProperOrbitDBIdentity() {
             directory: './test-identity/orbitdb'
         })
         
-        console.log(`   ✅ OrbitDB initialized with custom identity`)
-        console.log(`   🤖 OrbitDB identity: ${orbitdb.identity.id}`)
+        logger.info(`   ✅ OrbitDB initialized with custom identity`)
+        logger.info(`   🤖 OrbitDB identity: ${orbitdb.identity.id}`)
         
-        console.log('\n🗄️ Step 4: Test database operations with custom identity')
+        logger.info('\n🗄️ Step 4: Test database operations with custom identity')
         
         // Create a test database
         const db = await orbitdb.open('test-seed-identity-db')
         
-        console.log(`   📍 Database address: ${db.address}`)
-        console.log(`   🔑 Database creator: ${db.identity.id}`)
+        logger.info(`   📍 Database address: ${db.address}`)
+        logger.info(`   🔑 Database creator: ${db.identity.id}`)
         
         // Add some test data
         await db.add('Hello from seed-derived OrbitDB identity!')
@@ -98,36 +99,36 @@ async function testProperOrbitDBIdentity() {
         
         // Retrieve all data
         const allEntries = await db.all()
-        console.log(`   📝 Added ${allEntries.length} entries to database`)
+        logger.info(`   📝 Added ${allEntries.length} entries to database`)
         
-        console.log('\n📊 Database Entries:')
+        logger.info('\n📊 Database Entries:')
         allEntries.forEach((entry, index) => {
-            console.log(`   ${index + 1}. ${entry.value}`)
+            logger.info(`   ${index + 1}. ${entry.value}`)
         })
         
-        console.log('\n🔄 Step 5: Test deterministic identity recreation')
+        logger.info('\n🔄 Step 5: Test deterministic identity recreation')
         
         // Create the same identity again from the same seed
         const orbitdbResult2 = await createOrbitDBIdentityFromSeed(masterSeed)
         
         const identityMatch = orbitdbResult.identity.id === orbitdbResult2.identity.id
-        console.log(`   🔍 Identity determinism: ${identityMatch ? '✅ SAME' : '❌ DIFFERENT'}`)
-        console.log(`   📋 Original: ${orbitdbResult.identity.id}`)
-        console.log(`   📋 Recreated: ${orbitdbResult2.identity.id}`)
+        logger.info(`   🔍 Identity determinism: ${identityMatch ? '✅ SAME' : '❌ DIFFERENT'}`)
+        logger.info(`   📋 Original: ${orbitdbResult.identity.id}`)
+        logger.info(`   📋 Recreated: ${orbitdbResult2.identity.id}`)
         
         // Cleanup
-        console.log('\n🧹 Cleanup...')
+        logger.info('\n🧹 Cleanup...')
         await db.close()
         await orbitdb.stop()
         await ipfs.stop()
         
-        console.log('\n🎉 SUCCESS! Proper OrbitDB identity creation with DID provider works!')
-        console.log('\n📋 Test Summary:')
-        console.log(`   ✅ Seed-derived OrbitDB identity created`)
-        console.log(`   ✅ Custom DID provider registered`)
-        console.log(`   ✅ OrbitDB integrated with custom identity`)
-        console.log(`   ✅ Database operations successful`)
-        console.log(`   ${identityMatch ? '✅' : '❌'} Deterministic identity recreation`)
+        logger.info('\n🎉 SUCCESS! Proper OrbitDB identity creation with DID provider works!')
+        logger.info('\n📋 Test Summary:')
+        logger.info(`   ✅ Seed-derived OrbitDB identity created`)
+        logger.info(`   ✅ Custom DID provider registered`)
+        logger.info(`   ✅ OrbitDB integrated with custom identity`)
+        logger.info(`   ✅ Database operations successful`)
+        logger.info(`   ${identityMatch ? '✅' : '❌'} Deterministic identity recreation`)
         
         return {
             success: true,
@@ -138,8 +139,8 @@ async function testProperOrbitDBIdentity() {
         }
         
     } catch (error) {
-        console.error('\n❌ Test failed:', error.message)
-        console.error('Stack:', error.stack)
+        logger.error('\n❌ Test failed:', error.message)
+        logger.error('Stack:', error.stack)
         
         return {
             success: false,
@@ -153,15 +154,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     testProperOrbitDBIdentity()
         .then(result => {
             if (result.success) {
-                console.log('\n✅ All tests passed!')
+                logger.info('\n✅ All tests passed!')
                 process.exit(0)
             } else {
-                console.log('\n❌ Tests failed!')
+                logger.info('\n❌ Tests failed!')
                 process.exit(1)
             }
         })
         .catch(error => {
-            console.error('Test execution failed:', error)
+            logger.error('Test execution failed:', error)
             process.exit(1)
         })
 }

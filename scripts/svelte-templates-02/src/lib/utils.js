@@ -14,6 +14,7 @@ import { createHelia } from "helia";
 import { createOrbitDB } from "@orbitdb/core";
 import { LevelBlockstore } from "blockstore-level";
 import { LevelDatastore } from "datastore-level";
+import { logger } from '../../../../lib/logger.js'
 
 /**
  * Clean up OrbitDB directories
@@ -33,19 +34,19 @@ export async function cleanupOrbitDBDirectories() {
     for (const dir of orbitdbDirs) {
       try {
         await fs.promises.rm(dir.name, { recursive: true, force: true });
-        console.log(`🧹 Cleaned up: ${dir.name}`);
+        logger.info(`🧹 Cleaned up: ${dir.name}`);
       } catch (error) {
-        console.warn(`⚠️ Could not clean up ${dir.name}: ${error.message}`);
+        logger.warn(`⚠️ Could not clean up ${dir.name}: ${error.message}`);
       }
     }
 
     if (orbitdbDirs.length === 0) {
-      console.log("🧹 No OrbitDB directories to clean up");
+      logger.info("🧹 No OrbitDB directories to clean up");
     } else {
-      console.log(`🧹 Cleaned up ${orbitdbDirs.length} OrbitDB directories`);
+      logger.info(`🧹 Cleaned up ${orbitdbDirs.length} OrbitDB directories`);
     }
   } catch (error) {
-    console.warn(`⚠️ Cleanup warning: ${error.message}`);
+    logger.warn(`⚠️ Cleanup warning: ${error.message}`);
   }
 }
 
@@ -57,7 +58,7 @@ export async function cleanupAllTestArtifacts() {
   const fs = await import("fs");
   // const path = await import('path') // Currently unused
 
-  console.log("🧹 Starting comprehensive test cleanup...");
+  logger.info("🧹 Starting comprehensive test cleanup...");
 
   // Test directories to clean up
   const testDirectories = [
@@ -88,11 +89,11 @@ export async function cleanupAllTestArtifacts() {
   for (const dir of testDirectories) {
     try {
       await fs.promises.rm(dir, { recursive: true, force: true });
-      console.log(`🧹 Removed test directory: ${dir}`);
+      logger.info(`🧹 Removed test directory: ${dir}`);
       cleanedDirs++;
     } catch (error) {
       if (error.code !== "ENOENT") {
-        console.warn(`⚠️ Could not remove ${dir}: ${error.message}`);
+        logger.warn(`⚠️ Could not remove ${dir}: ${error.message}`);
       }
     }
   }
@@ -107,20 +108,20 @@ export async function cleanupAllTestArtifacts() {
     for (const carFile of carFiles) {
       try {
         await fs.promises.unlink(carFile.name);
-        console.log(`🧹 Removed CAR file: ${carFile.name}`);
+        logger.info(`🧹 Removed CAR file: ${carFile.name}`);
         cleanedFiles++;
       } catch (error) {
-        console.warn(`⚠️ Could not remove ${carFile.name}: ${error.message}`);
+        logger.warn(`⚠️ Could not remove ${carFile.name}: ${error.message}`);
       }
     }
   } catch (error) {
-    console.warn(`⚠️ Error scanning for CAR files: ${error.message}`);
+    logger.warn(`⚠️ Error scanning for CAR files: ${error.message}`);
   }
 
   // Also clean up OrbitDB directories
   await cleanupOrbitDBDirectories();
 
-  console.log(
+  logger.info(
     `🧹 Comprehensive cleanup completed: ${cleanedDirs} directories, ${cleanedFiles} CAR files`,
   );
 }
@@ -136,7 +137,7 @@ export async function cleanupTestDirectory(testDir, carPrefix = "") {
   try {
     // Remove test directory
     await fs.promises.rm(testDir, { recursive: true, force: true });
-    console.log(`🧹 Removed test directory: ${testDir}`);
+    logger.info(`🧹 Removed test directory: ${testDir}`);
 
     // Remove associated CAR files if prefix provided
     if (carPrefix) {
@@ -151,17 +152,17 @@ export async function cleanupTestDirectory(testDir, carPrefix = "") {
 
         for (const carFile of carFiles) {
           await fs.promises.unlink(carFile.name);
-          console.log(`🧹 Removed CAR file: ${carFile.name}`);
+          logger.info(`🧹 Removed CAR file: ${carFile.name}`);
         }
       } catch (error) {
-        console.warn(
+        logger.warn(
           `⚠️ Error cleaning CAR files with prefix ${carPrefix}: ${error.message}`,
         );
       }
     }
   } catch (error) {
     if (error.code !== "ENOENT") {
-      console.warn(
+      logger.warn(
         `⚠️ Could not clean up test directory ${testDir}: ${error.message}`,
       );
     }

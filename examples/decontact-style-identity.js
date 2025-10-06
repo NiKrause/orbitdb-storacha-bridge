@@ -34,6 +34,7 @@ import { Ed25519Provider } from 'key-did-provider-ed25519'
 import * as KeyDIDResolver from 'key-did-resolver'
 import * as Delegation from '@ucanto/core/delegation'
 import OrbitDBIdentityProviderDID from '@orbitdb/identity-provider-did'
+import { logger } from '../lib/logger.js'
 
 /**
  * Convert 64-bit seed to 32-bit seed (same as deContact)
@@ -63,14 +64,14 @@ function generateMasterSeed(mnemonicSeedphrase, password = 'password') {
  * The same seed will always produce the same identity/DID.
  */
 async function createStorachaIdentityFromSeed(masterSeed) {
-    console.log('🔐 Creating deterministic Storacha identity from seed...')
+    logger.info('🔐 Creating deterministic Storacha identity from seed...')
     
     const seed32 = convertTo32BitSeed(masterSeed)
     const ucantoPrincipal = await ed25519.derive(seed32)
     const principal = Signer.from(ucantoPrincipal.toArchive())
     
-    console.log(`   ✅ Storacha identity: ${principal.did()}`)
-    console.log(`   📝 Note: Deterministic identity created from seed (same seed = same identity)`)
+    logger.info(`   ✅ Storacha identity: ${principal.did()}`)
+    logger.info(`   📝 Note: Deterministic identity created from seed (same seed = same identity)`)
     
     return {
         principal,
@@ -84,7 +85,7 @@ async function createStorachaIdentityFromSeed(masterSeed) {
  * Generate proper OrbitDB identity from seed using official DID provider
  */
 async function createOrbitDBIdentityFromSeed(masterSeed) {
-    console.log('🆔 Creating proper OrbitDB identity with DID provider...')
+    logger.info('🆔 Creating proper OrbitDB identity with DID provider...')
     
     const seed32 = convertTo32BitSeed(masterSeed)
     
@@ -96,7 +97,7 @@ async function createOrbitDBIdentityFromSeed(masterSeed) {
     OrbitDBIdentityProviderDID.setDIDResolver(keyDidResolver)
     useIdentityProvider(OrbitDBIdentityProviderDID)
     
-    console.log(`   ✅ Official DID provider registered with OrbitDB`)
+    logger.info(`   ✅ Official DID provider registered with OrbitDB`)
     
     // Create OrbitDB identities instance
     const identities = await Identities()
@@ -111,9 +112,9 @@ async function createOrbitDBIdentityFromSeed(masterSeed) {
         }) 
     })
     
-    console.log(`   ✅ OrbitDB identity created: ${identity.id}`)
-    console.log(`   🔑 Identity type: ${identity.type}`)
-    console.log(`   📝 Note: True deterministic OrbitDB identity from seed`)
+    logger.info(`   ✅ OrbitDB identity created: ${identity.id}`)
+    logger.info(`   🔑 Identity type: ${identity.type}`)
+    logger.info(`   📝 Note: True deterministic OrbitDB identity from seed`)
     
     return {
         identity,
@@ -128,7 +129,7 @@ async function createOrbitDBIdentityFromSeed(masterSeed) {
  * Create UCAN delegation using existing Storacha credentials
  */
 async function createStorachaDelegation(storachaIdentity, authorityCredentials) {
-    console.log('📜 Creating UCAN delegation for seed-derived identity...')
+    logger.info('📜 Creating UCAN delegation for seed-derived identity...')
     
     try {
         // Initialize authority client
@@ -144,8 +145,8 @@ async function createStorachaDelegation(storachaIdentity, authorityCredentials) 
         const space = await authorityClient.addSpace(proof)
         await authorityClient.setCurrentSpace(space.did())
         
-        console.log(`   🚀 Authority space: ${space.did()}`)
-        console.log(`   🎯 Delegating to: ${storachaIdentity.did}`)
+        logger.info(`   🚀 Authority space: ${space.did()}`)
+        logger.info(`   🎯 Delegating to: ${storachaIdentity.did}`)
         
         // Create delegation for 30 days
         const expiration = Math.floor(Date.now() / 1000) + (30 * 24 * 60 * 60)
@@ -172,8 +173,8 @@ async function createStorachaDelegation(storachaIdentity, authorityCredentials) 
         
         const delegationToken = Buffer.from(archive.ok).toString('base64')
         
-        console.log('   ✅ UCAN delegation created!')
-        console.log(`   📏 Token length: ${delegationToken.length} characters`)
+        logger.info('   ✅ UCAN delegation created!')
+        logger.info(`   📏 Token length: ${delegationToken.length} characters`)
         
         return {
             delegation: delegationToken,
@@ -183,7 +184,7 @@ async function createStorachaDelegation(storachaIdentity, authorityCredentials) 
         }
         
     } catch (error) {
-        console.error('   ❌ Delegation failed:', error.message)
+        logger.error('   ❌ Delegation failed:', error.message)
         throw error
     }
 }
@@ -192,7 +193,7 @@ async function createStorachaDelegation(storachaIdentity, authorityCredentials) 
  * Test file upload using seed-derived Storacha identity
  */
 async function testFileUploadWithSeedIdentity(storachaIdentity, delegation) {
-    console.log('📤 Testing file upload with seed-derived identity...')
+    logger.info('📤 Testing file upload with seed-derived identity...')
     
     try {
         // Initialize UCAN-authenticated client directly (no internal helpers)
@@ -217,14 +218,14 @@ Space: ${delegation.spaceDID}`
             type: 'text/plain'
         })
 
-        console.log(`   📄 Uploading file: ${testFile.name} (${testFile.size} bytes)`)
+        logger.info(`   📄 Uploading file: ${testFile.name} (${testFile.size} bytes)`)
 
         // Upload file
         const result = await client.uploadFile(testFile)
 
-        console.log('   ✅ File uploaded successfully!')
-        console.log(`   🔗 CID: ${result}`)
-        console.log(`   🌐 IPFS URL: https://w3s.link/ipfs/${result}`)
+        logger.info('   ✅ File uploaded successfully!')
+        logger.info(`   🔗 CID: ${result}`)
+        logger.info(`   🌐 IPFS URL: https://w3s.link/ipfs/${result}`)
 
         return {
             cid: result.toString(),
@@ -233,7 +234,7 @@ Space: ${delegation.spaceDID}`
         }
         
     } catch (error) {
-        console.error('   ❌ File upload failed:', error.message)
+        logger.error('   ❌ File upload failed:', error.message)
         throw error
     }
 }
@@ -242,8 +243,8 @@ Space: ${delegation.spaceDID}`
  * Main demonstration
  */
 async function main() {
-    console.log('🚀 deContact-Style Identity Generation for Storacha')
-    console.log('=' .repeat(60))
+    logger.info('🚀 deContact-Style Identity Generation for Storacha')
+    logger.info('=' .repeat(60))
     
     try {
         // Check if we have authority credentials for delegation
@@ -251,22 +252,22 @@ async function main() {
         const authorityProof = process.env.STORACHA_PROOF
         
         if (!authorityKey || !authorityProof) {
-            console.log('⚠️  Missing STORACHA_KEY and STORACHA_PROOF in .env')
-            console.log('💡 Add these to enable delegation and file uploads')
-            console.log('   This demo will show identity generation only')
+            logger.info('⚠️  Missing STORACHA_KEY and STORACHA_PROOF in .env')
+            logger.info('💡 Add these to enable delegation and file uploads')
+            logger.info('   This demo will show identity generation only')
         }
         
-        console.log('\n🌱 Step 1: Generate seed phrase (like deContact onboarding)')
+        logger.info('\n🌱 Step 1: Generate seed phrase (like deContact onboarding)')
         
         // Generate or use existing seed phrase
         const seedPhrase = process.env.DEMO_SEED_PHRASE || generateMnemonic(english)
-        console.log(`   🔤 Seed phrase: ${seedPhrase}`)
+        logger.info(`   🔤 Seed phrase: ${seedPhrase}`)
         
         // Generate master seed (deContact style)
         const masterSeed = generateMasterSeed(seedPhrase, 'password')
-        console.log(`   🔑 Master seed: ${masterSeed.substring(0, 16)}...`)
+        logger.info(`   🔑 Master seed: ${masterSeed.substring(0, 16)}...`)
         
-        console.log('\n🆔 Step 2: Create deterministic identities from seed')
+        logger.info('\n🆔 Step 2: Create deterministic identities from seed')
         
         // Create Storacha identity from seed
         const storachaIdentity = await createStorachaIdentityFromSeed(masterSeed)
@@ -274,43 +275,43 @@ async function main() {
         // Create OrbitDB DID identity from seed (for comparison)
         const orbitdbIdentity = await createOrbitDBIdentityFromSeed(masterSeed)
         
-        console.log('\n📋 Identity Summary:')
-        console.log(`   🔵 OrbitDB DID: ${orbitdbIdentity.did}`)
-        console.log(`   🟢 Storacha DID: ${storachaIdentity.did}`)
-        console.log('   ✅ Both identities derived from same seed phrase!')
+        logger.info('\n📋 Identity Summary:')
+        logger.info(`   🔵 OrbitDB DID: ${orbitdbIdentity.did}`)
+        logger.info(`   🟢 Storacha DID: ${storachaIdentity.did}`)
+        logger.info('   ✅ Both identities derived from same seed phrase!')
         
         if (authorityKey && authorityProof) {
-            console.log('\n📜 Step 3: Create UCAN delegation')
+            logger.info('\n📜 Step 3: Create UCAN delegation')
             
             const delegation = await createStorachaDelegation(storachaIdentity, {
                 key: authorityKey,
                 proof: authorityProof
             })
             
-            console.log('\n📤 Step 4: Test file upload')
+            logger.info('\n📤 Step 4: Test file upload')
             
             const uploadResult = await testFileUploadWithSeedIdentity(storachaIdentity, delegation)
             
-            console.log('\n🎉 SUCCESS! Complete demonstration:')
-            console.log(`   ✅ Seed phrase generated: ${seedPhrase.split(' ').length} words`)
-            console.log(`   ✅ Deterministic Storacha identity: ${storachaIdentity.did}`)
-            console.log(`   ✅ UCAN delegation created`)
-            console.log(`   ✅ File uploaded: ${uploadResult.cid}`)
-            console.log(`   ✅ Same seed can be used on any device!`)
+            logger.info('\n🎉 SUCCESS! Complete demonstration:')
+            logger.info(`   ✅ Seed phrase generated: ${seedPhrase.split(' ').length} words`)
+            logger.info(`   ✅ Deterministic Storacha identity: ${storachaIdentity.did}`)
+            logger.info(`   ✅ UCAN delegation created`)
+            logger.info(`   ✅ File uploaded: ${uploadResult.cid}`)
+            logger.info(`   ✅ Same seed can be used on any device!`)
             
         } else {
-            console.log('\n💡 Next Steps:')
-            console.log('   1. Add STORACHA_KEY and STORACHA_PROOF to .env')
-            console.log('   2. Run this script again to test full delegation flow')
-            console.log('   3. Use same seed phrase on different device to verify deterministic identity')
+            logger.info('\n💡 Next Steps:')
+            logger.info('   1. Add STORACHA_KEY and STORACHA_PROOF to .env')
+            logger.info('   2. Run this script again to test full delegation flow')
+            logger.info('   3. Use same seed phrase on different device to verify deterministic identity')
         }
         
-        console.log('\n🔄 Cross-Device Recovery:')
-        console.log('   To recover this identity on another device:')
-        console.log(`   1. Use seed phrase: ${seedPhrase}`)
-        console.log(`   2. Generate same master seed with password: 'password'`)
-        console.log(`   3. Derive Storacha identity with derivation index: 1`)
-        console.log(`   4. Result: ${storachaIdentity.did}`)
+        logger.info('\n🔄 Cross-Device Recovery:')
+        logger.info('   To recover this identity on another device:')
+        logger.info(`   1. Use seed phrase: ${seedPhrase}`)
+        logger.info(`   2. Generate same master seed with password: 'password'`)
+        logger.info(`   3. Derive Storacha identity with derivation index: 1`)
+        logger.info(`   4. Result: ${storachaIdentity.did}`)
         
         return {
             seedPhrase,
@@ -320,8 +321,8 @@ async function main() {
         }
         
     } catch (error) {
-        console.error('\n❌ Demo failed:', error.message)
-        console.error(error.stack)
+        logger.error('\n❌ Demo failed:', error.message)
+        logger.error(error.stack)
         process.exit(1)
     }
 }

@@ -15,7 +15,7 @@ import { promises as fs } from 'fs'
 import { join } from 'path'
 import CARStorage from '../lib/car-storage.js'
 import { createHeliaOrbitDB, cleanupOrbitDBDirectories, cleanupAllTestArtifacts } from '../lib/utils.js'
-
+import { logger } from '../lib/logger.js'
 // Import OrbitDB storage modules for integration tests
 let ComposedStorage, MemoryStorage, LRUStorage
 try {
@@ -24,7 +24,7 @@ try {
   MemoryStorage = storageModules.MemoryStorage
   LRUStorage = storageModules.LRUStorage
 } catch (error) {
-  console.warn('OrbitDB storage modules not available for integration tests')
+  logger.warn('OrbitDB storage modules not available for integration tests')
 }
 
 /**
@@ -54,9 +54,9 @@ describe('CAR Storage', () => {
    * @description Global setup that cleans all test artifacts before running tests
    */
   beforeAll(async () => {
-    console.log(`${colors.bright}${colors.cyan}🧹 Global cleanup: Removing all test artifacts before test suite...${colors.reset}`)
+    logger.info(`${colors.bright}${colors.cyan}🧹 Global cleanup: Removing all test artifacts before test suite...${colors.reset}`)
     await cleanupAllTestArtifacts()
-    console.log(`${colors.bright}${colors.green}✅ Global cleanup completed${colors.reset}`)
+    logger.info(`${colors.bright}${colors.green}✅ Global cleanup completed${colors.reset}`)
   })
 
   /**
@@ -64,9 +64,9 @@ describe('CAR Storage', () => {
    * @description Global cleanup that removes all test artifacts after all tests complete
    */
   afterAll(async () => {
-    console.log(`${colors.bright}${colors.cyan}🧹 Global cleanup: Removing all test artifacts after test suite...${colors.reset}`)
+    logger.info(`${colors.bright}${colors.cyan}🧹 Global cleanup: Removing all test artifacts after test suite...${colors.reset}`)
     await cleanupAllTestArtifacts()
-    console.log(`${colors.bright}${colors.green}✅ Final cleanup completed${colors.reset}`)
+    logger.info(`${colors.bright}${colors.green}✅ Final cleanup completed${colors.reset}`)
   })
   
   /**
@@ -74,7 +74,7 @@ describe('CAR Storage', () => {
    * @description Pre-test setup that cleans up test directory
    */
   beforeEach(async () => {
-    console.log(`${colors.bright}${colors.cyan}🧹 Setting up CAR storage test environment...${colors.reset}`)
+    logger.info(`${colors.bright}${colors.cyan}🧹 Setting up CAR storage test environment...${colors.reset}`)
     
     // Clean up test directory
     try {
@@ -93,7 +93,7 @@ describe('CAR Storage', () => {
       try {
         await storage.close()
       } catch (error) {
-        console.warn('Storage cleanup warning:', error.message)
+        logger.warn('Storage cleanup warning:', error.message)
       }
       storage = null
     }
@@ -105,7 +105,7 @@ describe('CAR Storage', () => {
       // Ignore if directory doesn't exist
     }
     
-    console.log(`${colors.bright}${colors.green}✅ CAR storage test cleanup completed${colors.reset}`)
+    logger.info(`${colors.bright}${colors.green}✅ CAR storage test cleanup completed${colors.reset}`)
   })
   
   /**
@@ -132,7 +132,7 @@ describe('CAR Storage', () => {
       expect(typeof storage.persist).toBe('function')
       expect(typeof storage.close).toBe('function')
       
-      console.log(`${colors.green}✅ CAR storage instance created with all required methods${colors.reset}`)
+      logger.info(`${colors.green}✅ CAR storage instance created with all required methods${colors.reset}`)
     })
 
     /**
@@ -154,7 +154,7 @@ describe('CAR Storage', () => {
       expect(retrieved).toBeTruthy()
       expect(retrieved).toEqual(testData)
       
-      console.log(`${colors.green}✅ Data storage and retrieval successful${colors.reset}`)
+      logger.info(`${colors.green}✅ Data storage and retrieval successful${colors.reset}`)
     })
 
     /**
@@ -181,7 +181,7 @@ describe('CAR Storage', () => {
       const retrievedString = new TextDecoder().decode(retrieved)
       expect(retrievedString).toBe(testString)
       
-      console.log(`${colors.green}✅ String data conversion handled correctly${colors.reset}`)
+      logger.info(`${colors.green}✅ String data conversion handled correctly${colors.reset}`)
     })
 
     /**
@@ -203,7 +203,7 @@ describe('CAR Storage', () => {
       await storage.del(testKey)
       expect(await storage.get(testKey)).toBeUndefined()
       
-      console.log(`${colors.green}✅ Data deletion successful${colors.reset}`)
+      logger.info(`${colors.green}✅ Data deletion successful${colors.reset}`)
     })
 
     /**
@@ -242,7 +242,7 @@ describe('CAR Storage', () => {
         expect(found).toBeTruthy()
       }
       
-      console.log(`${colors.green}✅ Data iteration over ${entries.length} entries successful${colors.reset}`)
+      logger.info(`${colors.green}✅ Data iteration over ${entries.length} entries successful${colors.reset}`)
     })
   })
   
@@ -276,7 +276,7 @@ describe('CAR Storage', () => {
       expect(stats.isFile()).toBe(true)
       expect(stats.size).toBeGreaterThan(0)
       
-      console.log(`${colors.green}✅ CAR file created with ${stats.size} bytes${colors.reset}`)
+      logger.info(`${colors.green}✅ CAR file created with ${stats.size} bytes${colors.reset}`)
     })
 
     /**
@@ -311,7 +311,7 @@ describe('CAR Storage', () => {
       const recoveredValue = new TextDecoder().decode(recovered)
       expect(recoveredValue).toBe(testValue)
       
-      console.log(`${colors.green}✅ Data recovery from CAR file successful${colors.reset}`)
+      logger.info(`${colors.green}✅ Data recovery from CAR file successful${colors.reset}`)
     })
 
     /**
@@ -350,7 +350,7 @@ describe('CAR Storage', () => {
       const stats = await fs.stat(carPath)
       expect(stats.isFile()).toBe(true)
       
-      console.log(`${colors.green}✅ Auto-flush triggered at threshold, CAR file: ${stats.size} bytes${colors.reset}`)
+      logger.info(`${colors.green}✅ Auto-flush triggered at threshold, CAR file: ${stats.size} bytes${colors.reset}`)
     })
   })
   
@@ -366,7 +366,7 @@ describe('CAR Storage', () => {
     test('should work with ComposedStorage for hybrid storage', async () => {
       // Skip if OrbitDB storage modules not available
       if (!ComposedStorage || !MemoryStorage) {
-        console.log(`${colors.yellow}⚠️ Skipping ComposedStorage test - OrbitDB modules not available${colors.reset}`)
+        logger.info(`${colors.yellow}⚠️ Skipping ComposedStorage test - OrbitDB modules not available${colors.reset}`)
         return
       }
 
@@ -398,7 +398,7 @@ describe('CAR Storage', () => {
       expect(fromComposed).toBeTruthy()
       expect(fromComposed).toEqual(testData)
       
-      console.log(`${colors.green}✅ ComposedStorage integration successful${colors.reset}`)
+      logger.info(`${colors.green}✅ ComposedStorage integration successful${colors.reset}`)
     })
 
     /**
@@ -408,7 +408,7 @@ describe('CAR Storage', () => {
     test('should demonstrate LRU + CAR composition', async () => {
       // Skip if OrbitDB storage modules not available
       if (!ComposedStorage || !LRUStorage) {
-        console.log(`${colors.yellow}⚠️ Skipping LRU+CAR test - OrbitDB modules not available${colors.reset}`)
+        logger.info(`${colors.yellow}⚠️ Skipping LRU+CAR test - OrbitDB modules not available${colors.reset}`)
         return
       }
 
@@ -440,7 +440,7 @@ describe('CAR Storage', () => {
       const value = new TextDecoder().decode(key1FromComposed)
       expect(value).toBe('value1')
       
-      console.log(`${colors.green}✅ LRU + CAR composition with cache eviction successful${colors.reset}`)
+      logger.info(`${colors.green}✅ LRU + CAR composition with cache eviction successful${colors.reset}`)
     })
   })
   
@@ -533,7 +533,7 @@ describe('CAR Storage', () => {
       const carPath = join(testDir, 'clear-test.car')
       await expect(fs.stat(carPath)).rejects.toThrow()
       
-      console.log(`${colors.green}✅ Clear operation removed all data and CAR file${colors.reset}`)
+      logger.info(`${colors.green}✅ Clear operation removed all data and CAR file${colors.reset}`)
     })
 
     /**
@@ -548,7 +548,7 @@ describe('CAR Storage', () => {
 
       // Skip if MemoryStorage not available
       if (!MemoryStorage) {
-        console.log(`${colors.yellow}⚠️ Skipping merge test - MemoryStorage not available${colors.reset}`)
+        logger.info(`${colors.yellow}⚠️ Skipping merge test - MemoryStorage not available${colors.reset}`)
         return
       }
 
@@ -568,7 +568,7 @@ describe('CAR Storage', () => {
       expect(new TextDecoder().decode(value1)).toBe('merge-value1')
       expect(new TextDecoder().decode(value2)).toBe('merge-value2')
       
-      console.log(`${colors.green}✅ Merge operation successful${colors.reset}`)
+      logger.info(`${colors.green}✅ Merge operation successful${colors.reset}`)
     })
 
     /**
@@ -606,7 +606,7 @@ describe('CAR Storage', () => {
 
       expect(reversedKeys).toEqual(allKeys.reverse())
       
-      console.log(`${colors.green}✅ Iterator options (amount: 3, reverse) working correctly${colors.reset}`)
+      logger.info(`${colors.green}✅ Iterator options (amount: 3, reverse) working correctly${colors.reset}`)
     })
   })
   
@@ -663,7 +663,7 @@ describe('CAR Storage', () => {
         expect(recoveredValue).toBe(testData[i])
       }
       
-      console.log(`${colors.green}✅ OrbitDB hash format handling: ${orbitdbHashes.length} hashes persisted and recovered${colors.reset}`)
+      logger.info(`${colors.green}✅ OrbitDB hash format handling: ${orbitdbHashes.length} hashes persisted and recovered${colors.reset}`)
     })
   })
   
@@ -711,9 +711,9 @@ describe('CAR Storage', () => {
 
       expect(iteratedCount).toBe(entryCount)
       
-      console.log(`${colors.green}✅ Performance test completed:${colors.reset}`)
-      console.log(`   📊 ${entryCount} entries: PUT ${putTime}ms, ITERATE ${iterTime}ms, PERSIST ${persistTime}ms`)
-      console.log(`   ⚡ Average: ${(putTime/entryCount).toFixed(2)}ms per PUT operation`)
+      logger.info(`${colors.green}✅ Performance test completed:${colors.reset}`)
+      logger.info(`   📊 ${entryCount} entries: PUT ${putTime}ms, ITERATE ${iterTime}ms, PERSIST ${persistTime}ms`)
+      logger.info(`   ⚡ Average: ${(putTime/entryCount).toFixed(2)}ms per PUT operation`)
       
       // Basic performance expectations (these are quite generous)
       expect(putTime).toBeLessThan(5000) // 5 seconds for 100 puts
@@ -736,7 +736,7 @@ describe('Full OrbitDB Integration with Persistence', () => {
    * @description Setup for OrbitDB integration tests
    */
   beforeAll(async () => {
-    console.log(`${colors.bright}${colors.cyan}🧹 OrbitDB Integration: Initial cleanup...${colors.reset}`)
+    logger.info(`${colors.bright}${colors.cyan}🧹 OrbitDB Integration: Initial cleanup...${colors.reset}`)
     await cleanupAllTestArtifacts()
   })
 
@@ -745,7 +745,7 @@ describe('Full OrbitDB Integration with Persistence', () => {
    * @description Cleanup after OrbitDB integration tests
    */
   afterAll(async () => {
-    console.log(`${colors.bright}${colors.cyan}🧹 OrbitDB Integration: Final cleanup...${colors.reset}`)
+    logger.info(`${colors.bright}${colors.cyan}🧹 OrbitDB Integration: Final cleanup...${colors.reset}`)
     await cleanupAllTestArtifacts()
   })
   
@@ -756,11 +756,11 @@ describe('Full OrbitDB Integration with Persistence', () => {
   test('should persist and recover OrbitDB todos using CAR storage', async () => {
     // Skip if OrbitDB storage modules not available
     if (!ComposedStorage || !MemoryStorage) {
-      console.log(`${colors.yellow}⚠️ Skipping full OrbitDB test - storage modules not available${colors.reset}`)
+      logger.info(`${colors.yellow}⚠️ Skipping full OrbitDB test - storage modules not available${colors.reset}`)
       return
     }
 
-    console.log(`${colors.bright}${colors.cyan}🚀 Starting full OrbitDB + CAR storage integration test...${colors.reset}`)
+    logger.info(`${colors.bright}${colors.cyan}🚀 Starting full OrbitDB + CAR storage integration test...${colors.reset}`)
     
     const dbName = 'todos-test'
     const carStoragePath = testDir
@@ -769,7 +769,7 @@ describe('Full OrbitDB Integration with Persistence', () => {
     
     try {
       // Phase 1: Create OrbitDB with CAR storage for all storage types
-      console.log(`${colors.cyan}📝 Phase 1: Creating OrbitDB with CAR storage...${colors.reset}`)
+      logger.info(`${colors.cyan}📝 Phase 1: Creating OrbitDB with CAR storage...${colors.reset}`)
       
       // Create CAR storage instances for each OrbitDB storage type
       const entryCarStorage1 = await CARStorage({
@@ -819,7 +819,7 @@ describe('Full OrbitDB Integration with Persistence', () => {
         { id: 'todo4', text: 'Deploy to production', completed: false, priority: 'low' }
       ]
       
-      console.log(`${colors.cyan}📝 Adding ${todos.length} todos to OrbitDB...${colors.reset}`)
+      logger.info(`${colors.cyan}📝 Adding ${todos.length} todos to OrbitDB...${colors.reset}`)
       for (const todo of todos) {
         await todosDb1.put(todo.id, todo)
       }
@@ -833,23 +833,23 @@ describe('Full OrbitDB Integration with Persistence', () => {
         retrievedTodos.push(retrieved)
       }
       
-      console.log(`${colors.green}✅ Phase 1: ${retrievedTodos.length} todos added and verified in OrbitDB${colors.reset}`)
+      logger.info(`${colors.green}✅ Phase 1: ${retrievedTodos.length} todos added and verified in OrbitDB${colors.reset}`)
       
       // Force persistence to CAR storage
       await entryCarStorage1.persist()
       await headsCarStorage1.persist()
       await indexCarStorage1.persist()
-      console.log(`${colors.cyan}💾 Phase 1: Data persisted to CAR storage (entries, heads, index)${colors.reset}`)
+      logger.info(`${colors.cyan}💾 Phase 1: Data persisted to CAR storage (entries, heads, index)${colors.reset}`)
       
       // Close first database and OrbitDB instance
       await todosDb1.close()
       await orbitdb1.stop()
       await helia1.stop()
       
-      console.log(`${colors.cyan}🔒 Phase 1: Database and OrbitDB instance closed${colors.reset}`)
+      logger.info(`${colors.cyan}🔒 Phase 1: Database and OrbitDB instance closed${colors.reset}`)
       
       // Phase 2: Create new OrbitDB instance with same CAR storage configuration
-      console.log(`${colors.cyan}🔄 Phase 2: Creating new OrbitDB instance with same CAR storage...${colors.reset}`)
+      logger.info(`${colors.cyan}🔄 Phase 2: Creating new OrbitDB instance with same CAR storage...${colors.reset}`)
       
       // Create new CAR storage instances with same names (should load existing data)
       const entryCarStorage2 = await CARStorage({
@@ -891,7 +891,7 @@ describe('Full OrbitDB Integration with Persistence', () => {
         indexStorage: indexStorage2
       })
       
-      console.log(`${colors.cyan}🔍 Phase 2: Verifying todos recovered from CAR storage...${colors.reset}`)
+      logger.info(`${colors.cyan}🔍 Phase 2: Verifying todos recovered from CAR storage...${colors.reset}`)
       
       // Verify all todos are recovered
       const recoveredTodos = []
@@ -904,7 +904,7 @@ describe('Full OrbitDB Integration with Persistence', () => {
         recoveredTodos.push(recovered)
       }
       
-      console.log(`${colors.green}✅ Phase 2: ${recoveredTodos.length} todos successfully recovered from CAR storage${colors.reset}`)
+      logger.info(`${colors.green}✅ Phase 2: ${recoveredTodos.length} todos successfully recovered from CAR storage${colors.reset}`)
       
       // Test adding new todo to verify database is fully functional
       const newTodo = { id: 'todo5', text: 'Celebrate successful persistence!', completed: false, priority: 'high' }
@@ -914,10 +914,10 @@ describe('Full OrbitDB Integration with Persistence', () => {
       expect(retrievedNewTodo).toBeTruthy()
       expect(retrievedNewTodo.text).toBe(newTodo.text)
       
-      console.log(`${colors.green}✅ Phase 2: New todo added successfully, database fully functional${colors.reset}`)
+      logger.info(`${colors.green}✅ Phase 2: New todo added successfully, database fully functional${colors.reset}`)
       
       // Verify data persistence across all storage layers
-      console.log(`${colors.cyan}🔍 Verifying data in CAR storage layers...${colors.reset}`)
+      logger.info(`${colors.cyan}🔍 Verifying data in CAR storage layers...${colors.reset}`)
       
       // Check that data exists in the CAR storage layers
       let entryCount = 0
@@ -935,33 +935,33 @@ describe('Full OrbitDB Integration with Persistence', () => {
         indexCount++
       }
       
-      console.log(`${colors.green}✅ CAR storage verification: ${entryCount} entries, ${headsCount} heads, ${indexCount} index items${colors.reset}`)
+      logger.info(`${colors.green}✅ CAR storage verification: ${entryCount} entries, ${headsCount} heads, ${indexCount} index items${colors.reset}`)
       
       // Close second database
       await todosDb2.close()
       await orbitdb2.stop()
       await helia2.stop()
       
-      console.log(`${colors.bright}${colors.green}🎉 Full OrbitDB + CAR storage integration test completed successfully!${colors.reset}`)
-      console.log(`${colors.green}   📊 Summary: ${todos.length + 1} todos persisted and recovered across OrbitDB restarts${colors.reset}`)
-      console.log(`${colors.green}   🗃️ Storage layers: entries, heads, and index all persisted to CAR files${colors.reset}`)
+      logger.info(`${colors.bright}${colors.green}🎉 Full OrbitDB + CAR storage integration test completed successfully!${colors.reset}`)
+      logger.info(`${colors.green}   📊 Summary: ${todos.length + 1} todos persisted and recovered across OrbitDB restarts${colors.reset}`)
+      logger.info(`${colors.green}   🗃️ Storage layers: entries, heads, and index all persisted to CAR files${colors.reset}`)
       
     } catch (error) {
-      console.error(`${colors.red}❌ OrbitDB integration test failed: ${error.message}${colors.reset}`)
+      logger.error(`${colors.red}❌ OrbitDB integration test failed: ${error.message}${colors.reset}`)
       throw error
     } finally {
       // Cleanup
       if (orbitdbInstance1) {
-        try { await orbitdbInstance1.stop() } catch (e) { console.warn('Error stopping orbitdb1:', e.message) }
+        try { await orbitdbInstance1.stop() } catch (e) { logger.warn('Error stopping orbitdb1:', e.message) }
       }
       if (orbitdbInstance2) {
-        try { await orbitdbInstance2.stop() } catch (e) { console.warn('Error stopping orbitdb2:', e.message) }
+        try { await orbitdbInstance2.stop() } catch (e) { logger.warn('Error stopping orbitdb2:', e.message) }
       }
       if (heliaInstance1) {
-        try { await heliaInstance1.stop() } catch (e) { console.warn('Error stopping helia1:', e.message) }
+        try { await heliaInstance1.stop() } catch (e) { logger.warn('Error stopping helia1:', e.message) }
       }
       if (heliaInstance2) {
-        try { await heliaInstance2.stop() } catch (e) { console.warn('Error stopping helia2:', e.message) }
+        try { await heliaInstance2.stop() } catch (e) { logger.warn('Error stopping helia2:', e.message) }
       }
       
       // Clean up OrbitDB directories
