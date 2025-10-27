@@ -156,6 +156,34 @@ Full integration component for existing OrbitDB Svelte applications:
 4. **CID Bridging** - Converts between Storacha CIDs (`bafkre*`) and OrbitDB CIDs (`zdpu*`)
 5. **Reconstruct Database** - Reassembles blocks and opens database with original identity
 
+## Logging
+
+The library uses **Pino** for structured, high-performance logging. Control logging with environment variables:
+
+```bash
+# Set log level (trace, debug, info, warn, error, fatal, silent)
+export LOG_LEVEL=debug
+
+# Enable pretty printing for development
+export LOG_PRETTY=true
+```
+
+**Quick example:**
+
+```javascript
+import { logger } from 'orbitdb-storacha-bridge/lib/logger.js';
+
+// Structured logging with context
+logger.info({ blockCount: 150, dbName: 'todos' }, 'Backup completed');
+
+// Control logging programmatically
+import { setLogLevel, disableLogging } from 'orbitdb-storacha-bridge/lib/logger.js';
+setLogLevel('debug');
+disableLogging(); // Silence all logs
+```
+
+📖 **See [docs/LOGGING_QUICKSTART.md](docs/LOGGING_QUICKSTART.md)** for quick reference or **[docs/LOGGING.md](docs/LOGGING.md)** for complete documentation.
+
 ## Testing
 
 Ensure you have Storacha credentials in your `.env` file.

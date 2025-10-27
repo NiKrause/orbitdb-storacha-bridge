@@ -69,6 +69,7 @@
     Checkmark,
     Warning,
   } from "carbon-icons-svelte";
+  import { logger } from "../../../../lib/logger.js";
 
   // Storacha authentication state
   let storachaAuthenticated = false;
@@ -177,7 +178,7 @@ let showProgress = false;
           bridgeOptions.spaceDID = currentSpace.did();
         }
       } catch (error) {
-        console.warn('Could not get current space DID:', error.message);
+        logger.warn('Could not get current space DID:', error.message);
       }
     } else {
       throw new Error(
@@ -189,7 +190,7 @@ let showProgress = false;
     
     // Set up progress event listeners
     bridge.on('uploadProgress', (progress) => {
-      console.log('📤 Upload Progress:', progress);
+      logger.info('📤 Upload Progress:', progress);
       if (progress && typeof progress === 'object') {
         uploadProgress = progress;
         showProgress = true;
@@ -204,12 +205,12 @@ let showProgress = false;
           showProgress = false;
         }
       } else {
-        console.warn('Invalid upload progress data:', progress);
+        logger.warn('Invalid upload progress data:', progress);
       }
     });
     
     bridge.on('downloadProgress', (progress) => {
-      console.log('📥 Download Progress:', progress);
+      logger.info('📥 Download Progress:', progress);
       if (progress && typeof progress === 'object') {
         downloadProgress = progress;
         showProgress = true;
@@ -224,7 +225,7 @@ let showProgress = false;
           showProgress = false;
         }
       } else {
-        console.warn('Invalid download progress data:', progress);
+        logger.warn('Invalid download progress data:', progress);
       }
     });
     
@@ -233,7 +234,7 @@ let showProgress = false;
 
   // Handle Storacha authentication events
   function handleStorachaAuthenticated(event) {
-    console.log("🔐 Storacha authenticated:", event.detail);
+    logger.info("🔐 Storacha authenticated:", event.detail);
     storachaAuthenticated = true;
     storachaClient = event.detail.client;
     storachaCredentials = {
@@ -245,28 +246,28 @@ let showProgress = false;
     // Store credentials for backup/restore operations
     if (event.detail.method === "credentials") {
       // For key/proof authentication, we need to extract the credentials
-      console.log(
+      logger.info(
         "📝 Credentials-based authentication - storing for backup operations",
       );
     } else if (
       event.detail.method === "ucan" ||
       event.detail.method === "seed"
     ) {
-      console.log(
+      logger.info(
         `📝 ${event.detail.method}-based authentication - ready for operations`,
       );
     }
   }
 
   function handleStorachaLogout() {
-    console.log("🚪 Storacha logged out");
+    logger.info("🚪 Storacha logged out");
     storachaAuthenticated = false;
     storachaClient = null;
     storachaCredentials = null;
   }
 
   function handleSpaceChanged(event) {
-    console.log("🔄 Storacha space changed:", event.detail.space);
+    logger.info("🔄 Storacha space changed:", event.detail.space);
     // Update any space-dependent operations
   }
 
@@ -297,7 +298,7 @@ let showProgress = false;
    * Create a reusable OrbitDB identity from seed
    */
   async function createReusableIdentity(persona = "shared") {
-    console.log(`🆔 Creating ${persona} identity...`);
+    logger.info(`🆔 Creating ${persona} identity...`);
 
     // Generate a test seed phrase for consistent identity
     const seedPhrase = generateMnemonic(english);
@@ -322,7 +323,7 @@ let showProgress = false;
       }),
     });
 
-    console.log(`✅ ${persona} identity created: ${identity.id}`);
+    logger.info(`✅ ${persona} identity created: ${identity.id}`);
     return { identity, identities, seedPhrase, masterSeed };
   }
 
@@ -340,7 +341,7 @@ let showProgress = false;
     } else {
       bobResults = [...bobResults, result];
     }
-    console.log(`🧪 ${persona}: ${step} - ${status} - ${message}`, data || "");
+    logger.info(`🧪 ${persona}: ${step} - ${status} - ${message}`, data || "");
   }
 
   function updateLastResult(persona, status, message, data = null) {
@@ -366,20 +367,20 @@ let showProgress = false;
     databaseConfig,
     useSharedIdentity = true,
   ) {
-    console.log(`🔧 Creating OrbitDB instance for ${persona}...`);
+    logger.info(`🔧 Creating OrbitDB instance for ${persona}...`);
 
     // Use minimal libp2p config to avoid relay connections
     const config = DefaultLibp2pBrowserOptions;
 
     // Create libp2p instance
     const libp2p = await createLibp2p(config);
-    console.log("libp2p created");
+    logger.info("libp2p created");
 
     // Create Helia instance with memory storage for tests to avoid persistence conflicts
-    console.log("🗄️ Initializing Helia with memory storage for testing...");
+    logger.info("🗄️ Initializing Helia with memory storage for testing...");
     // Use memory storage to avoid filesystem conflicts and faster cleanup
     const helia = await createHelia({ libp2p });
-    console.log("Helia created with memory storage");
+    logger.info("Helia created with memory storage");
 
     // Create OrbitDB instance with unique ID and memory storage
     const orbitdbConfig = {
@@ -396,22 +397,22 @@ let showProgress = false;
       if (useSharedIdentity && sharedIdentity && sharedIdentities) {
         orbitdbConfig.identity = sharedIdentity;
         orbitdbConfig.identities = sharedIdentities;
-        console.log(
+        logger.info(
           `🔗 Bob using Alice's shared identity: ${sharedIdentity.id}`,
         );
       } else if (bobIdentity && bobIdentities) {
         orbitdbConfig.identity = bobIdentity;
         orbitdbConfig.identities = bobIdentities;
-        console.log(`🆔 Bob using his own identity: ${bobIdentity.id}`);
+        logger.info(`🆔 Bob using his own identity: ${bobIdentity.id}`);
       }
     }
 
     const orbitdb = await createOrbitDB(orbitdbConfig);
-    console.log("orbitdb", orbitdb);
+    logger.info("orbitdb", orbitdb);
 
     // Create database with access controller (like working integration test)
     const database = await orbitdb.open(databaseName, databaseConfig);
-    console.log("database", database);
+    logger.info("database", database);
 
     // Set up event listeners for this database
     setupDatabaseEventListeners(database, persona);
@@ -423,8 +424,8 @@ let showProgress = false;
   function setupDatabaseEventListeners(database, persona) {
     if (!database) return;
 
-    console.log(`🎧 Setting up event listeners for ${persona}'s database...`);
-    console.log(`🎯 [StorachaTest] Database address: ${database.address}`);
+    logger.info(`🎧 Setting up event listeners for ${persona}'s database...`);
+    logger.info(`🎯 [StorachaTest] Database address: ${database.address}`);
 
     // Add this database address to our tracking set
     storachaTestDatabaseAddresses.add(
@@ -437,7 +438,7 @@ let showProgress = false;
       const eventAddress = address?.toString() || address;
 
       if (storachaTestDatabaseAddresses.has(eventAddress)) {
-        console.log(`🔗 [StorachaTest-${persona}] JOIN EVENT:`, {
+        logger.info(`🔗 [StorachaTest-${persona}] JOIN EVENT:`, {
           address: eventAddress,
           entry: {
             hash: entry?.hash?.toString() || entry?.hash,
@@ -486,7 +487,7 @@ let showProgress = false;
       const eventAddress = address?.toString() || address;
 
       if (storachaTestDatabaseAddresses.has(eventAddress)) {
-        console.log(`🔄 [StorachaTest-${persona}] UPDATE EVENT:`, {
+        logger.info(`🔄 [StorachaTest-${persona}] UPDATE EVENT:`, {
           address: eventAddress,
           entry: {
             hash: entry?.hash?.toString() || entry?.hash,
@@ -529,18 +530,18 @@ let showProgress = false;
       }
     });
 
-    console.log(
+    logger.info(
       `✅ [StorachaTest] Event listeners set up for database instance ${persona}`,
     );
   }
 
   async function clearIndexedDB() {
-    console.log("🗑️ Clearing IndexedDB...");
+    logger.info("🗑️ Clearing IndexedDB...");
 
     // Get all IndexedDB databases
     if ("databases" in indexedDB) {
       const databases = await indexedDB.databases();
-      console.log(
+      logger.info(
         "📋 Found databases:",
         databases.map((db) => db.name),
       );
@@ -559,7 +560,7 @@ let showProgress = false;
 
       for (const db of dbsToDelete) {
         try {
-          console.log(`🗑️ Deleting database: ${db.name}`);
+          logger.info(`🗑️ Deleting database: ${db.name}`);
 
           // Add timeout to prevent hanging
           await Promise.race([
@@ -568,7 +569,7 @@ let showProgress = false;
               deleteReq.onsuccess = () => resolve();
               deleteReq.onerror = () => reject(deleteReq.error);
               deleteReq.onblocked = () => {
-                console.warn(`⚠️ Database deletion blocked for: ${db.name}`);
+                logger.warn(`⚠️ Database deletion blocked for: ${db.name}`);
                 // Don't reject immediately, give it more time
               };
             }),
@@ -577,18 +578,18 @@ let showProgress = false;
             ),
           ]);
 
-          console.log(`✅ Deleted database: ${db.name}`);
+          logger.info(`✅ Deleted database: ${db.name}`);
         } catch (error) {
           if (error.message === "Timeout") {
-            console.warn(`⏱️ Timeout deleting database ${db.name} - skipping`);
+            logger.warn(`⏱️ Timeout deleting database ${db.name} - skipping`);
           } else {
-            console.warn(`⚠️ Failed to delete database ${db.name}:`, error);
+            logger.warn(`⚠️ Failed to delete database ${db.name}:`, error);
           }
         }
       }
     }
 
-    console.log("🧹 IndexedDB cleanup completed");
+    logger.info("🧹 IndexedDB cleanup completed");
   }
 
   // Alice's functions
@@ -665,7 +666,7 @@ let showProgress = false;
 
       aliceStep = "Alice ready to add todos";
     } catch (error) {
-      console.error("❌ Alice initialization failed:", error);
+      logger.error("❌ Alice initialization failed:", error);
       aliceError = error.message;
       aliceStep = `Alice initialization failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -691,7 +692,7 @@ let showProgress = false;
       for (let i = 0; i < originalTodos.length; i++) {
         const todo = originalTodos[i];
         await aliceDatabase.put(todo.id, todo);
-        console.log(`✅ Alice added todo ${i + 1}:`, todo);
+        logger.info(`✅ Alice added todo ${i + 1}:`, todo);
       }
 
       // Get all todos to verify and display
@@ -712,7 +713,7 @@ let showProgress = false;
 
       aliceStep = "Alice ready to backup";
     } catch (error) {
-      console.error("❌ Adding todos failed:", error);
+      logger.error("❌ Adding todos failed:", error);
       aliceError = error.message;
       aliceStep = `Adding todos failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -779,7 +780,7 @@ let showProgress = false;
 
       aliceStep = "Alice backup complete - Bob can now restore";
     } catch (error) {
-      console.error("❌ Backup failed:", error);
+      logger.error("❌ Backup failed:", error);
       aliceError = error.message;
       aliceStep = `Backup failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -880,7 +881,7 @@ let showProgress = false;
 
       bobStep = "Bob ready to restore";
     } catch (error) {
-      console.error("❌ Bob initialization failed:", error);
+      logger.error("❌ Bob initialization failed:", error);
       bobError = error.message;
       bobStep = `Bob initialization failed: ${error.message}`;
       updateLastResult("bob", "error", error.message);
@@ -979,7 +980,7 @@ let showProgress = false;
 
       bobStep = "Bob restore complete";
     } catch (error) {
-      console.error("❌ Restore failed:", error);
+      logger.error("❌ Restore failed:", error);
       bobError = error.message;
       bobStep = `Restore failed: ${error.message}`;
       updateLastResult("bob", "error", error.message);
@@ -990,7 +991,7 @@ let showProgress = false;
 
   // Cleanup functions
   async function cleanup() {
-    console.log("🧹 Cleaning up all instances...");
+    logger.info("🧹 Cleaning up all instances...");
 
     // Cleanup Alice
     try {
@@ -999,7 +1000,7 @@ let showProgress = false;
       if (aliceHelia) await aliceHelia.stop();
       if (aliceLibp2p) await aliceLibp2p.stop();
     } catch (error) {
-      console.warn("⚠️ Alice cleanup error:", error.message);
+      logger.warn("⚠️ Alice cleanup error:", error.message);
     }
 
     // Cleanup Bob
@@ -1009,7 +1010,7 @@ let showProgress = false;
       if (bobHelia) await bobHelia.stop();
       if (bobLibp2p) await bobLibp2p.stop();
     } catch (error) {
-      console.warn("⚠️ Bob cleanup error:", error.message);
+      logger.warn("⚠️ Bob cleanup error:", error.message);
     }
 
     await clearIndexedDB();

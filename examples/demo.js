@@ -110,28 +110,28 @@ async function testOrbitDBStorachaBridge() {
     }
     
     // Test identity separation
-    console.log('\n🔐 Testing identity separation...')
+    logger.info('\n🔐 Testing identity separation...')
     
     // Get Alice's identity from the log entries (not from the entries array)
     const logEntries = await restoreResult.database.log.values()
     const firstLogEntry = logEntries[0]
-    console.log('   Alice\'s identity (from restored log):', firstLogEntry.identity)
+    logger.info({ aliceIdentity: firstLogEntry.identity }, '   Alice\'s identity (from restored log)')
     
     // Get Bob's current OrbitDB identity
     const bobIdentity = targetNode.orbitdb.identity.id
-    console.log('   Bob\'s identity (current OrbitDB):', bobIdentity)
-    console.log('   📊 Identities match:', firstLogEntry.identity === bobIdentity ? '❌ Same (unexpected)' : '✅ Different (expected)')
+    logger.info({ bobIdentity }, '   Bob\'s identity (current OrbitDB)')
+    logger.info({ match: firstLogEntry.identity === bobIdentity }, '   📊 Identities match: ' + (firstLogEntry.identity === bobIdentity ? '❌ Same (unexpected)' : '✅ Different (expected)'))
     
     // Try to add a new entry as Bob (this will fail due to access control)
-    console.log('\n🔒 Testing access control...')
-    console.log('   Bob attempts to write to Alice\'s database...')
+    logger.info('\n🔒 Testing access control...')
+    logger.info('   Bob attempts to write to Alice\'s database...')
     try {
       const bobEntry = await restoreResult.database.add('New entry from Bob')
-      console.log('   ❌ UNEXPECTED: Bob was able to write! Entry hash:', bobEntry.substring(0, 16) + '...')
+      logger.warn({ entryHash: bobEntry.substring(0, 16) }, '   ❌ UNEXPECTED: Bob was able to write!')
     } catch (error) {
-      console.log('   ✅ EXPECTED: Access control working!')
-      console.log('   📝 Error:', error.message)
-      console.log('   🎯 This confirms Bob has a different identity and cannot write to Alice\'s database')
+      logger.info('   ✅ EXPECTED: Access control working!')
+      logger.info({ error: error.message }, '   📝 Error')
+      logger.info('   🎯 This confirms Bob has a different identity and cannot write to Alice\'s database')
     }
     
     const originalCount = sampleData.length

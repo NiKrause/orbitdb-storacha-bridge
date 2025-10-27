@@ -17,13 +17,14 @@ import * as ed25519 from "@ucanto/principal/ed25519";
 import { generateMnemonic, mnemonicToSeedSync } from "@scure/bip39";
 import { wordlist as english } from "@scure/bip39/wordlists/english";
 import { createHash } from "crypto";
+import { logger } from "../../../../../lib/logger.js";
 
 /**
  * Initialize Storacha client with key/proof credentials
  */
 export async function initializeStorachaClient(storachaKey, storachaProof) {
   try {
-    console.log("🔐 Initializing Storacha client with credentials...");
+    logger.info("🔐 Initializing Storacha client with credentials...");
 
     const principal = Signer.parse(storachaKey);
     const store = new StoreMemory();
@@ -33,10 +34,10 @@ export async function initializeStorachaClient(storachaKey, storachaProof) {
     const space = await client.addSpace(proof);
     await client.setCurrentSpace(space.did());
 
-    console.log(`✅ Storacha client initialized with space: ${space.did()}`);
+    logger.info(`✅ Storacha client initialized with space: ${space.did()}`);
     return client;
   } catch (error) {
-    console.error("❌ Failed to initialize Storacha client:", error);
+    logger.error("❌ Failed to initialize Storacha client:", error);
     throw error;
   }
 }
@@ -49,7 +50,7 @@ export async function initializeStorachaClientWithUCAN(
   recipientKey,
 ) {
   try {
-    console.log("🔐 Initializing Storacha client with UCAN...");
+    logger.info("🔐 Initializing Storacha client with UCAN...");
 
     // Parse recipient identity from JSON archive
     const recipientKeyData = JSON.parse(recipientKey);
@@ -81,12 +82,12 @@ export async function initializeStorachaClientWithUCAN(
     const space = await client.addSpace(delegation.ok);
     await client.setCurrentSpace(space.did());
 
-    console.log(
+    logger.info(
       `✅ Storacha client initialized with UCAN space: ${space.did()}`,
     );
     return client;
   } catch (error) {
-    console.error("❌ Failed to initialize Storacha client with UCAN:", error);
+    logger.error("❌ Failed to initialize Storacha client with UCAN:", error);
     throw error;
   }
 }
@@ -123,7 +124,7 @@ export async function createStorachaIdentityFromSeed(
   derivationIndex = 1,
 ) {
   try {
-    console.log("🌱 Creating Storacha identity from seed phrase...");
+    logger.info("🌱 Creating Storacha identity from seed phrase...");
 
     const masterSeed = generateMasterSeed(seedPhrase, password);
     const seed32 = convertTo32BitSeed(masterSeed);
@@ -136,7 +137,7 @@ export async function createStorachaIdentityFromSeed(
     const principal = await ed25519.derive(derivedSeed);
     const signer = Signer.from(principal.toArchive());
 
-    console.log(`✅ Storacha identity created: ${signer.did()}`);
+    logger.info(`✅ Storacha identity created: ${signer.did()}`);
     return {
       principal: signer,
       did: signer.did(),
@@ -145,7 +146,7 @@ export async function createStorachaIdentityFromSeed(
       masterSeed,
     };
   } catch (error) {
-    console.error("❌ Failed to create Storacha identity from seed:", error);
+    logger.error("❌ Failed to create Storacha identity from seed:", error);
     throw error;
   }
 }
@@ -159,7 +160,7 @@ export async function initializeStorachaClientWithSeed(
   delegationToken = null,
 ) {
   try {
-    console.log("🌱 Initializing Storacha client with seed phrase...");
+    logger.info("🌱 Initializing Storacha client with seed phrase...");
 
     const identity = await createStorachaIdentityFromSeed(seedPhrase, password);
     const store = new StoreMemory();
@@ -180,19 +181,19 @@ export async function initializeStorachaClientWithSeed(
       const space = await client.addSpace(delegation.ok);
       await client.setCurrentSpace(space.did());
 
-      console.log(
+      logger.info(
         `✅ Storacha client initialized with seed + delegation: ${space.did()}`,
       );
     } else {
-      console.log(
+      logger.info(
         `✅ Storacha client initialized with seed identity: ${identity.did}`,
       );
-      console.log("⚠️ No delegation provided - limited functionality");
+      logger.info("⚠️ No delegation provided - limited functionality");
     }
 
     return { client, identity };
   } catch (error) {
-    console.error("❌ Failed to initialize Storacha client with seed:", error);
+    logger.error("❌ Failed to initialize Storacha client with seed:", error);
     throw error;
   }
 }
@@ -202,7 +203,7 @@ export async function initializeStorachaClientWithSeed(
  */
 export async function createStorachaAccount(email) {
   try {
-    console.log(`📧 Creating Storacha account for: ${email}`);
+    logger.info(`📧 Creating Storacha account for: ${email}`);
 
     // This is a placeholder - in reality, this would integrate with w3 CLI
     // or require the user to manually create an account
@@ -213,7 +214,7 @@ export async function createStorachaAccount(email) {
       error: "Manual setup required",
     };
   } catch (error) {
-    console.error("❌ Failed to create Storacha account:", error);
+    logger.error("❌ Failed to create Storacha account:", error);
     return {
       success: false,
       error: error.message,
@@ -226,7 +227,7 @@ export async function createStorachaAccount(email) {
  */
 export async function listSpaces(client) {
   try {
-    console.log("📋 Listing Storacha spaces...");
+    logger.info("📋 Listing Storacha spaces...");
 
     const spaces = [];
 
@@ -257,13 +258,13 @@ export async function listSpaces(client) {
         }
       }
     } catch (accountError) {
-      console.warn("⚠️ Could not list account spaces:", accountError.message);
+      logger.warn("⚠️ Could not list account spaces:", accountError.message);
     }
 
-    console.log(`✅ Found ${spaces.length} spaces`);
+    logger.info(`✅ Found ${spaces.length} spaces`);
     return spaces;
   } catch (error) {
-    console.error("❌ Failed to list spaces:", error);
+    logger.error("❌ Failed to list spaces:", error);
     throw error;
   }
 }
@@ -273,7 +274,7 @@ export async function listSpaces(client) {
  */
 export async function createSpace(client, spaceName) {
   try {
-    console.log(`🆕 Creating space: ${spaceName}`);
+    logger.info(`🆕 Creating space: ${spaceName}`);
 
     // This requires account-based authentication
     const accounts = client.accounts();
@@ -286,7 +287,7 @@ export async function createSpace(client, spaceName) {
     const account = accounts[0];
     const space = await account.createSpace(spaceName);
 
-    console.log(`✅ Space created: ${space.did()}`);
+    logger.info(`✅ Space created: ${space.did()}`);
     return {
       success: true,
       space: {
@@ -295,7 +296,7 @@ export async function createSpace(client, spaceName) {
       },
     };
   } catch (error) {
-    console.error("❌ Failed to create space:", error);
+    logger.error("❌ Failed to create space:", error);
     return {
       success: false,
       error: error.message,

@@ -68,6 +68,7 @@
     Checkmark,
     Warning,
   } from "carbon-icons-svelte";
+  import { logger } from "../../../lib/logger.js";
 
   // Storacha authentication state
   let storachaAuthenticated = false;
@@ -180,7 +181,7 @@
     try {
       webAuthnStatus = await identityService.initializeWebAuthnSupport();
     } catch (error) {
-      console.error("WebAuthn support check failed:", error);
+      logger.error({ error: error.message, stack: error.stack }, "WebAuthn support check failed:");
       webAuthnStatus = {
         supported: false,
         platformAvailable: false,
@@ -248,7 +249,7 @@
           bridgeOptions.spaceDID = currentSpace.did();
         }
       } catch (error) {
-        console.warn("Could not get current space DID:", error.message);
+        logger.warn({ error: error.message }, "Could not get current space DID:");
       }
     } else {
       throw new Error(
@@ -260,7 +261,7 @@
 
     // Set up progress event listeners
     bridge.on("uploadProgress", (progress) => {
-      console.log("📤 Upload Progress:", progress);
+      logger.info({ progress }, "📤 Upload Progress:");
       if (progress && typeof progress === "object") {
         uploadProgress = progress;
         showProgress = true;
@@ -275,12 +276,12 @@
           showProgress = false;
         }
       } else {
-        console.warn("Invalid upload progress data:", progress);
+        logger.warn({ progress }, "Invalid upload progress data:");
       }
     });
 
     bridge.on("downloadProgress", (progress) => {
-      console.log("📥 Download Progress:", progress);
+      logger.info({ progress }, "📥 Download Progress:");
       if (progress && typeof progress === "object") {
         downloadProgress = progress;
         showProgress = true;
@@ -295,7 +296,7 @@
           showProgress = false;
         }
       } else {
-        console.warn("Invalid download progress data:", progress);
+        logger.warn({ progress }, "Invalid download progress data:");
       }
     });
 
@@ -304,7 +305,7 @@
 
   // Handle Storacha authentication events
   function handleStorachaAuthenticated(event) {
-    console.log("🔐 Storacha authenticated:", event.detail);
+    logger.info({ detail: event.detail }, "🔐 Storacha authenticated:");
     storachaAuthenticated = true;
     storachaClient = event.detail.client;
     storachaCredentials = {
@@ -316,28 +317,29 @@
     // Store credentials for backup/restore operations
     if (event.detail.method === "credentials") {
       // For key/proof authentication, we need to extract the credentials
-      console.log(
-        "📝 Credentials-based authentication - storing for backup operations",
+      logger.info(
+        "📝 Credentials-based authentication - storing for backup operations"
       );
     } else if (
       event.detail.method === "ucan" ||
       event.detail.method === "seed"
     ) {
-      console.log(
-        `📝 ${event.detail.method}-based authentication - ready for operations`,
+      logger.info(
+        { method: event.detail.method },
+        `📝 ${event.detail.method}-based authentication - ready for operations`
       );
     }
   }
 
   function handleStorachaLogout() {
-    console.log("🚪 Storacha logged out");
+    logger.info("🚪 Storacha logged out");
     storachaAuthenticated = false;
     storachaClient = null;
     storachaCredentials = null;
   }
 
   function handleSpaceChanged(event) {
-    console.log("🔄 Storacha space changed:", event.detail.space);
+    logger.info({ space: event.detail.space }, "🔄 Storacha space changed:");
     // Update any space-dependent operations
   }
 
@@ -357,7 +359,7 @@
     } else {
       bobResults = [...bobResults, result];
     }
-    console.log(`🧪 ${persona}: ${step} - ${status} - ${message}`, data || "");
+    logger.info({ persona, step, status, message, data }, `🧪 ${persona}: ${step} - ${status} - ${message}`);
   }
 
   function updateLastResult(persona, status, message, data = null) {
@@ -384,7 +386,7 @@
       data: event.data,
     };
     replicationEvents = [...replicationEvents, replicationEvent].slice(-20); // Keep last 20 events
-    console.log("🔄 Replication Event:", replicationEvent);
+    logger.info({ replicationEvent }, "🔄 Replication Event:");
   }
 
   // OrbitDB instance creation now handled by OrbitDBService
@@ -414,14 +416,14 @@
   // Database event listeners now handled by OrbitDBService
 
   async function clearIndexedDB() {
-    console.log("🗑️ Clearing IndexedDB...");
+    logger.info("🗑️ Clearing IndexedDB...");
 
     // Get all IndexedDB databases
     if ("databases" in indexedDB) {
       const databases = await indexedDB.databases();
-      console.log(
-        "📋 Found databases:",
-        databases.map((db) => db.name),
+      logger.info(
+        { databases: databases.map((db) => db.name) },
+        "📋 Found databases:"
       );
 
       // Delete databases that look like OrbitDB/Helia related
@@ -438,7 +440,7 @@
 
       for (const db of dbsToDelete) {
         try {
-          console.log(`🗑️ Deleting database: ${db.name}`);
+          logger.info({ databaseName: db.name }, `🗑️ Deleting database: ${db.name}`);
 
           // Add timeout to prevent hanging
           await Promise.race([
@@ -447,7 +449,7 @@
               deleteReq.onsuccess = () => resolve();
               deleteReq.onerror = () => reject(deleteReq.error);
               deleteReq.onblocked = () => {
-                console.warn(`⚠️ Database deletion blocked for: ${db.name}`);
+                logger.warn({ databaseName: db.name }, `⚠️ Database deletion blocked for: ${db.name}`);
                 // Don't reject immediately, give it more time
               };
             }),
@@ -456,18 +458,18 @@
             ),
           ]);
 
-          console.log(`✅ Deleted database: ${db.name}`);
+          logger.info({ databaseName: db.name }, `✅ Deleted database: ${db.name}`);
         } catch (error) {
           if (error.message === "Timeout") {
-            console.warn(`⏱️ Timeout deleting database ${db.name} - skipping`);
+            logger.warn({ databaseName: db.name }, `⏱️ Timeout deleting database ${db.name} - skipping`);
           } else {
-            console.warn(`⚠️ Failed to delete database ${db.name}:`, error);
+            logger.warn({ databaseName: db.name, error: error.message }, `⚠️ Failed to delete database ${db.name}:`);
           }
         }
       }
     }
 
-    console.log("🧹 IndexedDB cleanup completed");
+    logger.info("🧹 IndexedDB cleanup completed");
   }
 
   // Alice's functions
@@ -528,22 +530,21 @@
       );
 
       // 🔐 UCAN ACCESS CONTROLLER CONFIGURATION
-      console.log("\n🔐 Configuring UCAN Access Controller for Alice:");
-      console.log("   🆔 Alice Identity ID:", sharedIdentity.id);
-      console.log("   🏷️ Identity Type:", sharedIdentity.type);
-      console.log(
-        "   🔑 Identity Key (for access):",
-        sharedIdentity.key?.slice(0, 32) + "..." || "NO KEY",
-      );
+      logger.info("\n🔐 Configuring UCAN Access Controller for Alice:");
+      logger.info({ identityId: sharedIdentity.id }, "   🆔 Alice Identity ID:");
+      logger.info({ identityType: sharedIdentity.type }, "   🏷️ Identity Type:");
+      logger.info({ 
+        identityKey: sharedIdentity.key?.slice(0, 32) + "..." || "NO KEY"
+      }, "   🔑 Identity Key (for access):");
 
       const writePermissions = [sharedIdentity.id];
-      console.log("   ✍️ Initial Write Permissions:", writePermissions);
-      console.log("   🔒 Access Control Type: UCAN");
+      logger.info({ writePermissions }, "   ✍️ Initial Write Permissions:");
+      logger.info("   🔒 Access Control Type: UCAN");
 
       // Register the UCAN access controller for full delegation support
-      console.log("   📋 Registering UCAN access controller with OrbitDB...");
+      logger.info("   📋 Registering UCAN access controller with OrbitDB...");
       useAccessController(UCANOrbitDBAccessController);
-      console.log("   ✅ UCAN access controller registered");
+      logger.info("   ✅ UCAN access controller registered");
 
       const databaseConfig = {
         type: "keyvalue",
@@ -557,39 +558,35 @@
         }),
       };
 
-      console.log("   ⚙️ Final Database Config:", {
-        type: databaseConfig.type,
-        accessControllerType: "UCAN",
+      logger.info({
+        databaseName: databaseConfig.name,
+        databaseType: databaseConfig.type,
+        accessController: databaseConfig.AccessController?.type || 'default',
         writePermissions: writePermissions,
-        hasAccessController: !!databaseConfig.AccessController,
-        accessControllerType: typeof databaseConfig.AccessController,
-      });
+        identityId: sharedIdentity.id,
+        identityType: sharedIdentity.type
+      }, "   ⚙️ Final Database Config:");
 
       // DEBUG: Test the access controller function directly before using it
-      console.log("   🧪 Testing UCAN access controller function directly...");
+      logger.info("   🧪 Testing UCAN access controller function directly...");
       try {
         const testAccessController = UCANOrbitDBAccessController({
           write: writePermissions,
           storachaClient: storachaClient,
         });
-        console.log(
-          "   ✅ UCAN access controller function created successfully:",
-          {
-            type: typeof testAccessController,
-            hasCanAppend: typeof testAccessController.canAppend,
-            hasGrant: typeof testAccessController.grant,
-            hasType: !!testAccessController.type,
-          },
+        logger.info(
+          { canAppend: testAccessController.canAppend },
+          "   ✅ UCAN access controller function test passed - canAppend returned:"
         );
       } catch (acError) {
-        console.error("   ❌ UCAN access controller function failed:", acError);
+        logger.error({ error: acError.message }, "   ❌ UCAN access controller function failed:");
         throw new Error(
           `UCAN access controller creation failed: ${acError.message}`,
         );
       }
 
-      console.log(
-        "   🚀 Creating OrbitDB instance with UCAN access controller...",
+      logger.info(
+        "   📝 Creating OrbitDB instance with UCAN access controller..."
       );
       let instance;
       try {
@@ -600,9 +597,9 @@
           databaseConfig,
           true, // Open database immediately
         );
-        console.log("   ✅ OrbitDB instance created successfully");
+        logger.info("   ✅ OrbitDB instance created successfully");
       } catch (dbError) {
-        console.error("   ❌ OrbitDB instance creation failed:", dbError);
+        logger.error({ error: dbError.message }, "   ❌ OrbitDB instance creation failed:");
         throw dbError;
       }
       // Get instances from OrbitDB service
@@ -616,22 +613,15 @@
       aliceUCANAccessController = aliceDatabase.access;
 
       // Debug: Check what's actually in the access controller
-      console.log("\n🔍 Debug: Checking database access controller:");
-      console.log("   📊 Type:", typeof aliceUCANAccessController);
-      console.log("   🏷️ Access type:", aliceUCANAccessController?.type);
-      console.log(
-        "   📋 Available properties:",
-        Object.keys(aliceUCANAccessController || {}),
-      );
-      console.log("   🔧 Has grant?", typeof aliceUCANAccessController?.grant);
-      console.log(
-        "   🔧 Has revoke?",
-        typeof aliceUCANAccessController?.revoke,
-      );
-      console.log(
-        "   🔧 Has canAppend?",
-        typeof aliceUCANAccessController?.canAppend,
-      );
+      logger.info("\n🔍 Debug: Checking database access controller:");
+      logger.info({ controllerType: typeof aliceUCANAccessController }, "   📊 Type:");
+      logger.info({ accessType: aliceUCANAccessController?.type }, "   🏷️ Access type:");
+      logger.info({ 
+        availableProperties: Object.keys(aliceUCANAccessController || {})
+      }, "   📋 Available properties:");
+      logger.info({ hasGrant: typeof aliceUCANAccessController?.grant }, "   🔧 Has grant?");
+      logger.info({ hasRevoke: typeof aliceUCANAccessController?.revoke }, "   🔧 Has revoke?");
+      logger.info({ hasCanAppend: typeof aliceUCANAccessController?.canAppend }, "   🔧 Has canAppend?");
 
       updateLastResult("alice", "success", `Alice's OrbitDB instance ready`, {
         orbitDBId: aliceOrbitDB.id,
@@ -642,7 +632,7 @@
 
       aliceStep = "Alice ready to add todos";
     } catch (error) {
-      console.error("❌ Alice initialization failed:", error);
+      logger.error({ error: error.message, stack: error.stack }, "❌ Alice initialization failed:");
       aliceError = error.message;
       aliceStep = `Alice initialization failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -667,7 +657,7 @@
 
       // First, create Bob's identity so we can assign todos to his actual DID
       if (!bobIdentity) {
-        console.log("\n🆔 Creating Bob's identity for todo assignment...");
+        logger.info("\n🆔 Creating Bob's identity for todo assignment...");
         let bobIdentityResult;
         bobIdentityResult = await identityService.createIdentity(
           identityMethod,
@@ -675,7 +665,7 @@
         );
         bobIdentity = bobIdentityResult.identity;
         bobIdentities = bobIdentityResult.identities;
-        console.log(`   ✅ Bob\'s identity created: ${bobIdentity.id}`);
+        logger.info({ identityId: bobIdentity.id }, `   ✅ Bob's identity created: ${bobIdentity.id}`);
       }
 
       for (let i = 0; i < originalTodos.length; i++) {
@@ -684,55 +674,42 @@
         // Update assignee field with Bob's actual DID if it was assigned to "bob"
         if (todo.assignee === "bob") {
           todo.assignee = bobIdentity.id;
-          console.log(
-            `   🎯 Updated todo "${todo.text}" assignee to Bob's DID: ${bobIdentity.id}`,
-          );
+          logger.info({ 
+            todoText: todo.text,
+            assigneeDID: bobIdentity.id
+          }, `   🎯 Updated todo "${todo.text}" assignee to Bob's DID: ${bobIdentity.id}`);
         }
 
-        console.log(`📝 Adding todo ${i + 1}: ${todo.text}`);
+        logger.info({ todoIndex: i + 1, todoText: todo.text }, `📝 Adding todo ${i + 1}: ${todo.text}`);
 
         const hash = await aliceDatabase.put(todo.id, todo);
 
-        console.log(
-          `✅ Todo ${i + 1} added with hash: ${hash.slice(0, 16)}...`,
-        );
+        logger.info({ todoIndex: i + 1, hashPrefix: hash.slice(0, 16) }, `✅ Todo ${i + 1} added with hash: ${hash.slice(0, 16)}...`);
 
         // 🔍 DETAILED WEBAUTHN SIGNATURE VERIFICATION
         const entry = await aliceDatabase.log.get(hash);
         if (entry) {
-          console.log(
-            `\n🔐 =============== TODO ${i + 1} SIGNATURE ANALYSIS ===============`,
-          );
-          console.log("📄 Entry Hash:", hash);
-          console.log("🆔 Entry Identity:", entry.identity);
-          console.log(
-            "🔑 Expected Identity (WebAuthn):",
-            aliceOrbitDB.identity.id,
-          );
-          console.log("🔑 Expected Identity Hash:", aliceOrbitDB.identity.hash);
+          logger.info({ todoIndex: i + 1 }, `\n🔐 =============== TODO ${i + 1} SIGNATURE ANALYSIS ===============`);
+          logger.info({ entryHash: hash }, "📄 Entry Hash:");
+          logger.info({ entryIdentity: entry.identity }, "🆔 Entry Identity:");
+          logger.info({ expectedIdentity: aliceOrbitDB.identity.id }, "🔑 Expected Identity (WebAuthn):");
+          logger.info({ expectedIdentityHash: aliceOrbitDB.identity.hash }, "🔑 Expected Identity Hash:");
 
           // Check both DID and hash matches (OrbitDB may convert DID to hash for oplog)
           const didMatch = entry.identity === aliceOrbitDB.identity.id;
           const hashMatch = entry.identity === aliceOrbitDB.identity.hash;
           const isMatch = didMatch || hashMatch;
 
-          console.log("✅ Identity Match:", isMatch ? "✅ YES" : "❌ NO");
-          console.log("   📊 DID Match:", didMatch ? "✅ YES" : "❌ NO");
-          console.log("   📊 Hash Match:", hashMatch ? "✅ YES" : "❌ NO");
+          logger.info({ isMatch: isMatch }, "✅ Identity Match:");
+          logger.info({ didMatch: didMatch }, "   📊 DID Match:");
+          logger.info({ hashMatch: hashMatch }, "   📊 Hash Match:");
 
           // Signature Analysis
           if (entry.sig) {
-            console.log("🔐 Signature Present: ✅ YES");
-            console.log(
-              "   📏 Signature Length:",
-              entry.sig.length,
-              "characters",
-            );
-            console.log(
-              "   🔤 Signature Preview:",
-              entry.sig.slice(0, 64) + "...",
-            );
-            console.log("   🔍 Signature Type: WebAuthn (base64url encoded)");
+            logger.info("🔐 Signature Present: ✅ YES");
+            logger.info({ signatureLength: entry.sig.length }, "   📏 Signature Length: characters");
+            logger.info({ signaturePreview: entry.sig.slice(0, 64) + "..." }, "   🔤 Signature Preview:");
+            logger.info("   🔍 Signature Type: WebAuthn (base64url encoded)");
 
             // Try to decode and analyze the WebAuthn proof
             try {
@@ -745,24 +722,24 @@
               const proofText = new TextDecoder().decode(proofBytes);
               const webauthnProof = JSON.parse(proofText);
 
-              console.log("   🧪 WebAuthn Proof Structure:");
-              console.log(
+              logger.info("   🧪 WebAuthn Proof Structure:");
+              logger.info(
                 "      🆔 Credential ID:",
                 webauthnProof.credentialId?.slice(0, 16) + "..." || "MISSING",
               );
-              console.log(
+              logger.info(
                 "      📊 Data Hash:",
                 webauthnProof.dataHash?.slice(0, 16) + "..." || "MISSING",
               );
-              console.log(
+              logger.info(
                 "      🔐 Auth Data:",
                 webauthnProof.authenticatorData ? "PRESENT" : "MISSING",
               );
-              console.log(
+              logger.info(
                 "      📱 Client Data:",
                 webauthnProof.clientDataJSON ? "PRESENT" : "MISSING",
               );
-              console.log(
+              logger.info(
                 "      ⏰ Timestamp:",
                 webauthnProof.timestamp
                   ? new Date(webauthnProof.timestamp).toISOString()
@@ -777,62 +754,62 @@
                 const credentialMatch =
                   webauthnProof.credentialId ===
                   sharedWebAuthnCredential.credentialId;
-                console.log(
+                logger.info(
                   "      🔗 Credential Match:",
                   credentialMatch ? "✅ YES" : "❌ NO",
                 );
                 if (!credentialMatch) {
-                  console.log(
+                  logger.info(
                     "         Expected:",
                     sharedWebAuthnCredential.credentialId?.slice(0, 16) + "...",
                   );
-                  console.log(
+                  logger.info(
                     "         Got:",
                     webauthnProof.credentialId?.slice(0, 16) + "...",
                   );
                 }
               }
 
-              console.log(
+              logger.info(
                 "   ✅ WebAuthn Proof Successfully Decoded and Analyzed!",
               );
             } catch (decodeError) {
-              console.log(
+              logger.info(
                 "   ⚠️ Could not decode WebAuthn proof:",
                 decodeError.message,
               );
-              console.log("   📄 Raw signature might not be WebAuthn format");
+              logger.info("   📄 Raw signature might not be WebAuthn format");
             }
           } else {
-            console.log(
+            logger.info(
               "🔐 Signature Present: ❌ NO - This entry is NOT SIGNED!",
             );
-            console.log(
+            logger.info(
               "   ⚠️ WARNING: Missing signature indicates signing failure!",
             );
           }
 
           // Clock and Payload Analysis
-          console.log(
+          logger.info(
             "⏰ Clock Info:",
             entry.clock
               ? `{id: ${entry.clock.id?.slice(0, 16)}..., time: ${entry.clock.time}}`
               : "NO CLOCK",
           );
-          console.log(
+          logger.info(
             "📦 Payload Operation:",
             entry.payload?.op || "NO OPERATION",
           );
-          console.log(
+          logger.info(
             "🔑 Payload Key:",
             entry.payload?.key || entry.key || "NO KEY",
           );
 
-          console.log(
+          logger.info(
             `🔐 =============== END TODO ${i + 1} ANALYSIS ===============\n`,
           );
         } else {
-          console.log(`❌ Could not retrieve oplog entry for hash: ${hash}`);
+          logger.info(`❌ Could not retrieve oplog entry for hash: ${hash}`);
         }
       }
 
@@ -840,7 +817,7 @@
       aliceTodos = await aliceDatabase.all();
 
       // Grant Bob write access to Alice's database and create Storacha delegation
-      console.log("\n🎁 Granting Bob access to Alice's database...");
+      logger.info("\n🎁 Granting Bob access to Alice's database...");
       if (aliceUCANAccessController && bobIdentity) {
         try {
           // Grant Bob write access to Alice's database
@@ -848,12 +825,12 @@
             "write",
             bobIdentity.id,
           );
-          console.log(`   ✅ Granted write access to Bob: ${bobIdentity.id}`);
+          logger.info(`   ✅ Granted write access to Bob: ${bobIdentity.id}`);
 
           // Create Storacha UCAN delegation for Bob
-          console.log("\n🚀 Creating Storacha delegation for Bob...");
+          logger.info("\n🚀 Creating Storacha delegation for Bob...");
           if (useBridgeDelegation) {
-            console.log("   🌉 Using bridge delegation: EdDSA → P-256 → P-256");
+            logger.info("   🌉 Using bridge delegation: EdDSA → P-256 → P-256");
             storachaDelegation = await ucanService.createDelegation(
               "bridge",
               bobIdentity.id,
@@ -861,45 +838,45 @@
               sharedIdentity,
             );
           } else {
-            console.log("   📤 Using direct EdDSA delegation");
+            logger.info("   📤 Using direct EdDSA delegation");
             storachaDelegation = await ucanService.createDelegation(
               "direct",
               bobIdentity.id,
               storachaClient,
             );
           }
-          console.log(
+          logger.info(
             `   ✅ Storacha delegation created (${storachaDelegation.delegationType || "direct"})`,
           );
-          console.log(
+          logger.info(
             `   📝 Delegation token length: ${storachaDelegation.delegationToken?.length || "N/A"}`,
           );
         } catch (grantError) {
-          console.error(
+          logger.error(
             `   ❌ Failed to grant access or create delegation: ${grantError.message}`,
           );
         }
       } else {
-        console.warn(
+        logger.warn(
           "   ⚠️ Could not grant access - missing access controller or Bob identity",
         );
       }
 
       // 🔍 ITERATE OVER THE ENTIRE OPLOG HISTORY
-      console.log(
+      logger.info(
         "\n🗂️ =============== COMPLETE OPLOG HISTORY ===============",
       );
-      console.log("📊 Database:", aliceDatabase.name);
-      console.log("📍 Address:", aliceDatabase.address);
-      console.log("🆔 Database Identity:", aliceDatabase.identity?.id);
-      console.log("📝 Total Todos Added:", aliceTodos.length);
+      logger.info("📊 Database:", aliceDatabase.name);
+      logger.info("📍 Address:", aliceDatabase.address);
+      logger.info("🆔 Database Identity:", aliceDatabase.identity?.id);
+      logger.info("📝 Total Todos Added:", aliceTodos.length);
 
       try {
-        console.log("\n🔄 Iterating through oplog entries...");
+        logger.info("\n🔄 Iterating through oplog entries...");
 
         // Get the oplog from the database
         const oplog = aliceDatabase.log;
-        console.log("📋 Oplog basic info:", {
+        logger.info("📋 Oplog basic info:", {
           hasIterator: typeof oplog.iterator === "function",
           length: oplog.length || "unknown",
         });
@@ -907,30 +884,30 @@
         // Method 1: Use the correct OrbitDB API - log.iterator()
         let entryCount = 0;
         if (typeof oplog.iterator === "function") {
-          console.log("\n📖 Using log.iterator() to traverse ALL entries:");
+          logger.info("\n📖 Using log.iterator() to traverse ALL entries:");
 
           try {
             for await (const entry of oplog.iterator()) {
               entryCount++;
-              console.log(`\n📄 Entry #${entryCount}:`);
-              console.log("   🔗 Hash:", entry.hash?.toString() || entry.hash);
-              console.log("   🆔 Identity:", entry.identity);
-              console.log("   🔑 Key:", entry.key || entry.payload?.key);
-              console.log("   📋 Operation:", entry.payload?.op);
-              console.log(
+              logger.info(`\n📄 Entry #${entryCount}:`);
+              logger.info("   🔗 Hash:", entry.hash?.toString() || entry.hash);
+              logger.info("   🆔 Identity:", entry.identity);
+              logger.info("   🔑 Key:", entry.key || entry.payload?.key);
+              logger.info("   📋 Operation:", entry.payload?.op);
+              logger.info(
                 "   💾 Value Preview:",
                 JSON.stringify(entry.payload?.value || entry.value)?.slice(
                   0,
                   100,
                 ) + "...",
               );
-              console.log(
+              logger.info(
                 "   🔐 Signature:",
                 entry.sig
                   ? `${entry.sig.slice(0, 32)}... (${entry.sig.length} chars)`
                   : "NO SIGNATURE",
               );
-              console.log(
+              logger.info(
                 "   ⏰ Clock:",
                 entry.clock
                   ? `{id: ${entry.clock.id?.slice(0, 16)}..., time: ${entry.clock.time}}`
@@ -949,14 +926,14 @@
                   ? [entry.refs.toString().slice(0, 16) + "..."]
                   : [];
 
-              console.log(
+              logger.info(
                 "   🔗 Next:",
                 nextRefs.length > 0 ? nextRefs : "NO NEXT",
               );
-              console.log("   📎 Refs:", refs.length > 0 ? refs : "NO REFS");
+              logger.info("   📎 Refs:", refs.length > 0 ? refs : "NO REFS");
 
               // Show full entry structure (collapsed)
-              console.log("   🏗️ Full Entry Structure:", {
+              logger.info("   🏗️ Full Entry Structure:", {
                 version: entry.v,
                 id: entry.id,
                 key: entry.key,
@@ -972,54 +949,54 @@
 
               // Limit output to prevent console overflow
               if (entryCount >= 10) {
-                console.log(
+                logger.info(
                   "   ⚠️ Limiting output to first 10 entries to prevent console overflow...",
                 );
                 break;
               }
             }
           } catch (iteratorError) {
-            console.error(
+            logger.error(
               "❌ Error using log.iterator():",
               iteratorError.message,
             );
             entryCount = 0; // Reset to try alternative methods
           }
         } else {
-          console.log(
+          logger.info(
             "⚠️ log.iterator() not available, trying alternative methods...",
           );
         }
 
         // Method 2: Try using database.iterator() as fallback (for database entries)
         if (entryCount === 0) {
-          console.log("\n📖 Trying database.iterator() as fallback:");
+          logger.info("\n📖 Trying database.iterator() as fallback:");
           try {
             for await (const record of aliceDatabase.iterator()) {
               entryCount++;
-              console.log(`\n📄 Database Record #${entryCount}:`);
-              console.log("   🔑 Key:", record.key);
-              console.log(
+              logger.info(`\n📄 Database Record #${entryCount}:`);
+              logger.info("   🔑 Key:", record.key);
+              logger.info(
                 "   💾 Value:",
                 JSON.stringify(record.value)?.slice(0, 100) + "...",
               );
-              console.log("   🔗 Hash:", record.hash?.toString() || "NO HASH");
+              logger.info("   🔗 Hash:", record.hash?.toString() || "NO HASH");
 
               // Try to get the actual oplog entry for this record
               if (record.hash) {
                 try {
                   const oplogEntry = await aliceDatabase.log.get(record.hash);
                   if (oplogEntry) {
-                    console.log(
+                    logger.info(
                       "   🔐 Signature:",
                       oplogEntry.sig
                         ? `${oplogEntry.sig.slice(0, 32)}... (${oplogEntry.sig.length} chars)`
                         : "NO SIGNATURE",
                     );
-                    console.log("   🆔 Entry Identity:", oplogEntry.identity);
+                    logger.info("   🆔 Entry Identity:", oplogEntry.identity);
                   }
                 } catch (getError) {
-                  console.log(
+                  logger.info(
                     "   ⚠️ Could not get oplog entry for record:",
                     getError.message,
                   );
@@ -1028,12 +1005,12 @@
 
               // Limit output
               if (entryCount >= 10) {
-                console.log("   ⚠️ Limiting output to first 10 records...");
+                logger.info("   ⚠️ Limiting output to first 10 records...");
                 break;
               }
             }
           } catch (dbIteratorError) {
-            console.error(
+            logger.error(
               "❌ Error using database.iterator():",
               dbIteratorError.message,
             );
@@ -1041,15 +1018,15 @@
         }
 
         // Summary
-        console.log(`\n📊 OPLOG SUMMARY:`);
-        console.log(`   📝 Total Entries Found: ${entryCount}`);
-        console.log(`   🗄️ Database Todos: ${aliceTodos.length}`);
-        console.log(
+        logger.info(`\n📊 OPLOG SUMMARY:`);
+        logger.info(`   📝 Total Entries Found: ${entryCount}`);
+        logger.info(`   🗄️ Database Todos: ${aliceTodos.length}`);
+        logger.info(
           `   🔍 Match: ${entryCount >= aliceTodos.length ? "✅ YES" : "❌ NO - Missing entries"}`,
         );
 
         // 🔐 WEBAUTHN SIGNATURE VERIFICATION SUMMARY
-        console.log(
+        logger.info(
           `\n🔐 =============== WEBAUTHN SIGNATURE SUMMARY ===============`,
         );
 
@@ -1102,24 +1079,24 @@
             }
           }
         } catch (iterError) {
-          console.log(
+          logger.info(
             "   ⚠️ Could not iterate for signature analysis:",
             iterError.message,
           );
         }
 
-        console.log("📊 Signature Analysis Results:");
-        console.log(`   📝 Total Entries: ${entryCount}`);
-        console.log(
+        logger.info("📊 Signature Analysis Results:");
+        logger.info(`   📝 Total Entries: ${entryCount}`);
+        logger.info(
           `   ✍️ Signed Entries: ${signedEntries}/${entryCount} (${entryCount > 0 ? Math.round((signedEntries / entryCount) * 100) : 0}%)`,
         );
-        console.log(
+        logger.info(
           `   🔐 WebAuthn Proofs: ${webauthnProofs}/${signedEntries} (${signedEntries > 0 ? Math.round((webauthnProofs / signedEntries) * 100) : 0}%)`,
         );
-        console.log(
+        logger.info(
           `   🆔 Identity Matches: ${identityMatches}/${entryCount} (${entryCount > 0 ? Math.round((identityMatches / entryCount) * 100) : 0}%)`,
         );
-        console.log(
+        logger.info(
           `   🔗 Credential Matches: ${credentialMatches}/${webauthnProofs} (${webauthnProofs > 0 ? Math.round((credentialMatches / webauthnProofs) * 100) : 0}%)`,
         );
 
@@ -1132,17 +1109,17 @@
         const allMatchingCredential =
           credentialMatches === webauthnProofs && webauthnProofs > 0;
 
-        console.log("\n🏆 Overall Assessment:");
-        console.log(
+        logger.info("\n🏆 Overall Assessment:");
+        logger.info(
           `   📝 All entries signed: ${allSigned ? "✅ YES" : "❌ NO"}`,
         );
-        console.log(
+        logger.info(
           `   🔐 All signatures are WebAuthn: ${allWebAuthn ? "✅ YES" : "❌ NO"}`,
         );
-        console.log(
+        logger.info(
           `   🆔 All identities match: ${allMatchingIdentity ? "✅ YES" : "❌ NO"}`,
         );
-        console.log(
+        logger.info(
           `   🔗 All credentials match: ${allMatchingCredential ? "✅ YES" : "❌ NO"}`,
         );
 
@@ -1151,49 +1128,49 @@
           allWebAuthn &&
           allMatchingIdentity &&
           allMatchingCredential;
-        console.log(
+        logger.info(
           `   🎯 WebAuthn Integration: ${perfect ? "🎉 PERFECT!" : "⚠️ NEEDS ATTENTION"}`,
         );
 
-        console.log(`🔐 =============== END WEBAUTHN SUMMARY ===============`);
+        logger.info(`🔐 =============== END WEBAUTHN SUMMARY ===============`);
 
         // Additional oplog info
-        console.log(`\n🔧 Oplog Technical Details:`);
-        console.log(`   📊 Oplog Length:`, oplog.length || "unknown");
-        console.log(`   🆔 Oplog Type:`, typeof oplog);
-        console.log(
+        logger.info(`\n🔧 Oplog Technical Details:`);
+        logger.info(`   📊 Oplog Length:`, oplog.length || "unknown");
+        logger.info(`   🆔 Oplog Type:`, typeof oplog);
+        logger.info(
           `   📋 Available Methods:`,
           Object.getOwnPropertyNames(oplog).filter(
             (prop) => typeof oplog[prop] === "function",
           ),
         );
       } catch (error) {
-        console.error("❌ Error iterating oplog:", error);
-        console.error("   Error details:", error.message);
-        console.error("   Error stack:", error.stack?.slice(0, 500) + "...");
+        logger.error("❌ Error iterating oplog:", error);
+        logger.error("   Error details:", error.message);
+        logger.error("   Error stack:", error.stack?.slice(0, 500) + "...");
       }
 
-      console.log("🗂️ =============== END OPLOG HISTORY ===============\n");
+      logger.info("🗂️ =============== END OPLOG HISTORY ===============\n");
 
       // 🔒 ACCESS CONTROLLER INSPECTION
-      console.log(
+      logger.info(
         "\n🔒 =============== ACCESS CONTROLLER ANALYSIS ===============",
       );
       try {
         const database = aliceDatabase;
-        console.log("🎯 Database Access Controller Details:");
-        console.log("   📊 Database Name:", database.name);
-        console.log("   🆔 Database Identity:", database.identity?.id);
-        console.log("   📍 Database Address:", database.address);
+        logger.info("🎯 Database Access Controller Details:");
+        logger.info("   📊 Database Name:", database.name);
+        logger.info("   🆔 Database Identity:", database.identity?.id);
+        logger.info("   📍 Database Address:", database.address);
 
         // Check if access controller exists
         if (database.access) {
-          console.log("\n🔐 Access Controller Found:");
-          console.log(
+          logger.info("\n🔐 Access Controller Found:");
+          logger.info(
             "   🏷️ Type:",
             database.access.type || typeof database.access,
           );
-          console.log(
+          logger.info(
             "   📋 Available Methods:",
             Object.getOwnPropertyNames(database.access).filter(
               (prop) => typeof database.access[prop] === "function",
@@ -1202,24 +1179,24 @@
 
           // Check for write permissions
           if (database.access.write) {
-            console.log("\n✍️ Write Permissions:");
+            logger.info("\n✍️ Write Permissions:");
             if (Array.isArray(database.access.write)) {
-              console.log("   📝 Write Array:", database.access.write);
-              console.log("   📊 Total Writers:", database.access.write.length);
+              logger.info("   📝 Write Array:", database.access.write);
+              logger.info("   📊 Total Writers:", database.access.write.length);
 
               // Check if wildcard is present
               if (database.access.write.includes("*")) {
-                console.log(
+                logger.info(
                   "   🌟 WILDCARD ACCESS: * found - ALL identities can write",
                 );
-                console.log(
+                logger.info(
                   "   ⚠️ WARNING: Using wildcard access - this was the old configuration!",
                 );
               } else {
-                console.log(
+                logger.info(
                   "   🔒 RESTRICTED ACCESS: Only specific identities can write",
                 );
-                console.log(
+                logger.info(
                   "   ✅ GOOD: Using identity-based access control as intended",
                 );
               }
@@ -1231,18 +1208,18 @@
               );
 
               if (hasWildcard && hasSpecificIdentities) {
-                console.log(
+                logger.info(
                   "   ⚠️ MIXED ACCESS: Both wildcard (*) AND specific identities present",
                 );
-                console.log(
+                logger.info(
                   "   📝 This means the wildcard makes specific identities redundant",
                 );
               } else if (hasWildcard) {
-                console.log(
+                logger.info(
                   "   🌍 OPEN ACCESS: Only wildcard present - any identity can write",
                 );
               } else {
-                console.log(
+                logger.info(
                   "   🔐 SECURE ACCESS: Only specific identities can write (recommended)",
                 );
               }
@@ -1253,44 +1230,44 @@
                 ourIdentityId &&
                 database.access.write.includes(ourIdentityId)
               ) {
-                console.log(
+                logger.info(
                   "   ✅ OUR IDENTITY ALLOWED:",
                   ourIdentityId.slice(0, 32) + "...",
                 );
               } else if (ourIdentityId) {
-                console.log(
+                logger.info(
                   "   ❌ OUR IDENTITY NOT IN LIST:",
                   ourIdentityId.slice(0, 32) + "...",
                 );
-                console.log("   ⚠️ This might cause write failures!");
+                logger.info("   ⚠️ This might cause write failures!");
               }
 
               // Show each allowed identity
               database.access.write.forEach((identity, index) => {
                 if (identity === "*") {
-                  console.log(
+                  logger.info(
                     `   ${index + 1}. 🌟 WILDCARD: * (allows all identities)`,
                   );
                 } else {
                   const isOurs = identity === ourIdentityId;
-                  console.log(
+                  logger.info(
                     `   ${index + 1}. ${isOurs ? "👤 OUR IDENTITY" : "👥 OTHER IDENTITY"}: ${identity.slice(0, 32)}...`,
                   );
                 }
               });
             } else {
-              console.log(
+              logger.info(
                 "   📝 Write Property (not array):",
                 database.access.write,
               );
             }
           } else {
-            console.log("   ⚠️ No write property found on access controller");
+            logger.info("   ⚠️ No write property found on access controller");
           }
 
           // Test access controller methods
           if (typeof database.access.canAppend === "function") {
-            console.log("\n🧪 Testing Access Controller canAppend method:");
+            logger.info("\n🧪 Testing Access Controller canAppend method:");
 
             // Create a mock entry to test access
             const mockEntry = {
@@ -1302,40 +1279,40 @@
 
             try {
               const canAppend = await database.access.canAppend(mockEntry);
-              console.log(
+              logger.info(
                 "   🧪 Mock Entry Test Result:",
                 canAppend ? "✅ ALLOWED" : "❌ DENIED",
               );
 
               if (!canAppend) {
-                console.log(
+                logger.info(
                   "   ⚠️ WARNING: Mock entry would be denied - this explains write failures!",
                 );
               }
             } catch (canAppendError) {
-              console.log(
+              logger.info(
                 "   ❌ Error testing canAppend:",
                 canAppendError.message,
               );
             }
           } else {
-            console.log("   ⚠️ No canAppend method found on access controller");
+            logger.info("   ⚠️ No canAppend method found on access controller");
           }
         } else {
-          console.log("\n❌ No access controller found on database");
-          console.log("   ⚠️ This might indicate a configuration issue");
+          logger.info("\n❌ No access controller found on database");
+          logger.info("   ⚠️ This might indicate a configuration issue");
         }
 
         // Check the original database configuration
-        console.log("\n📋 Database Configuration Analysis:");
-        console.log("   🏗️ Database Type:", database.type || "unknown");
-        console.log(
+        logger.info("\n📋 Database Configuration Analysis:");
+        logger.info("   🏗️ Database Type:", database.type || "unknown");
+        logger.info(
           "   📊 Database Options Keys:",
           Object.keys(database.options || {}),
         );
 
         if (database.options?.AccessController) {
-          console.log(
+          logger.info(
             "   🔐 AccessController in options:",
             typeof database.options.AccessController,
           );
@@ -1343,17 +1320,17 @@
 
         // Show the actual access controller constructor/function
         if (database.access && database.access.constructor) {
-          console.log(
+          logger.info(
             "   🏗️ Access Controller Constructor:",
             database.access.constructor.name,
           );
         }
       } catch (accessError) {
-        console.error("❌ Error inspecting access controller:", accessError);
-        console.error("   Error details:", accessError.message);
+        logger.error("❌ Error inspecting access controller:", accessError);
+        logger.error("   Error details:", accessError.message);
       }
 
-      console.log(
+      logger.info(
         "🔒 =============== END ACCESS CONTROLLER ANALYSIS ===============\n",
       );
 
@@ -1372,7 +1349,7 @@
 
       aliceStep = "Alice ready to backup";
     } catch (error) {
-      console.error("❌ Adding todos failed:", error);
+      logger.error("❌ Adding todos failed:", error);
       aliceError = error.message;
       aliceStep = `Adding todos failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -1443,7 +1420,7 @@
 
       aliceStep = "Alice backup complete - Bob can now restore";
     } catch (error) {
-      console.error("❌ Backup failed:", error);
+      logger.error("❌ Backup failed:", error);
       aliceError = error.message;
       aliceStep = `Backup failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -1526,7 +1503,7 @@
       // Note: bobDatabase is still null at this point
 
       // Wait for Bob to have dialable addresses before attempting connection
-      console.log("⏳ Waiting for Bob to have dialable multiaddresses...");
+      logger.info("⏳ Waiting for Bob to have dialable multiaddresses...");
       bobStep = "Waiting for Bob's P2P addresses to be ready...";
 
       addResult(
@@ -1546,21 +1523,21 @@
       );
 
       // Now that Bob has addresses, try to connect to Alice
-      console.log("📞 Bob attempting to connect directly to Alice...");
+      logger.info("📞 Bob attempting to connect directly to Alice...");
 
       const connected = await orbitDBService.forceDirectConnection();
-      console.log(`📋 forceDirectConnection() returned: ${connected}`);
+      logger.info(`📋 forceDirectConnection() returned: ${connected}`);
 
       if (!connected) {
-        console.warn(
+        logger.warn(
           "⚠️  Direct connection failed - proceeding anyway (may rely on discovery)",
         );
       } else {
-        console.log("✅ Direct connection to Alice established!");
+        logger.info("✅ Direct connection to Alice established!");
       }
 
       // Wait and verify that Bob is actually connected to Alice before opening database
-      console.log("⏳ Waiting to verify connection with Alice...");
+      logger.info("⏳ Waiting to verify connection with Alice...");
       bobStep = "Verifying connection with Alice...";
 
       addResult(
@@ -1572,24 +1549,24 @@
 
       // Skip direct P2P connection verification for UCAN delegation demo
       // The UCAN access control works through IPFS/DHT without requiring direct peer connections
-      console.log(
+      logger.info(
         "🚀 Skipping P2P connection verification for UCAN delegation demo",
       );
-      console.log(
+      logger.info(
         "   💡 UCAN access control works through IPFS/DHT, not direct peer connections",
       );
-      console.log(
+      logger.info(
         "   🔗 Alice and Bob will communicate via OrbitDB replication over IPFS",
       );
 
       const connectionVerified = false; // Skip connection verification
 
-      console.log(
+      logger.info(
         "✅ Proceeding with database opening using UCAN delegation and IPFS/DHT",
       );
 
       // Now that connection is verified (or timed out), open Alice's shared database
-      console.log("📛 Bob now opening Alice's shared database...");
+      logger.info("📛 Bob now opening Alice's shared database...");
       bobStep = "Opening Alice's shared database...";
 
       addResult(
@@ -1603,39 +1580,39 @@
       useAccessController(UCANOrbitDBAccessController);
 
       // DEBUG: Test identity resolution across Alice and Bob's systems
-      console.log("\n🔍 [IDENTITY DEBUG] Testing cross-identity resolution...");
-      console.log(`   Alice's identities instance: ${!!sharedIdentities}`);
-      console.log(`   Bob's identities instance: ${!!bobIdentities}`);
-      console.log(`   Alice identity: ${sharedIdentity?.id}`);
-      console.log(`   Bob identity: ${bobIdentity?.id}`);
-      console.log(`   Alice identity hash: ${sharedIdentity?.hash}`);
-      console.log(`   Bob identity hash: ${bobIdentity?.hash}`);
+      logger.info("\n🔍 [IDENTITY DEBUG] Testing cross-identity resolution...");
+      logger.info(`   Alice's identities instance: ${!!sharedIdentities}`);
+      logger.info(`   Bob's identities instance: ${!!bobIdentities}`);
+      logger.info(`   Alice identity: ${sharedIdentity?.id}`);
+      logger.info(`   Bob identity: ${bobIdentity?.id}`);
+      logger.info(`   Alice identity hash: ${sharedIdentity?.hash}`);
+      logger.info(`   Bob identity hash: ${bobIdentity?.hash}`);
 
       // Test if Alice's identities can resolve Bob's identity
       try {
         if (sharedIdentities && bobIdentity) {
-          console.log(
+          logger.info(
             "🔍 Testing: Can Alice's identities resolve Bob's identity?",
           );
           const resolvedByAlice = await sharedIdentities.getIdentity(
             bobIdentity.hash,
           );
           if (resolvedByAlice) {
-            console.log(
+            logger.info(
               "✅ SUCCESS: Alice can resolve Bob's identity via IPFS",
             );
-            console.log(`   Resolved ID: ${resolvedByAlice.id}`);
+            logger.info(`   Resolved ID: ${resolvedByAlice.id}`);
           } else {
-            console.log(
+            logger.info(
               "❌ FAILED: Alice cannot resolve Bob's identity from IPFS",
             );
-            console.log(
+            logger.info(
               "   ⚠️ This will cause replication access control issues",
             );
           }
         }
       } catch (resolveError) {
-        console.log(
+        logger.info(
           `❌ ERROR resolving Bob\'s identity: ${resolveError.message}`,
         );
       }
@@ -1643,44 +1620,44 @@
       // Test if Bob's identities can resolve Alice's identity
       try {
         if (bobIdentities && sharedIdentity) {
-          console.log(
+          logger.info(
             "🔍 Testing: Can Bob's identities resolve Alice's identity?",
           );
           const resolvedByBob = await bobIdentities.getIdentity(
             sharedIdentity.hash,
           );
           if (resolvedByBob) {
-            console.log(
+            logger.info(
               "✅ SUCCESS: Bob can resolve Alice's identity via IPFS",
             );
-            console.log(`   Resolved ID: ${resolvedByBob.id}`);
+            logger.info(`   Resolved ID: ${resolvedByBob.id}`);
           } else {
-            console.log(
+            logger.info(
               "❌ FAILED: Bob cannot resolve Alice's identity from IPFS",
             );
           }
         }
       } catch (resolveError) {
-        console.log(
+        logger.info(
           `❌ ERROR resolving Alice\'s identity: ${resolveError.message}`,
         );
       }
 
-      console.log("🔍 [IDENTITY DEBUG] End of identity resolution tests\n");
+      logger.info("🔍 [IDENTITY DEBUG] End of identity resolution tests\n");
 
       // CRITICAL: Connect Alice and Bob's IPFS instances to enable identity sharing
-      console.log(
+      logger.info(
         "🔗 [IPFS CONNECT] Connecting Alice and Bob's IPFS instances...",
       );
       try {
         if (aliceLibp2p && bobLibp2p && aliceHelia && bobHelia) {
           // Method 1: Try direct peer connection (browser-compatible)
-          console.log("   Attempting direct libp2p peer connection...");
+          logger.info("   Attempting direct libp2p peer connection...");
           const alicePeerId = aliceLibp2p.peerId;
           const aliceMultiaddrs = aliceLibp2p.getMultiaddrs();
 
-          console.log(`   Alice Peer ID: ${alicePeerId.toString()}`);
-          console.log(`   Alice Multiaddrs: ${aliceMultiaddrs.length}`);
+          logger.info(`   Alice Peer ID: ${alicePeerId.toString()}`);
+          logger.info(`   Alice Multiaddrs: ${aliceMultiaddrs.length}`);
 
           // Save Alice's peer info to Bob's peer store
           await bobLibp2p.peerStore.save(alicePeerId, {
@@ -1692,18 +1669,18 @@
           });
 
           // Bob dials Alice directly for IPFS connectivity
-          console.log("   Bob dialing Alice for IPFS data sharing...");
+          logger.info("   Bob dialing Alice for IPFS data sharing...");
           const ipfsConnection = await bobLibp2p.dial(alicePeerId);
-          console.log("✅ IPFS connection established!");
-          console.log(
+          logger.info("✅ IPFS connection established!");
+          logger.info(
             `   Connection: ${ipfsConnection.remotePeer.toString().slice(-8)}`,
           );
 
-          console.log("⚠️ Missing IPFS instances - cannot connect");
+          logger.info("⚠️ Missing IPFS instances - cannot connect");
         }
       } catch (connectError) {
-        console.log(`⚠️ IPFS connection failed: ${connectError.message}`);
-        console.log(
+        logger.info(`⚠️ IPFS connection failed: ${connectError.message}`);
+        logger.info(
           "   Proceeding anyway - identities may not resolve properly",
         );
       }
@@ -1745,7 +1722,7 @@
       bobStep =
         "Bob ready - connected to Alice and opened shared database for replication";
     } catch (error) {
-      console.error("❌ Bob initialization failed:", error);
+      logger.error("❌ Bob initialization failed:", error);
       bobError = error.message;
       bobStep = `Bob initialization failed: ${error.message}`;
       updateLastResult("bob", "error", error.message);
@@ -1770,19 +1747,19 @@
         createdBy: "bob",
       };
 
-      console.log("📋 Before adding - Bob todos:", bobTodos.length);
+      logger.info("📋 Before adding - Bob todos:", bobTodos.length);
       if (aliceDatabase) {
         const aliceDataBefore = await aliceDatabase.all();
-        console.log("📋 Before adding - Alice todos:", aliceDataBefore.length);
+        logger.info("📋 Before adding - Alice todos:", aliceDataBefore.length);
       }
 
       // Test write operation
-      console.log("📝 Bob attempting to write todo to shared database...");
+      logger.info("📝 Bob attempting to write todo to shared database...");
       await bobDatabase.put(bobTodo.id, bobTodo);
-      console.log("✅ Bob added todo (should replicate to Alice):", bobTodo);
+      logger.info("✅ Bob added todo (should replicate to Alice):", bobTodo);
 
       // Wait a bit for replication
-      console.log("⏳ Waiting for replication events...");
+      logger.info("⏳ Waiting for replication events...");
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
       bobTodos = await bobDatabase.all();
@@ -1804,7 +1781,7 @@
 
       bobStep = "Bob added todo - check Alice's list for replication";
     } catch (error) {
-      console.error("❌ Bob todo add failed:", error);
+      logger.error("❌ Bob todo add failed:", error);
       bobError = error.message;
       bobStep = `Bob todo add failed: ${error.message}`;
       addResult("bob", "Replication Test", "error", error.message);
@@ -1829,7 +1806,7 @@
 
       // Get all todos from the shared database
       const allTodos = await bobDatabase.all();
-      console.log(`   📄 Found ${allTodos.length} todos in shared database`);
+      logger.info(`   📄 Found ${allTodos.length} todos in shared database`);
 
       // Find todos assigned to Bob
       const bobsTodos = allTodos.filter(
@@ -1837,7 +1814,7 @@
           todo.value.assignee === bobIdentity.id && !todo.value.completed,
       );
 
-      console.log(
+      logger.info(
         `   🎯 Bob has ${bobsTodos.length} incomplete assigned todos`,
       );
 
@@ -1859,13 +1836,13 @@
         todo.completedAt = new Date().toISOString();
         todo.completedBy = bobIdentity.id;
 
-        console.log(`   ✅ Bob completing todo: "${todo.text}"`);
+        logger.info(`   ✅ Bob completing todo: "${todo.text}"`);
 
         // Update the todo in the shared database
         await bobDatabase.put(todo.id, todo);
         completedCount++;
 
-        console.log(`   💾 Updated todo ${todo.id} in shared database`);
+        logger.info(`   💾 Updated todo ${todo.id} in shared database`);
       }
 
       // Wait a moment for replication
@@ -1900,7 +1877,7 @@
 
       bobStep = "Bob completed todos - changes should replicate to Alice";
     } catch (error) {
-      console.error(`❌ Bob failed to complete todos: ${error.message}`);
+      logger.error(`❌ Bob failed to complete todos: ${error.message}`);
       bobError = error.message;
       bobStep = `Failed to complete todos: ${error.message}`;
       updateLastResult("bob", "Complete Todos", "error", error.message);
@@ -1930,7 +1907,7 @@
       }
 
       const aliceDBForBob = aliceDBResult.aliceDatabase;
-      console.log(
+      logger.info(
         `📦 Bob backing up Alice's database: ${aliceDBForBob.address}`,
       );
 
@@ -1938,7 +1915,7 @@
       let bobStorachaClient;
       if (storachaDelegation.isFallback && storachaDelegation.tempPrincipal) {
         // Fallback: use the temporary principal created for Bob
-        console.log("   🔄 Using fallback delegation with temp principal");
+        logger.info("   🔄 Using fallback delegation with temp principal");
         const { StoreMemory } = await import("@storacha/client/stores/memory");
         const Client = await import("@storacha/client");
 
@@ -1959,13 +1936,13 @@
         if (delegation.ok) {
           const space = await bobStorachaClient.addSpace(delegation.ok);
           await bobStorachaClient.setCurrentSpace(space.did());
-          console.log("   ✅ Bob's delegation client ready with space access");
+          logger.info("   ✅ Bob's delegation client ready with space access");
         } else {
           throw new Error("Failed to parse delegation token");
         }
       } else {
         // Direct delegation to Bob's DID (preferred approach)
-        console.log("   🔑 Using direct delegation to Bob's DID");
+        logger.info("   🔑 Using direct delegation to Bob's DID");
         // In this case, Bob would need to create a client with his existing identity
         // and add the delegation - this requires more complex key derivation
         throw new Error(
@@ -2020,7 +1997,7 @@
 
       bobStep = "Bob backup complete - Alice can now restore";
     } catch (error) {
-      console.error(`❌ Bob's backup with delegation failed: ${error.message}`);
+      logger.error(`❌ Bob's backup with delegation failed: ${error.message}`);
       bobError = error.message;
       bobStep = `Backup failed: ${error.message}`;
       updateLastResult("bob", "error", error.message);
@@ -2122,7 +2099,7 @@
 
       bobStep = "Bob restore complete";
     } catch (error) {
-      console.error("❌ Restore failed:", error);
+      logger.error("❌ Restore failed:", error);
       bobError = error.message;
       bobStep = `Restore failed: ${error.message}`;
       updateLastResult("bob", "error", error.message);
@@ -2146,16 +2123,16 @@
         "Alice is revoking Bob's access to her database...",
       );
 
-      console.log(`🚫 Revoking access for Bob: ${bobIdentity.id}`);
+      logger.info(`🚫 Revoking access for Bob: ${bobIdentity.id}`);
 
       // Revoke Bob's write access
       await aliceUCANAccessController.revoke("write", bobIdentity.id);
-      console.log(`   ✅ Revoked write access for Bob`);
+      logger.info(`   ✅ Revoked write access for Bob`);
 
       // Revoke the Storacha delegation using UCAN service
       const revoked = ucanService.revokeDelegation(bobIdentity.id);
       storachaDelegation = null;
-      console.log(
+      logger.info(
         `   🗑️ ${revoked ? "Revoked and cleared" : "Cleared"} Storacha delegation reference`,
       );
 
@@ -2172,7 +2149,7 @@
 
       aliceStep = "Bob's access revoked - UCAN token expires in 1 hour";
     } catch (error) {
-      console.error(`❌ Failed to revoke access: ${error.message}`);
+      logger.error(`❌ Failed to revoke access: ${error.message}`);
       aliceError = error.message;
       aliceStep = `Failed to revoke access: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -2201,7 +2178,7 @@
         throw new Error("No backup available to restore from");
       }
 
-      console.log(`\n🗑️ Step 1: Dropping Alice's local database...`);
+      logger.info(`\n🗑️ Step 1: Dropping Alice's local database...`);
 
       // Close and cleanup Alice's current database
       await aliceDatabase.close();
@@ -2209,7 +2186,7 @@
       await aliceHelia.stop();
       await aliceLibp2p.stop();
 
-      console.log(`   ✅ Alice's local database and OrbitDB instance stopped`);
+      logger.info(`   ✅ Alice's local database and OrbitDB instance stopped`);
 
       // Clear Alice's state
       aliceOrbitDB = null;
@@ -2219,7 +2196,7 @@
       aliceTodos = [];
       aliceUCANAccessController = null;
 
-      console.log(
+      logger.info(
         `\n🆕 Step 2: Creating new clean OrbitDB instance for Alice...`,
       );
 
@@ -2250,10 +2227,10 @@
       aliceLibp2p = alicePeer.libp2p;
       aliceUCANAccessController = aliceDatabase.access;
 
-      console.log(`   ✅ New clean Alice OrbitDB instance created`);
-      console.log(`   📊 New database address: ${aliceDatabase.address}`);
+      logger.info(`   ✅ New clean Alice OrbitDB instance created`);
+      logger.info(`   📊 New database address: ${aliceDatabase.address}`);
 
-      console.log(`\n📥 Step 3: Restoring from Storacha space...`);
+      logger.info(`\n📥 Step 3: Restoring from Storacha space...`);
 
       // Create bridge for restore
       const bridge = createStorachaBridge(storachaCredentials);
@@ -2269,7 +2246,7 @@
         throw new Error(`Restore failed: ${restoreResult.error}`);
       }
 
-      console.log(`   ✅ Restore successful`);
+      logger.info(`   ✅ Restore successful`);
 
       // Get the restored database
       const restoredDatabase = restoreResult.database;
@@ -2278,21 +2255,21 @@
       await new Promise((resolve) => setTimeout(resolve, 5000));
       const restoredTodos = await restoredDatabase.all();
 
-      console.log(`\n🔍 Step 4: Verifying restored todos...`);
-      console.log(`   📊 Restored ${restoredTodos.length} todos`);
+      logger.info(`\n🔍 Step 4: Verifying restored todos...`);
+      logger.info(`   📊 Restored ${restoredTodos.length} todos`);
 
       // Check for todos completed by Bob
       const todosCompletedByBob = restoredTodos.filter(
         (todo) => todo.value.completedBy === bobIdentity?.id,
       );
 
-      console.log(
+      logger.info(
         `   🎯 Found ${todosCompletedByBob.length} todos completed by Bob`,
       );
 
       if (todosCompletedByBob.length > 0) {
         todosCompletedByBob.forEach((todo) => {
-          console.log(
+          logger.info(
             `     ✅ "${todo.value.text}" completed at ${todo.value.completedAt}`,
           );
         });
@@ -2323,7 +2300,7 @@
 
       aliceStep = "Alice database restored with Bob's completed todos";
     } catch (error) {
-      console.error(`❌ Alice drop and restore failed: ${error.message}`);
+      logger.error(`❌ Alice drop and restore failed: ${error.message}`);
       aliceError = error.message;
       aliceStep = `Drop and restore failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -2334,7 +2311,7 @@
 
   // Cleanup functions
   async function cleanup() {
-    console.log("🧹 Cleaning up all instances...");
+    logger.info("🧹 Cleaning up all instances...");
 
     // Use OrbitDB service for cleanup
     await orbitDBService.cleanup();

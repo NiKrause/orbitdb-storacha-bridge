@@ -1,5 +1,6 @@
 <script>
   import { createEventDispatcher, onMount } from "svelte";
+  import { logger } from "../../../lib/logger.js";
   // Import Carbon components and icons
   import {
     Tile,
@@ -124,7 +125,7 @@
           break;
       }
     } catch (err) {
-      console.warn("Failed to save credentials:", err);
+      logger.warn({ error: err.message }, "Failed to save credentials:");
     }
   }
 
@@ -163,7 +164,7 @@
         }
       }
     } catch (err) {
-      console.warn("Failed to load credentials:", err);
+      logger.warn({ error: err.message }, "Failed to load credentials:");
     }
     return null;
   }
@@ -175,7 +176,7 @@
         localStorage.removeItem(key);
       });
     } catch (err) {
-      console.warn("Failed to clear credentials:", err);
+      logger.warn({ error: err.message }, "Failed to clear credentials:");
     }
   }
 
@@ -331,7 +332,7 @@
       spaces = await listSpaces(client);
       currentSpace = client.currentSpace();
     } catch (err) {
-      console.warn("Failed to load spaces:", err);
+      logger.warn({ error: err.message }, "Failed to load spaces:");
       spaces = [];
     }
   }
@@ -420,12 +421,12 @@
     const stored = loadStoredCredentials();
     if (!stored) return;
 
-    console.log(`🔄 Auto-login with ${stored.method}...`);
+    logger.info({ method: stored.method }, `🔄 Auto-login with ${stored.method}...`);
 
     // Check if the stored method is enabled
     const tabIndex = getTabIndex(stored.method);
     if (tabIndex === -1) {
-      console.warn(`Stored auth method '${stored.method}' is disabled`);
+      logger.warn({ method: stored.method }, `Stored auth method '${stored.method}' is disabled`);
       clearStoredCredentials();
       return;
     }
@@ -446,7 +447,7 @@
         break;
       case "seed":
         if (!enableSeedAuth) {
-          console.warn("Seed auth is disabled");
+          logger.warn("Seed auth is disabled");
           return;
         }
         seedPhrase = stored.seedPhrase;

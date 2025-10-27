@@ -5,6 +5,8 @@
  * which can occur when Storacha agents have internal properties set to undefined.
  */
 
+import { logger } from "../../../lib/logger.js";
+
 /**
  * Detect signature algorithm from DID or agent properties
  * @param {Object} agent - The agent to analyze
@@ -29,7 +31,7 @@ function detectSignatureAlgorithm(agent) {
       }
     }
   } catch (error) {
-    console.warn("Could not detect signature algorithm from DID:", error);
+    logger.warn({ error: error.message }, "Could not detect signature algorithm from DID:");
   }
 
   // Default fallback
@@ -74,28 +76,28 @@ export function sanitizeAgent(agent) {
   }
 
   // Debug: Inspect the original agent
-  console.log("🔍 Agent sanitization debugging:");
-  console.log("   - Agent type:", typeof agent);
-  console.log("   - Agent constructor:", agent.constructor?.name);
-  console.log("   - Agent has did():", typeof agent.did === "function");
-  console.log("   - Agent has sign():", typeof agent.sign === "function");
-  console.log("   - Agent has issuer:", !!agent.issuer);
-  console.log("   - Agent.issuer type:", typeof agent.issuer);
-  console.log(
+  logger.info("🔍 Agent sanitization debugging:");
+  logger.info("   - Agent type:", typeof agent);
+  logger.info("   - Agent constructor:", agent.constructor?.name);
+  logger.info("   - Agent has did():", typeof agent.did === "function");
+  logger.info("   - Agent has sign():", typeof agent.sign === "function");
+  logger.info("   - Agent has issuer:", !!agent.issuer);
+  logger.info("   - Agent.issuer type:", typeof agent.issuer);
+  logger.info(
     "   - Agent.issuer has sign():",
     agent.issuer && typeof agent.issuer.sign === "function",
   );
-  console.log("   - Agent signatureAlgorithm:", agent.signatureAlgorithm);
-  console.log("   - Agent signatureCode:", agent.signatureCode);
+  logger.info("   - Agent signatureAlgorithm:", agent.signatureAlgorithm);
+  logger.info("   - Agent signatureCode:", agent.signatureCode);
 
   // For Storacha _Agent, the actual signer is in the issuer property
   const actualSigner = agent.issuer || agent;
-  console.log("   - Using actual signer:", actualSigner.constructor?.name);
-  console.log(
+  logger.info("   - Using actual signer:", actualSigner.constructor?.name);
+  logger.info(
     "   - Actual signer has sign():",
     typeof actualSigner.sign === "function",
   );
-  console.log(
+  logger.info(
     "   - Actual signer signatureAlgorithm:",
     actualSigner.signatureAlgorithm,
   );
@@ -104,7 +106,7 @@ export function sanitizeAgent(agent) {
   const detectedAlgorithm = detectSignatureAlgorithm(actualSigner);
   const detectedCode = detectSignatureCode(actualSigner, detectedAlgorithm);
 
-  console.log(
+  logger.info(
     `   - Detected algorithm="${detectedAlgorithm}", code=${detectedCode}`,
   );
 
@@ -114,10 +116,10 @@ export function sanitizeAgent(agent) {
       Object.getOwnPropertyNames(Object.getPrototypeOf(agent)),
     );
     const methods = agentKeys.filter((key) => typeof agent[key] === "function");
-    console.error(
+    logger.error(
       "⚠️ WARNING: Neither agent nor agent.issuer has a sign() method!",
     );
-    console.log("   - Agent methods:", methods.slice(0, 10));
+    logger.info("   - Agent methods:", methods.slice(0, 10));
     throw new Error("Cannot find a signing method in agent or agent.issuer");
   }
 
@@ -129,13 +131,13 @@ export function sanitizeAgent(agent) {
     },
 
     async sign(payload) {
-      console.log("🔐 Forwarding sign() call to actual signer...");
+      logger.info("🔐 Forwarding sign() call to actual signer...");
       try {
         const result = await actualSigner.sign(payload);
-        console.log("✅ Sign operation completed successfully");
+        logger.info("✅ Sign operation completed successfully");
         return result;
       } catch (error) {
-        console.error("❌ Sign operation failed:", error);
+        logger.error("❌ Sign operation failed:", error);
         throw error;
       }
     },

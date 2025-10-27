@@ -34,13 +34,13 @@ async function runBackupDemo() {
     
     for (const entry of sampleEntries) {
       const hash = await database.add(entry)
-      logger.info(`   ✓ Added: ${hash} - "${entry}"`)
+      logger.info({ hash, entry }, `   ✓ Added: ${hash} - "${entry}"`)
     }
     
-    logger.info(`\n📋 Database created:`)
-    logger.info(`   Name: ${database.name}`)
-    logger.info(`   Address: ${database.address}`)
-    logger.info(`   Entries: ${(await database.all()).length}`)
+    logger.info('\n📋 Database created:')
+    logger.info({ name: database.name }, '   Name')
+    logger.info({ address: database.address }, '   Address')
+    logger.info({ entryCount: (await database.all()).length }, '   Entries')
     
     // Step 3: Backup to Storacha
     logger.info('\n💾 Starting backup...')
@@ -48,27 +48,26 @@ async function runBackupDemo() {
     
     if (backupResult.success) {
       logger.info('\n🎉 Backup completed successfully!')
-      logger.info(`📋 Manifest CID: ${backupResult.manifestCID}`)
-      logger.info(`📊 Blocks uploaded: ${backupResult.blocksUploaded}/${backupResult.blocksTotal}`)
-      logger.info(`📈 Block breakdown:`)
+      logger.info({ manifestCID: backupResult.manifestCID }, '📋 Manifest CID')
+      logger.info({ uploaded: backupResult.blocksUploaded, total: backupResult.blocksTotal }, '📊 Blocks uploaded')
+      logger.info('📈 Block breakdown:')
       for (const [type, count] of Object.entries(backupResult.blockSummary)) {
-        logger.info(`   ${type}: ${count} blocks`)
+        logger.info({ type, count }, `   ${type}: ${count} blocks`)
       }
       
       // Save backup info for restoration demo
       logger.info('\n💾 Backup information (save this for restore):')
-      logger.info('Manifest CID:', backupResult.manifestCID)
-      logger.info('Database Address:', backupResult.databaseAddress)
-      logger.info('CID Mappings (sample):', Object.keys(backupResult.cidMappings).slice(0, 2))
+      logger.info({ manifestCID: backupResult.manifestCID }, 'Manifest CID')
+      logger.info({ databaseAddress: backupResult.databaseAddress }, 'Database Address')
+      logger.info({ sampleCidMappings: Object.keys(backupResult.cidMappings).slice(0, 2) }, 'CID Mappings (sample)')
       
     } else {
-      logger.error('\n❌ Backup failed:', backupResult.error)
+      logger.error({ error: backupResult.error }, '\n❌ Backup failed')
       process.exit(1)
     }
     
   } catch (error) {
-    logger.error('\n💥 Demo failed:', error.message)
-    logger.error(error.stack)
+    logger.error({ error: error.message, stack: error.stack }, '\n💥 Demo failed')
     process.exit(1)
     
   } finally {
@@ -81,7 +80,7 @@ async function runBackupDemo() {
         await sourceNode.datastore.close()
         logger.info('\n🧹 Cleanup completed')
       } catch (error) {
-        logger.warn('⚠️ Cleanup warning:', error.message)
+        logger.warn({ error: error.message }, '⚠️ Cleanup warning')
       }
     }
   }

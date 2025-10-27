@@ -439,7 +439,7 @@ export class OrbitDBWebAuthnIdentityProvider {
           dataLength: data?.length || 0,
           dataPreview: typeof data === 'string' ? data.slice(0, 100) : 'Binary data'
         });
-        console.trace('📋 Call stack for OrbitDB sign method');
+        logger.trace('📋 Call stack for OrbitDB sign method');
         // Return the Promise directly, don't await here
         return provider.signIdentity(data);
       },

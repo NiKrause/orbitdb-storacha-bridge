@@ -16,6 +16,7 @@ import { sha256 } from "multiformats/hashes/sha2";
 import { bases } from "multiformats/basics";
 import { EventEmitter } from "events";
 import { createHeliaOrbitDB, cleanupOrbitDBDirectories } from "./utils.js";
+import { logger } from "../../../../lib/logger.js";
 
 /**
  * Default configuration options
@@ -78,7 +79,7 @@ export async function extractDatabaseBlocks(database, options = {}) {
     ? "log entries only (fallback mode)"
     : "all blocks";
 
-  console.log(
+  logger.info(
     `🔍 Extracting ${extractionMode} from database: ${database.name}`,
   );
 
@@ -87,7 +88,7 @@ export async function extractDatabaseBlocks(database, options = {}) {
 
   // 1. Get all log entries
   const entries = await database.log.values();
-  console.log(`   Found ${entries.length} log entries`);
+  logger.info(`   Found ${entries.length} log entries`);
 
   for (const entry of entries) {
     try {
@@ -96,10 +97,10 @@ export async function extractDatabaseBlocks(database, options = {}) {
         const entryCid = CID.parse(entry.hash);
         blocks.set(entry.hash, { cid: entryCid, bytes: entryBytes });
         blockSources.set(entry.hash, "log_entry");
-        console.log(`   ✓ Entry block: ${entry.hash}`);
+        logger.info(`   ✓ Entry block: ${entry.hash}`);
       }
     } catch (error) {
-      console.warn(`   ⚠️ Failed to get entry ${entry.hash}: ${error.message}`);
+      logger.warn(`   ⚠️ Failed to get entry ${entry.hash}: ${error.message}`);
     }
   }
 
@@ -119,7 +120,7 @@ export async function extractDatabaseBlocks(database, options = {}) {
           bytes: manifestBytes,
         });
         blockSources.set(manifestCID, "manifest");
-        console.log(`   ✓ Manifest block: ${manifestCID}`);
+        logger.info(`   ✓ Manifest block: ${manifestCID}`);
 
         // Decode manifest to get access controller
         try {
@@ -144,24 +145,24 @@ export async function extractDatabaseBlocks(database, options = {}) {
                   bytes: accessBytes,
                 });
                 blockSources.set(accessControllerCID, "access_controller");
-                console.log(`   ✓ Access controller: ${accessControllerCID}`);
+                logger.info(`   ✓ Access controller: ${accessControllerCID}`);
               }
             } catch (error) {
-              console.warn(
+              logger.warn(
                 `   ⚠️ Could not get access controller: ${error.message}`,
               );
             }
           }
         } catch (error) {
-          console.warn(`   ⚠️ Could not decode manifest: ${error.message}`);
+          logger.warn(`   ⚠️ Could not decode manifest: ${error.message}`);
         }
       }
     } catch (error) {
-      console.warn(`   ⚠️ Could not get manifest: ${error.message}`);
+      logger.warn(`   ⚠️ Could not get manifest: ${error.message}`);
     }
 
     // 3. Get identity blocks by iterating through all storage blocks
-    console.log(`   🔍 Scanning all storage blocks for identities...`);
+    logger.info(`   🔍 Scanning all storage blocks for identities...`);
 
     // First, still collect known identity references from entries for comparison
     const referencedIdentities = new Set();
@@ -196,7 +197,7 @@ export async function extractDatabaseBlocks(database, options = {}) {
           if (content.id && content.type) {
             blocks.set(hash, { cid, bytes });
             blockSources.set(hash, "identity");
-            console.log(
+            logger.info(
               `   ✓ Identity block found: ${hash}${referencedIdentities.has(hash) ? " (referenced)" : " (discovered)"}`,
             );
           }
@@ -207,12 +208,12 @@ export async function extractDatabaseBlocks(database, options = {}) {
       }
     }
   } else {
-    console.log(
+    logger.info(
       `   ⚡ Skipping manifest, access controller, and identity blocks (fallback mode)`,
     );
   }
 
-  console.log(`   📊 Extracted ${blocks.size} total blocks`);
+  logger.info(`   📊 Extracted ${blocks.size} total blocks`);
   return { blocks, blockSources, manifestCID };
 }
 
@@ -244,7 +245,7 @@ async function initializeStorachaClient(storachaKey, storachaProof) {
  * @returns {Promise<Object>} - Initialized Storacha client
  */
 async function initializeStorachaClientWithUCAN(options) {
-  console.log('🔐 Initializing Storacha client with UCAN authentication...');
+  logger.info('🔐 Initializing Storacha client with UCAN authentication...');
   
   if (!options.client) {
     throw new Error('UCAN client is required');
@@ -252,13 +253,13 @@ async function initializeStorachaClientWithUCAN(options) {
   
   // If spaceDID is provided, set it as current space
   if (options.spaceDID) {
-    console.log(`   🚀 Setting current space: ${options.spaceDID}`);
+    logger.info(`   🚀 Setting current space: ${options.spaceDID}`);
     await options.client.setCurrentSpace(options.spaceDID);
   }
   
-  console.log('✅ UCAN Storacha client initialized');
-  console.log(`   🤖 Agent: ${options.client.agent.did()}`);
-  console.log(`   🚀 Current space: ${options.client.currentSpace()?.did()}`);
+  logger.info('✅ UCAN Storacha client initialized');
+  logger.info(`   🤖 Agent: ${options.client.agent.did()}`);
+  logger.info(`   🚀 Current space: ${options.client.currentSpace()?.did()}`);
   
   return options.client;
 }
@@ -280,7 +281,7 @@ async function uploadBlocksToStoracha(
   maxConcurrency = 3,
   eventEmitter = null,
 ) {
-  console.log(
+  logger.info(
     `📤 Uploading ${blocks.size} blocks to Storacha in batches of ${batchSize}...`,
   );
 
@@ -308,14 +309,14 @@ async function uploadBlocksToStoracha(
         type: "application/octet-stream",
       });
 
-      console.log(
+      logger.info(
         `   📤 Uploading block ${hash} (${blockData.bytes.length} bytes)...`,
       );
 
       const result = await client.uploadFile(blockFile);
       const uploadedCID = result.toString();
 
-      console.log(`   ✅ Uploaded: ${hash} → ${uploadedCID}`);
+      logger.info(`   ✅ Uploaded: ${hash} → ${uploadedCID}`);
 
       // Update progress
       completedBlocks++;
@@ -340,7 +341,7 @@ async function uploadBlocksToStoracha(
         size: blockData.bytes.length,
       };
     } catch (error) {
-      console.error(`   ❌ Failed to upload block ${hash}: ${error.message}`);
+      logger.error(`   ❌ Failed to upload block ${hash}: ${error.message}`);
 
       // Update progress even for failed uploads
       completedBlocks++;
@@ -377,13 +378,13 @@ async function uploadBlocksToStoracha(
       batches.push(batch);
     }
 
-    console.log(
+    logger.info(
       `   🔄 Processing ${batches.length} concurrent batches (${megaBatch.length} blocks)...`,
     );
 
     // Process all batches in this mega-batch concurrently
     const batchPromises = batches.map(async (batch, batchIndex) => {
-      console.log(
+      logger.info(
         `     📦 Batch ${batchIndex + 1}/${batches.length}: ${batch.length} blocks`,
       );
 
@@ -420,12 +421,12 @@ async function uploadBlocksToStoracha(
   const successful = uploadResults.filter((r) => r.uploadedCID);
   const failed = uploadResults.filter((r) => r.error);
 
-  console.log(`   📊 Upload summary:`);
-  console.log(`      Total blocks: ${blocks.size}`);
-  console.log(`      Successful: ${successful.length}`);
-  console.log(`      Failed: ${failed.length}`);
-  console.log(`      Batch size: ${batchSize}`);
-  console.log(`      Max concurrency: ${maxConcurrency}`);
+  logger.info(`   📊 Upload summary:`);
+  logger.info(`      Total blocks: ${blocks.size}`);
+  logger.info(`      Successful: ${successful.length}`);
+  logger.info(`      Failed: ${failed.length}`);
+  logger.info(`      Batch size: ${batchSize}`);
+  logger.info(`      Max concurrency: ${maxConcurrency}`);
 
   // Emit completion
   if (eventEmitter) {
@@ -460,7 +461,7 @@ async function uploadBlocksToStoracha(
  */
 export async function listStorachaSpaceFiles(options = {}) {
   const _config = { ...DEFAULT_OPTIONS, ...options };
-  console.log("📋 Listing files in Storacha space using SDK...");
+  logger.info("📋 Listing files in Storacha space using SDK...");
 
   try {
     // Initialize client - support both credential and UCAN authentication
@@ -509,7 +510,7 @@ export async function listStorachaSpaceFiles(options = {}) {
     // List uploads using SDK
     const result = await client.capability.upload.list(listOptions);
 
-    console.log(`   ✅ Found ${result.results.length} uploads in space`);
+    logger.info(`   ✅ Found ${result.results.length} uploads in space`);
 
     // Convert to the format we expect, with enhanced metadata
     const spaceFiles = result.results.map((upload) => ({
@@ -526,7 +527,7 @@ export async function listStorachaSpaceFiles(options = {}) {
 
     return spaceFiles;
   } catch (error) {
-    console.error("   ❌ SDK listing error:", error.message);
+    logger.error("   ❌ SDK listing error:", error.message);
     throw error;
   }
 }
@@ -614,7 +615,7 @@ export async function listLayerFiles(layer, options = {}) {
         );
     }
   } catch (error) {
-    console.warn(`   ⚠️ Failed to list ${layer}: ${error.message}`);
+    logger.warn(`   ⚠️ Failed to list ${layer}: ${error.message}`);
     return [];
   }
 }
@@ -629,12 +630,12 @@ export async function listLayerFiles(layer, options = {}) {
  */
 export async function removeLayerFiles(layer, cids, options = {}) {
   if (cids.length === 0) {
-    console.log(`   ✓ ${layer}: No files to remove`);
+    logger.info(`   ✓ ${layer}: No files to remove`);
     return { removed: 0, failed: 0 };
   }
 
   const batchSize = options.batchSize || 10;
-  console.log(
+  logger.info(
     `   🗑️ Removing ${cids.length} files from ${layer} layer using SDK (batch size: ${batchSize})...`,
   );
 
@@ -677,7 +678,7 @@ export async function removeLayerFiles(layer, cids, options = {}) {
       const batchNum = Math.floor(i / batchSize) + 1;
       const totalBatches = Math.ceil(cids.length / batchSize);
 
-      console.log(
+      logger.info(
         `      📦 Processing batch ${batchNum}/${totalBatches} (${batch.length} files)...`,
       );
 
@@ -718,16 +719,16 @@ export async function removeLayerFiles(layer, cids, options = {}) {
         if (result.status === "fulfilled") {
           if (result.value.success) {
             removed++;
-            console.log(`         ✓ Removed: ${result.value.cid}`);
+            logger.info(`         ✓ Removed: ${result.value.cid}`);
           } else {
             failed++;
-            console.log(
+            logger.info(
               `         ❌ Failed to remove ${result.value.cid}: ${result.value.error}`,
             );
           }
         } else {
           failed++;
-          console.log(`         ❌ Batch operation failed: ${result.reason}`);
+          logger.info(`         ❌ Batch operation failed: ${result.reason}`);
         }
       }
 
@@ -737,10 +738,10 @@ export async function removeLayerFiles(layer, cids, options = {}) {
       }
     }
 
-    console.log(`   📊 ${layer}: ${removed} removed, ${failed} failed`);
+    logger.info(`   📊 ${layer}: ${removed} removed, ${failed} failed`);
     return { removed, failed };
   } catch (error) {
-    console.error(`   ❌ Error removing from ${layer}: ${error.message}`);
+    logger.error(`   ❌ Error removing from ${layer}: ${error.message}`);
     return { removed: 0, failed: cids.length };
   }
 }
@@ -752,8 +753,8 @@ export async function removeLayerFiles(layer, cids, options = {}) {
  * @returns {Promise<Object>} - Clearing results
  */
 export async function clearStorachaSpace(options = {}) {
-  console.log("🧹 Clearing Storacha space using SDK...");
-  console.log("=".repeat(50));
+  logger.info("🧹 Clearing Storacha space using SDK...");
+  logger.info("=".repeat(50));
 
   const layers = ["upload", "store", "blob"];
   const summary = {
@@ -764,7 +765,7 @@ export async function clearStorachaSpace(options = {}) {
   };
 
   for (const layer of layers) {
-    console.log(`\n📋 Checking ${layer} layer...`);
+    logger.info(`\n📋 Checking ${layer} layer...`);
     const cids = await listLayerFiles(layer, options);
     summary.totalFiles += cids.length;
 
@@ -775,26 +776,26 @@ export async function clearStorachaSpace(options = {}) {
       summary.byLayer[layer] = result;
     } else {
       summary.byLayer[layer] = { removed: 0, failed: 0 };
-      console.log(`   ✓ ${layer}: Already empty`);
+      logger.info(`   ✓ ${layer}: Already empty`);
     }
   }
 
-  console.log("\n" + "=".repeat(50));
-  console.log("🧹 SPACE CLEARING RESULTS (SDK)");
-  console.log("=".repeat(50));
-  console.log(`📊 Total files found: ${summary.totalFiles}`);
-  console.log(`✅ Total files removed: ${summary.totalRemoved}`);
-  console.log(`❌ Total failures: ${summary.totalFailed}`);
+  logger.info("\n" + "=".repeat(50));
+  logger.info("🧹 SPACE CLEARING RESULTS (SDK)");
+  logger.info("=".repeat(50));
+  logger.info(`📊 Total files found: ${summary.totalFiles}`);
+  logger.info(`✅ Total files removed: ${summary.totalRemoved}`);
+  logger.info(`❌ Total failures: ${summary.totalFailed}`);
 
   for (const [layer, stats] of Object.entries(summary.byLayer)) {
-    console.log(
+    logger.info(
       `   ${layer}: ${stats.removed} removed, ${stats.failed} failed`,
     );
   }
 
   const success =
     summary.totalFailed === 0 && summary.totalFiles === summary.totalRemoved;
-  console.log(
+  logger.info(
     `\n${success ? "✅" : "⚠️"} Space clearing: ${success ? "COMPLETE" : "PARTIAL"}`,
   );
 
@@ -828,11 +829,11 @@ export async function downloadBlockFromStoracha(storachaCID, options = {}) {
 
       if (response.ok) {
         const bytes = new Uint8Array(await response.arrayBuffer());
-        console.log(`   ✅ Downloaded ${bytes.length} bytes from ${gateway}`);
+        logger.info(`   ✅ Downloaded ${bytes.length} bytes from ${gateway}`);
         return bytes;
       }
     } catch (error) {
-      console.log(`   ⚠️ Failed from ${gateway}: ${error.message}`);
+      logger.info(`   ⚠️ Failed from ${gateway}: ${error.message}`);
     }
   }
 
@@ -847,7 +848,7 @@ export async function downloadBlockFromStoracha(storachaCID, options = {}) {
  * @returns {Promise<Object>} - Analysis results
  */
 export async function analyzeBlocks(blockstore, downloadedBlocks = null) {
-  console.log("🔍 Analyzing downloaded blocks...");
+  logger.info("🔍 Analyzing downloaded blocks...");
 
   const analysis = {
     manifestBlocks: [],
@@ -880,16 +881,16 @@ export async function analyzeBlocks(blockstore, downloadedBlocks = null) {
           });
 
           const content = block.value;
-          console.log("content.type", content);
+          logger.info("content.type", content);
           // Smart block classification
           //if (content.type && content.name && content.accessController) {
           if (content.accessController) {
             analysis.manifestBlocks.push({ cid: cidString, content });
-            console.log(`   📋 Manifest: ${cidString} (${content.name})`);
+            logger.info(`   📋 Manifest: ${cidString} (${content.name})`);
           } else if (content.sig && content.key && content.identity) {
             analysis.logEntryBlocks.push({ cid: cidString, content });
             analysis.logStructure.set(cidString, content);
-            console.log(`   📝 Log Entry: ${cidString}`);
+            logger.info(`   📝 Log Entry: ${cidString}`);
 
             // Build log chain for head detection
             if (content.next && Array.isArray(content.next)) {
@@ -899,52 +900,52 @@ export async function analyzeBlocks(blockstore, downloadedBlocks = null) {
             }
           } else if (content.id && content.type) {
             analysis.identityBlocks.push({ cid: cidString, content });
-            console.log(`   👤 Identity: ${cidString}`);
+            logger.info(`   👤 Identity: ${cidString}`);
           } else if (
             content.type === "orbitdb-access-controller" ||
             content.type === "ipfs"
           ) {
             analysis.accessControllerBlocks.push({ cid: cidString, content });
-            console.log(`   🔒 Access Controller: ${cidString}`);
+            logger.info(`   🔒 Access Controller: ${cidString}`);
           } else {
             analysis.unknownBlocks.push({ cid: cidString, content });
-            console.log(`   ❓ Unknown: ${cidString}`);
+            logger.info(`   ❓ Unknown: ${cidString}`);
           }
         } catch (decodeError) {
           analysis.unknownBlocks.push({
             cid: cidString,
             decodeError: decodeError.message,
           });
-          console.log(`   ⚠️ Decode failed: ${cidString}`);
+          logger.info(`   ⚠️ Decode failed: ${cidString}`);
         }
       } else {
         analysis.unknownBlocks.push({ cid: cidString, reason: "not dag-cbor" });
-        console.log(`   🔧 Raw block: ${cidString}`);
+        logger.info(`   🔧 Raw block: ${cidString}`);
       }
     } catch (error) {
-      console.warn(
+      logger.warn(
         `   ❌ Error analyzing block ${cidString}: ${error.message}`,
       );
     }
   }
 
   // Intelligent head detection
-  console.log("🎯 Determining log heads:");
+  logger.info("🎯 Determining log heads:");
   for (const [entryHash, _entryContent] of analysis.logStructure) {
     if (!analysis.logChain.has(entryHash)) {
       analysis.potentialHeads.push(entryHash);
-      console.log(`   🎯 HEAD: ${entryHash}`);
+      logger.info(`   🎯 HEAD: ${entryHash}`);
     }
   }
 
-  console.log("📊 Analysis Summary:");
-  console.log(`   📋 Manifests: ${analysis.manifestBlocks.length}`);
-  console.log(`   📝 Log Entries: ${analysis.logEntryBlocks.length}`);
-  console.log(`   👤 Identities: ${analysis.identityBlocks.length}`);
-  console.log(
+  logger.info("📊 Analysis Summary:");
+  logger.info(`   📋 Manifests: ${analysis.manifestBlocks.length}`);
+  logger.info(`   📝 Log Entries: ${analysis.logEntryBlocks.length}`);
+  logger.info(`   👤 Identities: ${analysis.identityBlocks.length}`);
+  logger.info(
     `   🔒 Access Controllers: ${analysis.accessControllerBlocks.length}`,
   );
-  console.log(`   🎯 Heads Discovered: ${analysis.potentialHeads.length}`);
+  logger.info(`   🎯 Heads Discovered: ${analysis.potentialHeads.length}`);
 
   return analysis;
 }
@@ -965,7 +966,7 @@ async function downloadAndBridgeBlocks(
   options = {},
 ) {
   const config = { ...DEFAULT_OPTIONS, ...options };
-  console.log(
+  logger.info(
     `📥 Downloading and bridging ${cidMappings.size} blocks for OrbitDB...`,
   );
 
@@ -973,7 +974,7 @@ async function downloadAndBridgeBlocks(
 
   for (const [originalCID, storachaCID] of cidMappings) {
     try {
-      console.log(`   📥 Downloading ${storachaCID}...`);
+      logger.info(`   📥 Downloading ${storachaCID}...`);
 
       // Download block from Storacha
       const response = await fetch(`${config.gateway}/ipfs/${storachaCID}`, {
@@ -985,18 +986,18 @@ async function downloadAndBridgeBlocks(
       }
 
       const blockBytes = new Uint8Array(await response.arrayBuffer());
-      console.log(`   ✅ Downloaded ${blockBytes.length} bytes`);
+      logger.info(`   ✅ Downloaded ${blockBytes.length} bytes`);
 
       // Convert Storacha CID to OrbitDB format
       const bridgedCID = convertStorachaCIDToOrbitDB(storachaCID);
-      console.log(`   🌉 Bridged CID: ${storachaCID} → ${bridgedCID}`);
+      logger.info(`   🌉 Bridged CID: ${storachaCID} → ${bridgedCID}`);
 
       // Verify the bridged CID matches the original
       const match = bridgedCID === originalCID;
       if (match) {
-        console.log(`   ✅ CID bridge successful: ${bridgedCID}`);
+        logger.info(`   ✅ CID bridge successful: ${bridgedCID}`);
       } else {
-        console.warn(
+        logger.warn(
           `   ⚠️ CID bridge mismatch: expected ${originalCID}, got ${bridgedCID}`,
         );
       }
@@ -1004,7 +1005,7 @@ async function downloadAndBridgeBlocks(
       // Store block in target blockstore under OrbitDB CID format
       const parsedBridgedCID = CID.parse(bridgedCID);
       await targetBlockstore.put(parsedBridgedCID, blockBytes);
-      console.log(`   💾 Stored in blockstore as: ${bridgedCID}`);
+      logger.info(`   💾 Stored in blockstore as: ${bridgedCID}`);
 
       bridgedBlocks.push({
         originalCID,
@@ -1014,7 +1015,7 @@ async function downloadAndBridgeBlocks(
         match,
       });
     } catch (error) {
-      console.error(
+      logger.error(
         `   ❌ Failed to download/bridge ${storachaCID}: ${error.message}`,
       );
       bridgedBlocks.push({
@@ -1029,11 +1030,11 @@ async function downloadAndBridgeBlocks(
   const failed = bridgedBlocks.filter((b) => b.error);
   const matches = successful.filter((b) => b.match);
 
-  console.log(`   📊 Bridge summary:`);
-  console.log(`      Total blocks: ${cidMappings.size}`);
-  console.log(`      Downloaded: ${successful.length}`);
-  console.log(`      Failed: ${failed.length}`);
-  console.log(`      CID matches: ${matches.length}`);
+  logger.info(`   📊 Bridge summary:`);
+  logger.info(`      Total blocks: ${cidMappings.size}`);
+  logger.info(`      Downloaded: ${successful.length}`);
+  logger.info(`      Failed: ${failed.length}`);
+  logger.info(`      CID matches: ${matches.length}`);
 
   return { bridgedBlocks, successful, failed, matches };
 }
@@ -1057,9 +1058,9 @@ export async function backupDatabase(orbitdb, databaseAddress, options = {}) {
     ? "Log Entries Only (Fallback Mode)"
     : "Full Backup";
 
-  console.log("🚀 Starting OrbitDB Database Backup to Storacha");
-  console.log(`📍 Database: ${databaseAddress}`);
-  console.log(`🔧 Backup Mode: ${backupMode}`);
+  logger.info("🚀 Starting OrbitDB Database Backup to Storacha");
+  logger.info(`📍 Database: ${databaseAddress}`);
+  logger.info(`🔧 Backup Mode: ${backupMode}`);
 
   try {
     // Initialize Storacha client - support both credential and UCAN authentication
@@ -1067,7 +1068,7 @@ export async function backupDatabase(orbitdb, databaseAddress, options = {}) {
     
     // Check for UCAN authentication first
     if (config.ucanClient) {
-      console.log('🔐 Using UCAN authentication...');
+      logger.info('🔐 Using UCAN authentication...');
       client = await initializeStorachaClientWithUCAN({
         client: config.ucanClient,
         spaceDID: config.spaceDID
@@ -1089,7 +1090,7 @@ export async function backupDatabase(orbitdb, databaseAddress, options = {}) {
         );
       }
       
-      console.log('🔑 Using credential authentication...');
+      logger.info('🔑 Using credential authentication...');
       client = await initializeStorachaClient(storachaKey, storachaProof);
     }
 
@@ -1123,7 +1124,7 @@ export async function backupDatabase(orbitdb, databaseAddress, options = {}) {
       blockSummary[source] = (blockSummary[source] || 0) + 1;
     }
 
-    console.log("✅ Backup completed successfully!");
+    logger.info("✅ Backup completed successfully!");
 
     return {
       success: true,
@@ -1136,7 +1137,7 @@ export async function backupDatabase(orbitdb, databaseAddress, options = {}) {
       cidMappings: Object.fromEntries(cidMappings),
     };
   } catch (error) {
-    console.error("❌ Backup failed:", error.message);
+    logger.error("❌ Backup failed:", error.message);
     return {
       success: false,
       error: error.message,
@@ -1158,18 +1159,18 @@ export async function restoreLogEntriesOnly(orbitdb, options = {}) {
   const config = { ...DEFAULT_OPTIONS, ...options };
   const eventEmitter = options.eventEmitter;
 
-  console.log("⚡ Starting Optimized Log-Entries-Only Restore from Storacha");
+  logger.info("⚡ Starting Optimized Log-Entries-Only Restore from Storacha");
 
   try {
     // Step 1: List ALL files in Storacha space
-    console.log("\n📋 Step 1: Discovering all files in Storacha space...");
+    logger.info("\n📋 Step 1: Discovering all files in Storacha space...");
     const spaceFiles = await listStorachaSpaceFiles(config);
 
     if (spaceFiles.length === 0) {
       throw new Error("No files found in Storacha space");
     }
 
-    console.log(`   🎉 SUCCESS! Found ${spaceFiles.length} files in space`);
+    logger.info(`   🎉 SUCCESS! Found ${spaceFiles.length} files in space`);
 
     // Step 2: Download ONLY log entry blocks (optimized)
     const logEntryBlocks = await downloadLogEntriesOnly(
@@ -1183,19 +1184,19 @@ export async function restoreLogEntriesOnly(orbitdb, options = {}) {
       throw new Error("No log entries found in Storacha space");
     }
 
-    console.log(
+    logger.info(
       `   ⚡ OPTIMIZATION: Downloaded only ${logEntryBlocks.size} log entries instead of ${spaceFiles.length} total files`,
     );
 
     // Step 3: Direct fallback reconstruction (skip analysis since we only have log entries)
-    console.log("\n🔧 Step 3: Reconstructing database from log entries...");
+    logger.info("\n🔧 Step 3: Reconstructing database from log entries...");
     const fallbackResult = await reconstructWithoutManifest(
       orbitdb,
       logEntryBlocks,
       config,
     );
 
-    console.log(
+    logger.info(
       "✅ Optimized Log-Entries-Only Restore completed successfully!",
     );
 
@@ -1220,7 +1221,7 @@ export async function restoreLogEntriesOnly(orbitdb, options = {}) {
       },
     };
   } catch (error) {
-    console.error(
+    logger.error(
       "❌ Optimized Log-Entries-Only Restore failed:",
       error.message,
     );
@@ -1249,18 +1250,18 @@ export async function restoreDatabaseFromSpace(orbitdb, options = {}) {
   const eventEmitter = options.eventEmitter;
   // Use orbitdb parameter directly instead of creating an alias
 
-  console.log("🔄 Starting Mapping-Independent OrbitDB Restore from Storacha");
+  logger.info("🔄 Starting Mapping-Independent OrbitDB Restore from Storacha");
 
   try {
     // Step 1: List ALL files in Storacha space
-    console.log("\n📋 Step 1: Discovering all files in Storacha space...");
+    logger.info("\n📋 Step 1: Discovering all files in Storacha space...");
     const spaceFiles = await listStorachaSpaceFiles(config);
 
     if (spaceFiles.length === 0) {
       throw new Error("No files found in Storacha space");
     }
 
-    console.log(
+    logger.info(
       `   🎉 SUCCESS! Found ${spaceFiles.length} files in space without requiring CID mappings`,
     );
 
@@ -1275,14 +1276,14 @@ export async function restoreDatabaseFromSpace(orbitdb, options = {}) {
     // ... rest of existing code remains the same ...
 
     // Step 3: Intelligent block analysis
-    console.log("\n🔍 Step 3: Analyzing block structure ...");
+    logger.info("\n🔍 Step 3: Analyzing block structure ...");
     const analysis = await analyzeBlocks(
       orbitdb.ipfs.blockstore,
       downloadedBlocks,
     );
 
     if (analysis.manifestBlocks.length === 0 || options.forceFallback) {
-      console.log(
+      logger.info(
         "⚠️ No manifest blocks found - attempting fallback reconstruction...",
       );
 
@@ -1306,7 +1307,7 @@ export async function restoreDatabaseFromSpace(orbitdb, options = {}) {
     }
 
     // Step 4: Reconstruct database using discovered manifest
-    console.log("\n🔄 Step 4: Reconstructing database from analysis...");
+    logger.info("\n🔄 Step 4: Reconstructing database from analysis...");
 
     // Find the correct manifest by matching log entries to database IDs
     const correctManifest = findCorrectManifest(analysis);
@@ -1316,8 +1317,8 @@ export async function restoreDatabaseFromSpace(orbitdb, options = {}) {
 
     const databaseAddress = `/orbitdb/${correctManifest.cid}`;
 
-    console.log(`   📥 Opening database at: ${databaseAddress}`);
-    console.log(
+    logger.info(`   📥 Opening database at: ${databaseAddress}`);
+    logger.info(
       `   🎯 Selected manifest: ${correctManifest.cid} (matched from log entries)`,
     );
     
@@ -1325,23 +1326,23 @@ export async function restoreDatabaseFromSpace(orbitdb, options = {}) {
     let databaseType = inferDatabaseType(analysis.logEntryBlocks); // fallback
     if (correctManifest.content && correctManifest.content.type) {
       databaseType = correctManifest.content.type;
-      console.log(`   📋 Database type from manifest: ${databaseType}`);
+      logger.info(`   📋 Database type from manifest: ${databaseType}`);
     } else {
-      console.log(`   🔍 Inferred database type: ${databaseType}`);
+      logger.info(`   🔍 Inferred database type: ${databaseType}`);
     }
     
     const reconstructedDB = await orbitdb.open(
       databaseAddress,
       config.dbConfig ? config.dbConfig : { type: databaseType },
     );
-    console.log("config.dbConfig", config.dbConfig);
-    console.log("reconstructedDB.dbName", reconstructedDB.dbName);
+    logger.info("config.dbConfig", config.dbConfig);
+    logger.info("reconstructedDB.dbName", reconstructedDB.dbName);
     // const reconstructedDB = await orbitdb.open(config.dbName, config.dbConfig?config.dbConfig:{type: 'keyvalue'})
     // Wait for entries to load
-    console.log("   ⏳ Waiting for entries to load...");
+    logger.info("   ⏳ Waiting for entries to load...");
     await new Promise((resolve) => setTimeout(resolve, config.timeout / 10));
     const reconstructedEntries = await reconstructedDB.all();
-    console.log("   ⏳ Waiting for entries to load...");
+    logger.info("   ⏳ Waiting for entries to load...");
     await new Promise((resolve) => setTimeout(resolve, config.timeout / 10));
 
     // Handle different database types properly
@@ -1351,7 +1352,7 @@ export async function restoreDatabaseFromSpace(orbitdb, options = {}) {
       // For key-value databases, all() returns an object
       // Get the actual log entries to preserve hashes
       const logEntries = await reconstructedDB.log.values();
-      console.log("logEntries", logEntries);
+      logger.info("logEntries", logEntries);
       entriesArray = logEntries.map((logEntry) => ({
         hash: logEntry.hash,
         payload: logEntry.payload,
@@ -1365,10 +1366,10 @@ export async function restoreDatabaseFromSpace(orbitdb, options = {}) {
       entriesCount = entriesArray.length;
     }
 
-    console.log(`   📊 Reconstructed entries: ${entriesCount}`);
-    console.log(`   🔍 Database type: ${reconstructedDB.type}`);
+    logger.info(`   📊 Reconstructed entries: ${entriesCount}`);
+    logger.info(`   🔍 Database type: ${reconstructedDB.type}`);
 
-    console.log("✅ Mapping-Independent Restore completed successfully!");
+    logger.info("✅ Mapping-Independent Restore completed successfully!");
 
     return {
       success: true,
@@ -1386,7 +1387,7 @@ export async function restoreDatabaseFromSpace(orbitdb, options = {}) {
       entries: entriesArray,
     };
   } catch (error) {
-    console.error("❌ Mapping-Independent Restore failed:", error.message);
+    logger.error("❌ Mapping-Independent Restore failed:", error.message);
 
     return {
       success: false,
@@ -1412,8 +1413,8 @@ export async function restoreDatabase(
 ) {
   const config = { ...DEFAULT_OPTIONS, ...options };
 
-  console.log("🔄 Starting OrbitDB Database Restore from Storacha");
-  console.log(`📍 Manifest CID: ${manifestCID}`);
+  logger.info("🔄 Starting OrbitDB Database Restore from Storacha");
+  logger.info(`📍 Manifest CID: ${manifestCID}`);
 
   // No temporary resources needed
 
@@ -1479,17 +1480,17 @@ export async function restoreDatabase(
 
     // Reconstruct database
     const databaseAddress = `/orbitdb/${manifestCID}`;
-    console.log(`📥 Opening database at: ${databaseAddress}`);
+    logger.info(`📥 Opening database at: ${databaseAddress}`);
 
     const reconstructedDB = await orbitdb.open(databaseAddress);
 
     // Wait for entries to load
-    console.log("⏳ Waiting for entries to load...");
+    logger.info("⏳ Waiting for entries to load...");
     await new Promise((resolve) => setTimeout(resolve, config.timeout / 10));
 
     const reconstructedEntries = await reconstructedDB.all();
 
-    console.log(
+    logger.info(
       "✅ Restore completed successfully!",
       reconstructedEntries.length,
     );
@@ -1510,7 +1511,7 @@ export async function restoreDatabase(
       })),
     };
   } catch (error) {
-    console.error("❌ Restore failed:", error.message);
+    logger.error("❌ Restore failed:", error.message);
     return {
       success: false,
       error: error.message,
@@ -1596,15 +1597,15 @@ export class OrbitDBStorachaBridge extends EventEmitter {
  * @returns {Object|null} - Correct manifest block or null if not found
  */
 function findCorrectManifest(analysis) {
-  console.log("🎯 Finding correct manifest from log entries...");
+  logger.info("🎯 Finding correct manifest from log entries...");
 
   if (analysis.manifestBlocks.length === 1) {
-    console.log("   ✅ Only one manifest found, using it");
+    logger.info("   ✅ Only one manifest found, using it");
     return analysis.manifestBlocks[0];
   }
 
   if (analysis.manifestBlocks.length === 0) {
-    console.log("   ❌ No manifest blocks found");
+    logger.info("   ❌ No manifest blocks found");
     return null;
   }
 
@@ -1615,13 +1616,13 @@ function findCorrectManifest(analysis) {
       // Extract manifest CID from database address like '/orbitdb/zdpu...'
       const manifestCID = logEntry.content.id.replace("/orbitdb/", "");
       databaseIds.add(manifestCID);
-      console.log(
+      logger.info(
         `   📝 Log entry references database: ${logEntry.content.id} (manifest: ${manifestCID})`,
       );
     }
   }
 
-  console.log(
+  logger.info(
     `   🔍 Found ${databaseIds.size} unique database ID(s) from ${analysis.logEntryBlocks.length} log entries`,
   );
 
@@ -1630,7 +1631,7 @@ function findCorrectManifest(analysis) {
   for (const manifestBlock of analysis.manifestBlocks) {
     const count = databaseIds.has(manifestBlock.cid) ? 1 : 0;
     manifestCounts.set(manifestBlock.cid, count);
-    console.log(
+    logger.info(
       `   📋 Manifest ${manifestBlock.cid}: ${count > 0 ? "MATCHES" : "no match"}`,
     );
   }
@@ -1647,14 +1648,14 @@ function findCorrectManifest(analysis) {
   }
 
   if (bestManifest && bestCount > 0) {
-    console.log(
+    logger.info(
       `   ✅ Selected manifest: ${bestManifest.cid} (referenced by ${bestCount} log entries)`,
     );
     return bestManifest;
   }
 
   // Fallback: if no manifest matches log entries, use the first one and warn
-  console.warn(
+  logger.warn(
     "   ⚠️ No manifest matched log entries, using first manifest as fallback",
   );
   return analysis.manifestBlocks[0];
@@ -1675,7 +1676,7 @@ async function downloadLogEntriesOnly(
   config,
   eventEmitter = null,
 ) {
-  console.log("\n📥 Downloading and filtering log entry blocks only...");
+  logger.info("\n📥 Downloading and filtering log entry blocks only...");
   const logEntryBlocks = new Map();
   const totalFiles = spaceFiles.length;
   let completedFiles = 0;
@@ -1694,7 +1695,7 @@ async function downloadLogEntriesOnly(
 
   for (const spaceFile of spaceFiles) {
     const storachaCID = spaceFile.root;
-    console.log(`   🔄 Checking: ${storachaCID}`);
+    logger.info(`   🔄 Checking: ${storachaCID}`);
 
     try {
       const bytes = await downloadBlockFromStoracha(storachaCID, config);
@@ -1731,15 +1732,15 @@ async function downloadLogEntriesOnly(
             });
             logEntriesFound++;
 
-            console.log(`   ✅ Log entry stored: ${orbitdbCID}`);
+            logger.info(`   ✅ Log entry stored: ${orbitdbCID}`);
           } else {
-            console.log(`   ⚪ Skipped non-log block: ${orbitdbCID}`);
+            logger.info(`   ⚪ Skipped non-log block: ${orbitdbCID}`);
           }
         } catch (decodeError) {
-          console.log(`   ⚪ Skipped non-decodable block: ${orbitdbCID}`);
+          logger.info(`   ⚪ Skipped non-decodable block: ${orbitdbCID}`);
         }
       } else {
-        console.log(`   ⚪ Skipped non-CBOR block: ${orbitdbCID}`);
+        logger.info(`   ⚪ Skipped non-CBOR block: ${orbitdbCID}`);
       }
 
       // Update progress
@@ -1760,7 +1761,7 @@ async function downloadLogEntriesOnly(
         });
       }
     } catch (error) {
-      console.error(`   ❌ Failed: ${storachaCID} - ${error.message}`);
+      logger.error(`   ❌ Failed: ${storachaCID} - ${error.message}`);
 
       // Update progress even for failed downloads
       completedFiles++;
@@ -1796,7 +1797,7 @@ async function downloadLogEntriesOnly(
     });
   }
 
-  console.log(
+  logger.info(
     `   📊 Found ${logEntriesFound} log entries out of ${totalFiles} total files`,
   );
   return logEntryBlocks;
@@ -1817,7 +1818,7 @@ async function downloadBlocksWithProgress(
   config,
   eventEmitter = null,
 ) {
-  console.log("\n📥 Downloading all space files...");
+  logger.info("\n📥 Downloading all space files...");
   const downloadedBlocks = new Map();
   const totalFiles = spaceFiles.length;
   let completedFiles = 0;
@@ -1835,7 +1836,7 @@ async function downloadBlocksWithProgress(
 
   for (const spaceFile of spaceFiles) {
     const storachaCID = spaceFile.root;
-    console.log(`   🔄 Downloading: ${storachaCID}`);
+    logger.info(`   🔄 Downloading: ${storachaCID}`);
 
     try {
       const bytes = await downloadBlockFromStoracha(storachaCID, config);
@@ -1848,7 +1849,7 @@ async function downloadBlocksWithProgress(
       await currentOrbitDB.ipfs.blockstore.put(parsedCID, bytes);
       downloadedBlocks.set(orbitdbCID, { storachaCID, bytes: bytes.length });
 
-      console.log(`   ✅ Stored: ${orbitdbCID}`);
+      logger.info(`   ✅ Stored: ${orbitdbCID}`);
 
       // Update progress
       completedFiles++;
@@ -1867,7 +1868,7 @@ async function downloadBlocksWithProgress(
         });
       }
     } catch (error) {
-      console.error(`   ❌ Failed: ${storachaCID} - ${error.message}`);
+      logger.error(`   ❌ Failed: ${storachaCID} - ${error.message}`);
 
       // Update progress even for failed downloads
       completedFiles++;
@@ -1902,7 +1903,7 @@ async function downloadBlocksWithProgress(
     });
   }
 
-  console.log(`   📊 Downloaded ${downloadedBlocks.size} blocks total`);
+  logger.info(`   📊 Downloaded ${downloadedBlocks.size} blocks total`);
   return downloadedBlocks;
 }
 
@@ -1916,13 +1917,13 @@ async function downloadBlocksWithProgress(
  * @returns {Promise<Object>} - Reconstruction results
  */
 async function reconstructWithoutManifest(orbitdb, downloadedBlocks, config) {
-  console.log("🔧 Starting fallback reconstruction without manifest...");
+  logger.info("🔧 Starting fallback reconstruction without manifest...");
 
   const logEntries = [];
   const unknownBlocks = [];
 
   // Step 1: Decode all blocks and identify log entries
-  console.log("🔍 Step 1: Decoding blocks to find log entries...");
+  logger.info("🔍 Step 1: Decoding blocks to find log entries...");
 
   for (const [cidString, _] of downloadedBlocks) {
     try {
@@ -1956,20 +1957,20 @@ async function reconstructWithoutManifest(orbitdb, downloadedBlocks, config) {
               payload: content.payload,
             });
 
-            console.log(`   📝 Found log entry: ${cidString.slice(0, 12)}...`);
+            logger.info(`   📝 Found log entry: ${cidString.slice(0, 12)}...`);
           }
         } catch (decodeError) {
           unknownBlocks.push({ cid: cidString, error: decodeError.message });
         }
       }
     } catch (error) {
-      console.warn(
+      logger.warn(
         `   ⚠️ Error processing block ${cidString}: ${error.message}`,
       );
     }
   }
 
-  console.log(`   ✅ Found ${logEntries.length} log entries`);
+  logger.info(`   ✅ Found ${logEntries.length} log entries`);
 
   if (logEntries.length === 0) {
     throw new Error(
@@ -1978,25 +1979,25 @@ async function reconstructWithoutManifest(orbitdb, downloadedBlocks, config) {
   }
 
   // Step 2: Analyze payload patterns to determine database type
-  console.log(
+  logger.info(
     "🔍 Step 2: Analyzing payload patterns to determine database type...",
   );
 
   const databaseType = inferDatabaseType(logEntries);
-  console.log(`   📊 Inferred database type: ${databaseType}`);
+  logger.info(`   📊 Inferred database type: ${databaseType}`);
 
   // Step 3: Create new database and import entries
-  console.log(`🆕 Step 3: Creating new ${databaseType} database...`);
+  logger.info(`🆕 Step 3: Creating new ${databaseType} database...`);
 
   const dbName = "test-todos"; // config.fallbackDatabaseName || `restored-${Date.now()}`
 
   // const database = await orbitdb.open(dbName, { type: databaseType })
   const database = await orbitdb.open(dbName, config.dbConfig);
 
-  console.log(`   ✅ Created database: ${database.address}`);
+  logger.info(`   ✅ Created database: ${database.address}`);
 
   // Step 4: Sort entries by clock time and import them
-  console.log("📥 Step 4: Importing entries in chronological order...");
+  logger.info("📥 Step 4: Importing entries in chronological order...");
 
   // Sort by clock time to maintain order
   logEntries.sort((a, b) => {
@@ -2012,21 +2013,21 @@ async function reconstructWithoutManifest(orbitdb, downloadedBlocks, config) {
     try {
       await importEntryByType(database, entry, databaseType);
       importedCount++;
-      console.log(`   ✅ Imported entry ${importedCount}/${logEntries.length}`);
+      logger.info(`   ✅ Imported entry ${importedCount}/${logEntries.length}`);
     } catch (error) {
       importErrors.push({ entry: entry.hash, error: error.message });
-      console.warn(
+      logger.warn(
         `   ⚠️ Failed to import entry ${entry.hash.slice(0, 12)}...: ${error.message}`,
       );
     }
   }
 
-  console.log(
+  logger.info(
     `   📊 Import complete: ${importedCount}/${logEntries.length} entries imported`,
   );
 
   if (importErrors.length > 0) {
-    console.warn(`   ⚠️ ${importErrors.length} import errors occurred`);
+    logger.warn(`   ⚠️ ${importErrors.length} import errors occurred`);
   }
 
   // Create fallback metadata
@@ -2088,7 +2089,7 @@ function inferDatabaseType(logEntries) {
     }
   }
 
-  console.log("   📊 Payload analysis:", payloadPatterns);
+  logger.info("   📊 Payload analysis:", payloadPatterns);
 
   // Determine type based on majority pattern
   if (payloadPatterns.hasCounterOps > 0) {

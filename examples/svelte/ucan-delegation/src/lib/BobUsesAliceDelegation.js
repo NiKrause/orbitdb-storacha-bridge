@@ -5,6 +5,7 @@
 // Commented out unused imports
 // import { invoke } from "@ucanto/core";
 // import { Verifier } from "@ucanto/principal";
+import { logger } from "../../../lib/logger.js";
 
 /**
  * Bob creates a Storacha client using Alice's delegation
@@ -17,7 +18,7 @@ export async function createBobStorachaClient(
   bobWebAuthnSigner,
   bobDID,
 ) {
-  console.log("🔄 Bob creating Storacha client with Alice's delegation...");
+  logger.info("🔄 Bob creating Storacha client with Alice's delegation...");
 
   // Import Storacha client
   const { create } = await import("@storacha/client");
@@ -41,7 +42,7 @@ export async function createBobStorachaClient(
     proofs: [aliceDelegation], // Alice's EdDSA delegation
   });
 
-  console.log("✅ Bob can now use Storacha with Alice's permissions!");
+  logger.info("✅ Bob can now use Storacha with Alice's permissions!");
   return bobStorachaClient;
 }
 
@@ -51,21 +52,21 @@ export async function createBobStorachaClient(
  * @param {File} file - File to upload
  */
 export async function bobUploadToStoracha(bobStorachaClient, file) {
-  console.log("📤 Bob uploading file using Alice's delegation...");
+  logger.info("📤 Bob uploading file using Alice's delegation...");
 
   try {
     // Bob creates an invocation UCAN (signed with his P-256 keys)
     // and includes Alice's delegation (EdDSA-signed) as proof
     const result = await bobStorachaClient.uploadFile(file);
 
-    console.log("✅ Upload successful! Cross-algorithm delegation worked!");
-    console.log("   - Alice delegated with EdDSA");
-    console.log("   - Bob invoked with P-256");
-    console.log("   - Storacha verified both signatures");
+    logger.info("✅ Upload successful! Cross-algorithm delegation worked!");
+    logger.info("   - Alice delegated with EdDSA");
+    logger.info("   - Bob invoked with P-256");
+    logger.info("   - Storacha verified both signatures");
 
     return result;
   } catch (error) {
-    console.error("❌ Upload failed:", error);
+    logger.error({ error: error.message, stack: error.stack }, "❌ Upload failed:");
     throw error;
   }
 }

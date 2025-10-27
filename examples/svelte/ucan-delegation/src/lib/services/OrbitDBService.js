@@ -6,6 +6,7 @@
 import { createOrbitDB, Identities } from "@orbitdb/core";
 import { createLibp2pNode, createHeliaNode } from "../p2p.js";
 import UCANOrbitDBAccessController from "../UCANOrbitDBAccessController.js";
+import { logger } from "../../../../lib/logger.js";
 
 export class OrbitDBService {
   constructor() {
@@ -45,7 +46,7 @@ export class OrbitDBService {
    * Enhanced function to force connection between Alice and Bob
    */
   async forceDirectConnection() {
-    console.log(
+    logger.info(
       "🔗 [FORCE_CONNECTION] Starting enhanced connection attempt...",
     );
 
@@ -59,7 +60,7 @@ export class OrbitDBService {
       !this.connectionState.alicePeerId ||
       !this.connectionState.bobPeerId
     ) {
-      console.warn(
+      logger.warn(
         "⚠️ [FORCE_CONNECTION] Cannot force connection - missing libp2p instances or peer IDs",
       );
       return false;
@@ -69,13 +70,13 @@ export class OrbitDBService {
       !this.connectionState.aliceAddressReady ||
       !this.connectionState.bobAddressReady
     ) {
-      console.warn(
+      logger.warn(
         "⚠️ [FORCE_CONNECTION] Cannot force connection - addresses not ready yet",
       );
       return false;
     }
 
-    console.log(
+    logger.info(
       "✅ [FORCE_CONNECTION] Prerequisites met, proceeding with connection strategies...",
     );
 
@@ -87,7 +88,7 @@ export class OrbitDBService {
 
     // Try Bob dialing Alice using PeerId object
     try {
-      console.log(
+      logger.info(
         `📨 [FORCE_CONNECTION] Bob dialing Alice using PeerId object...`,
       );
 
@@ -98,7 +99,7 @@ export class OrbitDBService {
         ),
       ]);
 
-      console.log(`✅ [FORCE_CONNECTION] PeerId dial SUCCESS!`, {
+      logger.info(`✅ [FORCE_CONNECTION] PeerId dial SUCCESS!`, {
         remotePeer: connection.remotePeer.toString().slice(-12),
         direction: connection.direction,
         status: connection.status,
@@ -106,13 +107,13 @@ export class OrbitDBService {
 
       connectionEstablished = true;
     } catch (error) {
-      console.log(
+      logger.info(
         `❌ [FORCE_CONNECTION] Bob->Alice PeerId dial failed: ${error.message}`,
       );
 
       // Try Alice dialing Bob using PeerId object
       try {
-        console.log(
+        logger.info(
           `📨 [FORCE_CONNECTION] Alice dialing Bob using PeerId object...`,
         );
 
@@ -123,24 +124,24 @@ export class OrbitDBService {
           ),
         ]);
 
-        console.log(`✅ [FORCE_CONNECTION] PeerId dial SUCCESS!`);
+        logger.info(`✅ [FORCE_CONNECTION] PeerId dial SUCCESS!`);
         connectionEstablished = true;
       } catch (error2) {
-        console.log(
+        logger.info(
           `❌ [FORCE_CONNECTION] Alice->Bob PeerId dial failed: ${error2.message}`,
         );
       }
     }
 
     if (connectionEstablished) {
-      console.log(
+      logger.info(
         "🎉 [FORCE_CONNECTION] Strategy SUCCESS: Direct connection established!",
       );
       return true;
     }
 
     // Strategy 2: Wait for natural discovery
-    console.log("⏳ [FORCE_CONNECTION] Waiting for natural discovery...");
+    logger.info("⏳ [FORCE_CONNECTION] Waiting for natural discovery...");
 
     const discoveryTimeout = 15000; // 15 seconds
     const discoveryStartTime = Date.now();
@@ -166,7 +167,7 @@ export class OrbitDBService {
     }
 
     if (peersDiscovered) {
-      console.log("🎉 [FORCE_CONNECTION] Natural discovery worked!");
+      logger.info("🎉 [FORCE_CONNECTION] Natural discovery worked!");
       return true;
     }
 
@@ -175,12 +176,12 @@ export class OrbitDBService {
     const finalBobConnections = bob.libp2p.getConnections().length;
 
     if (finalAliceConnections > 0 && finalBobConnections > 0) {
-      console.log(
+      logger.info(
         "✨ [FORCE_CONNECTION] PARTIAL SUCCESS: Both peers connected to relay - OrbitDB replication may still work!",
       );
       return true;
     } else {
-      console.warn(
+      logger.warn(
         "⚠️ [FORCE_CONNECTION] All strategies failed - but proceeding anyway",
       );
       return false;
@@ -245,7 +246,7 @@ export class OrbitDBService {
       sharedDatabaseAddress = null,
     } = options;
 
-    console.log(
+    logger.info(
       `🔧 Creating OrbitDB instance for ${persona}... (openDatabase: ${openDatabase})`,
     );
 
@@ -255,14 +256,14 @@ export class OrbitDBService {
       enableNetworkConnection: replicationEnabled,
       enableReservations: true, // Enable circuit relay reservations
     });
-    console.log(
+    logger.info(
       `${persona} libp2p created with peer discovery enabled:`,
       replicationEnabled,
     );
-    console.log(`🆔 ${persona} Peer ID:`, libp2p.peerId.toString());
+    logger.info(`🆔 ${persona} Peer ID:`, libp2p.peerId.toString());
 
     const multiaddrs = libp2p.getMultiaddrs().map((addr) => addr.toString());
-    console.log(`🎧 ${persona} Listening on:`, multiaddrs);
+    logger.info(`🎧 ${persona} Listening on:`, multiaddrs);
 
     // Update connection state
     if (persona === "alice") {
@@ -278,7 +279,7 @@ export class OrbitDBService {
       const currentMultiaddrs = libp2p
         .getMultiaddrs()
         .map((addr) => addr.toString());
-      console.log(
+      logger.info(
         `🔍 ${persona.toUpperCase()} current addresses:`,
         currentMultiaddrs,
       );
@@ -299,7 +300,7 @@ export class OrbitDBService {
       const hasAnyAddresses = currentMultiaddrs.length > 0;
       const shouldBeReady = hasAnyAddresses; // Simplified: any addresses are ready
 
-      console.log(`🔍 ${persona.toUpperCase()} address analysis:`, {
+      logger.info(`🔍 ${persona.toUpperCase()} address analysis:`, {
         total: currentMultiaddrs.length,
         hasDialable: hasDialableAddresses,
         hasAny: hasAnyAddresses,
@@ -312,10 +313,10 @@ export class OrbitDBService {
         this.connectionState.aliceAddressReady = shouldBeReady;
 
         if (shouldBeReady && !wasReady) {
-          console.log(
+          logger.info(
             `✅ Alice ready for connections (${currentMultiaddrs.length} addresses)`,
           );
-          console.log(`✅ Alice addresses:`, currentMultiaddrs);
+          logger.info(`✅ Alice addresses:`, currentMultiaddrs);
           this.addReplicationEvent({
             type: "addresses_ready",
             peer: "alice",
@@ -331,10 +332,10 @@ export class OrbitDBService {
         this.connectionState.bobAddressReady = shouldBeReady;
 
         if (shouldBeReady && !wasReady) {
-          console.log(
+          logger.info(
             `✅ Bob ready for connections (${currentMultiaddrs.length} addresses)`,
           );
-          console.log(`✅ Bob addresses:`, currentMultiaddrs);
+          logger.info(`✅ Bob addresses:`, currentMultiaddrs);
           this.addReplicationEvent({
             type: "addresses_ready",
             peer: "bob",
@@ -364,7 +365,7 @@ export class OrbitDBService {
         );
 
       if (hasNewAddresses) {
-        console.log(
+        logger.info(
           `🔄 ${persona.toUpperCase()} addresses updated:`,
           currentMultiaddrs,
         );
@@ -378,7 +379,7 @@ export class OrbitDBService {
           : this.connectionState.bobAddressReady;
       if (isReady) {
         clearInterval(addressCheckInterval);
-        console.log(
+        logger.info(
           `✅ ${persona.toUpperCase()} address checking stopped - ready!`,
         );
       }
@@ -387,14 +388,14 @@ export class OrbitDBService {
     // Stop interval after 10 seconds regardless (reduced for UCAN demo)
     setTimeout(() => {
       clearInterval(addressCheckInterval);
-      console.log(`⏰ ${persona.toUpperCase()} address checking timeout`);
+      logger.info(`⏰ ${persona.toUpperCase()} address checking timeout`);
       // Force ready state for UCAN demo - we don't need perfect P2P connectivity
       if (persona === "alice") {
         this.connectionState.aliceAddressReady = true;
       } else {
         this.connectionState.bobAddressReady = true;
       }
-      console.log(
+      logger.info(
         `🚀 ${persona.toUpperCase()} forced ready for UCAN delegation demo`,
       );
     }, 10000);
@@ -402,7 +403,7 @@ export class OrbitDBService {
     // Peer Discovery Events
     libp2p.addEventListener("peer:discovery", (event) => {
       const peerId = event.detail.id.toString();
-      console.log(
+      logger.info(
         `🔍 ${persona.toUpperCase()} discovered peer: ...${peerId.slice(-8)}`,
       );
 
@@ -416,7 +417,7 @@ export class OrbitDBService {
     // Connection Events
     libp2p.addEventListener("peer:connect", (event) => {
       const peerId = event.detail.toString();
-      console.log(
+      logger.info(
         `🔗 ${persona.toUpperCase()} connected to peer: ...${peerId.slice(-8)}`,
       );
 
@@ -445,7 +446,7 @@ export class OrbitDBService {
     // Disconnection Events
     libp2p.addEventListener("peer:disconnect", (event) => {
       const peerId = event.detail.toString();
-      console.log(
+      logger.info(
         `🔌 ${persona.toUpperCase()} disconnected from: ...${peerId.slice(-8)}`,
       );
 
@@ -467,12 +468,12 @@ export class OrbitDBService {
     });
 
     // Create Helia instance with memory storage for tests to avoid persistence conflicts
-    console.log("🗄️ Initializing Helia with memory storage for testing...");
+    logger.info("🗄️ Initializing Helia with memory storage for testing...");
     const helia = await createHeliaNode(libp2p);
-    console.log("Helia created with memory storage");
+    logger.info("Helia created with memory storage");
 
     // 🔑 KEY FIX: Create IPFS-linked identities instance for this OrbitDB peer
-    console.log(
+    logger.info(
       `🔗 Creating IPFS-linked identities instance for ${persona}...`,
     );
     const linkedIdentities = await Identities({ ipfs: helia });
@@ -503,21 +504,21 @@ export class OrbitDBService {
     // Choose identity based on persona and settings
     if (persona === "alice" && sharedIdentity) {
       orbitdbConfig.identity = sharedIdentity;
-      console.log(`🔑 Alice using WebAuthn identity: ${sharedIdentity.id}`);
-      console.log(`   ✅ Alice using IPFS-linked identities system`);
+      logger.info(`🔑 Alice using WebAuthn identity: ${sharedIdentity.id}`);
+      logger.info(`   ✅ Alice using IPFS-linked identities system`);
     } else if (persona === "bob" && bobIdentity) {
       orbitdbConfig.identity = bobIdentity;
-      console.log(`🆔 Bob using his own separate identity: ${bobIdentity.id}`);
-      console.log(`   ✅ Bob using IPFS-linked identities system`);
+      logger.info(`🆔 Bob using his own separate identity: ${bobIdentity.id}`);
+      logger.info(`   ✅ Bob using IPFS-linked identities system`);
     } else {
       // Fallback: let OrbitDB create default identity with unique ID
       orbitdbConfig.id = `${persona}-${instanceId}-${Date.now()}-${Math.random()}`;
-      console.log(
+      logger.info(
         `⚠️ ${persona} using default OrbitDB identity with IPFS-linked identities`,
       );
     }
 
-    console.log("🔧 OrbitDB config about to be used:", {
+    logger.info("🔧 OrbitDB config about to be used:", {
       hasIPFS: !!orbitdbConfig.ipfs,
       hasIdentity: !!orbitdbConfig.identity,
       hasIdentities: !!orbitdbConfig.identities,
@@ -529,7 +530,7 @@ export class OrbitDBService {
 
     const orbitdb = await createOrbitDB(orbitdbConfig);
 
-    console.log("🆔 OrbitDB instance created:", {
+    logger.info("🆔 OrbitDB instance created:", {
       orbitDBId: orbitdb.id,
       actualIdentityId: orbitdb.identity?.id,
       actualIdentityType: orbitdb.identity?.type,
@@ -542,7 +543,7 @@ export class OrbitDBService {
       hasVerifyMethod: typeof orbitdb.identity?.verify === "function",
     });
 
-    console.log("📜 OrbitDB instance created with identity");
+    logger.info("📜 OrbitDB instance created with identity");
 
     // Create database with proper access controller (conditionally)
     let database = null;
@@ -565,7 +566,7 @@ export class OrbitDBService {
         this.setupDatabaseEventListeners(database, persona);
       }
     } else {
-      console.log(
+      logger.info(
         `⏳ ${persona} OrbitDB instance created but database not opened yet (waiting for connection)`,
       );
     }
@@ -586,14 +587,14 @@ export class OrbitDBService {
     sharedIdentity,
     bobIdentity,
   ) {
-    console.log(
+    logger.info(
       `📦 Cross-storing identities in ${persona}'s IPFS blockstore...`,
     );
 
     // 🔍 DEBUG: Check identity structure first
-    console.log("🔍 Identity debugging for IPFS storage:");
+    logger.info("🔍 Identity debugging for IPFS storage:");
     if (sharedIdentity) {
-      console.log("   Alice/shared identity:", {
+      logger.info("   Alice/shared identity:", {
         id: sharedIdentity.id,
         hash: sharedIdentity.hash,
         hashType: typeof sharedIdentity.hash,
@@ -605,7 +606,7 @@ export class OrbitDBService {
     }
 
     if (bobIdentity) {
-      console.log("   Bob identity:", {
+      logger.info("   Bob identity:", {
         id: bobIdentity.id,
         hash: bobIdentity.hash,
         hashType: typeof bobIdentity.hash,
@@ -622,14 +623,14 @@ export class OrbitDBService {
     if (sharedIdentity) {
       if (sharedIdentity.hash && sharedIdentity.bytes) {
         try {
-          console.log(
+          logger.info(
             `   📦 Attempting to store Alice identity with hash: ${sharedIdentity.hash}`,
           );
 
           // Parse hash string as CID (required by IPFS blockstore)
           const { CID } = await import("multiformats/cid");
           const hashCID = CID.parse(sharedIdentity.hash);
-          console.log(`     ✅ Parsed hash as CID: ${hashCID}`);
+          logger.info(`     ✅ Parsed hash as CID: ${hashCID}`);
 
           // Get helia from current peer
           const currentPeer = this.peers.get(persona);
@@ -639,30 +640,30 @@ export class OrbitDBService {
             );
           }
         } catch (hashError) {
-          console.error(
+          logger.error(
             `   ❌ Alice identity hash validation failed:`,
             hashError.message,
           );
-          console.log(`   🔧 Trying alternative storage method...`);
+          logger.info(`   🔧 Trying alternative storage method...`);
 
           // Alternative: Store using the identity directly through OrbitDB identities system
           try {
             await linkedIdentities.addIdentity(sharedIdentity);
-            console.log(
+            logger.info(
               `   ✅ Alice identity stored via identities.addIdentity()`,
             );
           } catch (altError) {
-            console.error(
+            logger.error(
               `   ❌ Alternative storage also failed:`,
               altError.message,
             );
           }
         }
       } else {
-        console.warn(
+        logger.warn(
           `   ⚠️ Alice identity missing hash or bytes - cannot store in IPFS`,
         );
-        console.log(
+        logger.info(
           `     Hash: ${sharedIdentity.hash}, Bytes: ${!!sharedIdentity.bytes}`,
         );
       }
@@ -672,14 +673,14 @@ export class OrbitDBService {
     if (bobIdentity) {
       if (bobIdentity.hash && bobIdentity.bytes) {
         try {
-          console.log(
+          logger.info(
             `   📦 Attempting to store Bob identity with hash: ${bobIdentity.hash}`,
           );
 
           // Parse hash string as CID (required by IPFS blockstore)
           const { CID } = await import("multiformats/cid");
           const hashCID = CID.parse(bobIdentity.hash);
-          console.log(`     ✅ Parsed hash as CID: ${hashCID}`);
+          logger.info(`     ✅ Parsed hash as CID: ${hashCID}`);
 
           // Get helia from current peer
           const currentPeer = this.peers.get(persona);
@@ -689,30 +690,30 @@ export class OrbitDBService {
             );
           }
         } catch (hashError) {
-          console.error(
+          logger.error(
             `   ❌ Bob identity hash validation failed:`,
             hashError.message,
           );
-          console.log(`   🔧 Trying alternative storage method...`);
+          logger.info(`   🔧 Trying alternative storage method...`);
 
           // Alternative: Store using the identity directly through OrbitDB identities system
           try {
             await linkedIdentities.addIdentity(bobIdentity);
-            console.log(
+            logger.info(
               `   ✅ Bob identity stored via identities.addIdentity()`,
             );
           } catch (altError) {
-            console.error(
+            logger.error(
               `   ❌ Alternative storage also failed:`,
               altError.message,
             );
           }
         }
       } else {
-        console.warn(
+        logger.warn(
           `   ⚠️ Bob identity missing hash or bytes - cannot store in IPFS`,
         );
-        console.log(
+        logger.info(
           `     Hash: ${bobIdentity.hash}, Bytes: ${!!bobIdentity.bytes}`,
         );
       }
@@ -722,20 +723,20 @@ export class OrbitDBService {
     if (identityStorePromises.length > 0) {
       try {
         await Promise.all(identityStorePromises);
-        console.log(
+        logger.info(
           `✅ Identity storage promises completed in ${persona}'s IPFS`,
         );
       } catch (storageError) {
-        console.error(
+        logger.error(
           `❌ Some identity storage failed in ${persona}'s IPFS:`,
           storageError,
         );
-        console.log(
+        logger.info(
           `   🔧 This might be expected if identities don't have proper hash/bytes`,
         );
       }
     } else {
-      console.log(
+      logger.info(
         `ℹ️ No IPFS storage needed - identities stored via alternative methods`,
       );
     }
@@ -750,13 +751,13 @@ export class OrbitDBService {
     sharedIdentity,
     bobIdentity,
   ) {
-    console.log(
+    logger.info(
       `🧪 Testing identity resolution for ${persona} after cross-storage:`,
     );
 
     // Try multiple resolution approaches
     if (sharedIdentity) {
-      console.log("   Testing Alice/shared identity resolution:");
+      logger.info("   Testing Alice/shared identity resolution:");
 
       // Method 1: By hash (if available)
       if (sharedIdentity.hash) {
@@ -765,7 +766,7 @@ export class OrbitDBService {
           const aliceByHashString = await linkedIdentities.getIdentity(
             sharedIdentity.hash,
           );
-          console.log(
+          logger.info(
             `     By hash (string): ${aliceByHashString ? "✅" : "❌"}`,
           );
 
@@ -773,23 +774,23 @@ export class OrbitDBService {
           const { CID } = await import("multiformats/cid");
           const hashCID = CID.parse(sharedIdentity.hash);
           const aliceByHashCID = await linkedIdentities.getIdentity(hashCID);
-          console.log(`     By hash (CID): ${aliceByHashCID ? "✅" : "❌"}`);
+          logger.info(`     By hash (CID): ${aliceByHashCID ? "✅" : "❌"}`);
         } catch (hashError) {
-          console.log(`     By hash: ❌ (${hashError.message})`);
+          logger.info(`     By hash: ❌ (${hashError.message})`);
         }
       }
 
       // Method 2: By ID
       try {
         const aliceById = await linkedIdentities.getIdentity(sharedIdentity.id);
-        console.log(`     By ID: ${aliceById ? "✅" : "❌"}`);
+        logger.info(`     By ID: ${aliceById ? "✅" : "❌"}`);
       } catch (idError) {
-        console.log(`     By ID: ❌ (${idError.message})`);
+        logger.info(`     By ID: ❌ (${idError.message})`);
       }
     }
 
     if (bobIdentity) {
-      console.log("   Testing Bob identity resolution:");
+      logger.info("   Testing Bob identity resolution:");
 
       // Method 1: By hash (if available)
       if (bobIdentity.hash) {
@@ -798,7 +799,7 @@ export class OrbitDBService {
           const bobByHashString = await linkedIdentities.getIdentity(
             bobIdentity.hash,
           );
-          console.log(
+          logger.info(
             `     By hash (string): ${bobByHashString ? "✅" : "❌"}`,
           );
 
@@ -806,18 +807,18 @@ export class OrbitDBService {
           const { CID } = await import("multiformats/cid");
           const hashCID = CID.parse(bobIdentity.hash);
           const bobByHashCID = await linkedIdentities.getIdentity(hashCID);
-          console.log(`     By hash (CID): ${bobByHashCID ? "✅" : "❌"}`);
+          logger.info(`     By hash (CID): ${bobByHashCID ? "✅" : "❌"}`);
         } catch (hashError) {
-          console.log(`     By hash: ❌ (${hashError.message})`);
+          logger.info(`     By hash: ❌ (${hashError.message})`);
         }
       }
 
       // Method 2: By ID
       try {
         const bobById = await linkedIdentities.getIdentity(bobIdentity.id);
-        console.log(`     By ID: ${bobById ? "✅" : "❌"}`);
+        logger.info(`     By ID: ${bobById ? "✅" : "❌"}`);
       } catch (idError) {
-        console.log(`     By ID: ❌ (${idError.message})`);
+        logger.info(`     By ID: ❌ (${idError.message})`);
       }
     }
   }
@@ -838,7 +839,7 @@ export class OrbitDBService {
 
     if (persona === "alice") {
       // Alice creates the database with both Alice and Bob access (if Bob exists)
-      console.log(
+      logger.info(
         `🆕 Alice creating new database with proper access control:`,
         databaseName,
       );
@@ -847,11 +848,11 @@ export class OrbitDBService {
       const writePermissions = [sharedIdentity.id];
       if (bobIdentity) {
         writePermissions.push(bobIdentity.id);
-        console.log(
+        logger.info(
           `🔐 Setting up database with write access for both Alice & Bob`,
         );
       } else {
-        console.log(
+        logger.info(
           `🔒 Setting up database with Alice-only access (Bob identity not ready yet)`,
         );
       }
@@ -865,11 +866,11 @@ export class OrbitDBService {
       };
 
       database = await orbitdb.open(databaseName, multiAccessConfig);
-      console.log(
+      logger.info(
         `📍 Alice created shared database with address:`,
         database.address,
       );
-      console.log(`🔐 Access granted to: ${writePermissions.join(", ")}`);
+      logger.info(`🔐 Access granted to: ${writePermissions.join(", ")}`);
     } else {
       // Bob opens the existing database by Alice's address
       if (!sharedDatabaseAddress) {
@@ -878,11 +879,11 @@ export class OrbitDBService {
         );
       }
 
-      console.log(
+      logger.info(
         `🔗 Bob opening existing database by Alice's address:`,
         sharedDatabaseAddress,
       );
-      console.log(
+      logger.info(
         `💡 Bob will inherit all configuration from Alice's database`,
       );
 
@@ -891,30 +892,30 @@ export class OrbitDBService {
 
       // Verify that the address matches
       if (database.address !== sharedDatabaseAddress) {
-        console.warn(
+        logger.warn(
           `⚠️ Address mismatch! Expected: ${sharedDatabaseAddress}, Got: ${database.address}`,
         );
       } else {
-        console.log(`✅ Bob successfully opened shared database by address`);
-        console.log(`🔐 Bob using Alice's access control`);
+        logger.info(`✅ Bob successfully opened shared database by address`);
+        logger.info(`🔐 Bob using Alice's access control`);
       }
     }
 
-    console.log("📜 Database created:", database.name);
+    logger.info("📜 Database created:", database.name);
 
     // Verify database setup
-    console.log(`✅ ${persona.toUpperCase()} database ready:`);
-    console.log(
+    logger.info(`✅ ${persona.toUpperCase()} database ready:`);
+    logger.info(
       `   Address: ...${database.address.split("/").pop().slice(-12)}`,
     );
-    console.log(`   Type: ${database.type}`);
-    console.log(`   Identity: ...${database.identity.id.slice(-12)}`);
+    logger.info(`   Type: ${database.type}`);
+    logger.info(`   Identity: ...${database.identity.id.slice(-12)}`);
 
     if (database.access && database.access.write) {
       const writeList = database.access.write.map(
         (id) => `...${id.slice(-12)}`,
       );
-      console.log(`   Write permissions: [${writeList.join(", ")}]`);
+      logger.info(`   Write permissions: [${writeList.join(", ")}]`);
     }
 
     return database;
@@ -926,8 +927,8 @@ export class OrbitDBService {
   setupDatabaseEventListeners(database, persona) {
     if (!database) return;
 
-    console.log(`🎧 Setting up event listeners for ${persona}'s database...`);
-    console.log(`🎯 [StorachaTest] Database address: ${database.address}`);
+    logger.info(`🎧 Setting up event listeners for ${persona}'s database...`);
+    logger.info(`🎯 [StorachaTest] Database address: ${database.address}`);
 
     // Add this database address to our tracking set
     this.databases.set(
@@ -944,18 +945,18 @@ export class OrbitDBService {
         const replicationSource =
           entry?.identity !== database.identity.id ? "REPLICATED" : "LOCAL";
 
-        console.log(
+        logger.info(
           `🔥 🔗 [${persona.toUpperCase()}] JOIN EVENT (${replicationSource}):`,
         );
-        console.log(`   Entry Key: ${entry?.key}`);
-        console.log(`   Entry Value:`, entry?.value);
-        console.log(`   Entry Identity: ${entry?.identity}`);
-        console.log(`   Local Identity: ${database.identity.id}`);
-        console.log(`   Address: ${eventAddress}`);
-        console.log(`   Timestamp: ${new Date().toISOString()}`);
+        logger.info(`   Entry Key: ${entry?.key}`);
+        logger.info(`   Entry Value:`, entry?.value);
+        logger.info(`   Entry Identity: ${entry?.identity}`);
+        logger.info(`   Local Identity: ${database.identity.id}`);
+        logger.info(`   Address: ${eventAddress}`);
+        logger.info(`   Timestamp: ${new Date().toISOString()}`);
 
         if (replicationSource === "REPLICATED") {
-          console.log(
+          logger.info(
             `✨ 🎆 REPLICATION DETECTED! ${persona} received data from remote peer!`,
           );
         }
@@ -998,7 +999,7 @@ export class OrbitDBService {
       const eventAddress = address?.toString() || address;
 
       if (this.databases.has(eventAddress)) {
-        console.log(`🔄 [StorachaTest-${persona}] UPDATE EVENT:`, {
+        logger.info(`🔄 [StorachaTest-${persona}] UPDATE EVENT:`, {
           address: eventAddress,
           entry: {
             hash: entry?.hash?.toString() || entry?.hash,
@@ -1028,7 +1029,7 @@ export class OrbitDBService {
       }
     });
 
-    console.log(
+    logger.info(
       `✅ [StorachaTest] Event listeners set up for database instance ${persona}`,
     );
   }
@@ -1051,7 +1052,7 @@ export class OrbitDBService {
    * Clean up all peer instances
    */
   async cleanup() {
-    console.log("🧹 Cleaning up OrbitDB service instances...");
+    logger.info("🧹 Cleaning up OrbitDB service instances...");
 
     for (const [persona, peer] of this.peers.entries()) {
       try {
@@ -1059,9 +1060,9 @@ export class OrbitDBService {
         if (peer.orbitdb) await peer.orbitdb.stop();
         if (peer.helia) await peer.helia.stop();
         if (peer.libp2p) await peer.libp2p.stop();
-        console.log(`✅ Cleaned up ${persona} peer`);
+        logger.info(`✅ Cleaned up ${persona} peer`);
       } catch (error) {
-        console.warn(`⚠️ ${persona} cleanup error:`, error.message);
+        logger.warn(`⚠️ ${persona} cleanup error:`, error.message);
       }
     }
 

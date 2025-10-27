@@ -18,6 +18,7 @@ import { autoNAT } from "@libp2p/autonat";
 import { gossipsub } from "@chainsafe/libp2p-gossipsub";
 import { pubsubPeerDiscovery } from "@libp2p/pubsub-peer-discovery";
 import { bootstrap } from "@libp2p/bootstrap";
+import { logger } from "../../../lib/logger.js";
 import { all } from "@libp2p/websockets/filters";
 
 // Local relay configuration (your relay)
@@ -64,7 +65,7 @@ export async function getLocalRelayInfo() {
       const health = await healthResponse.json();
       const multiaddrs = await multiaddrsResponse.json();
 
-      console.log("🏠 Local relay discovered:", {
+      logger.info("🏠 Local relay discovered:", {
         peerId: health.peerId,
         uptime: health.uptime,
         totalAddresses: multiaddrs.addressInfo?.totalAddresses,
@@ -74,8 +75,8 @@ export async function getLocalRelayInfo() {
       const websocketAddresses = multiaddrs.byTransport?.websocket || [];
       const bestWebsocketAddr = multiaddrs.best?.websocket;
 
-      console.log("🔌 Available websocket addresses:", websocketAddresses);
-      console.log("🎯 Best websocket address:", bestWebsocketAddr);
+      logger.info("🔌 Available websocket addresses:", websocketAddresses);
+      logger.info("🎯 Best websocket address:", bestWebsocketAddr);
 
       return {
         peerId: health.peerId,
@@ -86,7 +87,7 @@ export async function getLocalRelayInfo() {
       };
     }
   } catch (error) {
-    console.warn("⚠️ Local relay not available:", error.message);
+    logger.warn({ error: error.message }, "⚠️ Local relay not available:");
   }
   return null;
 }
@@ -97,12 +98,12 @@ export async function getLocalRelayInfo() {
  */
 export async function initializeRelayConfig() {
   if (RELAY_BOOTSTRAP_ADDR) {
-    console.log("✅ Relay configuration already initialized");
+    logger.info("✅ Relay configuration already initialized");
     return RELAY_BOOTSTRAP_ADDR;
   }
 
   if (USE_LOCAL_RELAY) {
-    console.log("🏠 Development mode: Attempting to use local relay...");
+    logger.info("🏠 Development mode: Attempting to use local relay...");
     const localRelayInfo = await getLocalRelayInfo();
 
     if (localRelayInfo) {
@@ -113,18 +114,18 @@ export async function initializeRelayConfig() {
 
       if (websocketAddresses && websocketAddresses.length > 0) {
         RELAY_BOOTSTRAP_ADDR = websocketAddresses;
-        console.log("✅ Using local relay websocket addresses:");
+        logger.info("✅ Using local relay websocket addresses:");
         websocketAddresses.forEach((addr, i) => {
-          console.log(`   ${i + 1}. ${addr}`);
+          logger.info(`   ${i + 1}. ${addr}`);
         });
         return RELAY_BOOTSTRAP_ADDR;
       } else {
-        console.log(
+        logger.info(
           "⚠️ Local relay found but no websocket addresses available",
         );
       }
     } else {
-      console.log(
+      logger.info(
         "⚠️ Local relay not available, falling back to static local addresses",
       );
     }
@@ -132,17 +133,17 @@ export async function initializeRelayConfig() {
     // Fallback to static local relay addresses when dynamic discovery fails
     RELAY_BOOTSTRAP_ADDR = LOCAL_RELAY_ADDRESSES;
     RELAY_PEER_ID = "12D3KooWFWHLsJT7ADZ2xZGxVpnEAmb3rXVBhCGhiqtVJ9A4VuMD";
-    console.log("✅ Using static local relay addresses:");
+    logger.info("✅ Using static local relay addresses:");
     LOCAL_RELAY_ADDRESSES.forEach((addr, i) => {
-      console.log(`   ${i + 1}. ${addr}`);
+      logger.info(`   ${i + 1}. ${addr}`);
     });
     return RELAY_BOOTSTRAP_ADDR;
   }
 
   // No relays configured - return empty array for no-bootstrap mode
   RELAY_BOOTSTRAP_ADDR = [];
-  console.log("⚠️ No relay configuration available");
-  console.log(
+  logger.info("⚠️ No relay configuration available");
+  logger.info(
     "   📡 Running in no-bootstrap mode (peer discovery via pubsub only)",
   );
 
@@ -183,22 +184,22 @@ export async function createLibp2pConfig(options = {}) {
   } = options;
 
   await initializeRelayConfig();
-  console.log("🔧 Creating libp2p configuration...");
-  console.log(
+  logger.info("🔧 Creating libp2p configuration...");
+  logger.info(
     `   🔗 Network connections: ${enableNetworkConnection ? "enabled" : "disabled"}`,
   );
-  console.log(
+  logger.info(
     `   👥 Peer discovery: ${enablePeerConnections ? "enabled" : "disabled"}`,
   );
-  console.log(
+  logger.info(
     `   🔄 Circuit relay reservations: ${enableReservations ? "enabled" : "disabled"}`,
   );
 
   // Configure peer discovery services
   const peerDiscoveryServices = [];
   if (enablePeerConnections && enableNetworkConnection) {
-    console.log("🔍 Enabling enhanced peer discovery...");
-    console.log(`   📬 Pubsub topics: ${PUBSUB_TOPICS.join(", ")}`);
+    logger.info("🔍 Enabling enhanced peer discovery...");
+    logger.info(`   📬 Pubsub topics: ${PUBSUB_TOPICS.join(", ")}`);
 
     peerDiscoveryServices.push(
       pubsubPeerDiscovery({
@@ -209,8 +210,8 @@ export async function createLibp2pConfig(options = {}) {
       }),
     );
 
-    console.log("✅ Pubsub peer discovery configured");
-    console.log(
+    logger.info("✅ Pubsub peer discovery configured");
+    logger.info(
       `   🔄 Broadcasting every 3 seconds on topics: ${PUBSUB_TOPICS}`,
     );
   }
@@ -226,35 +227,35 @@ export async function createLibp2pConfig(options = {}) {
 
   // Only add bootstrap service if network connections are enabled
   if (enableNetworkConnection && RELAY_BOOTSTRAP_ADDR?.length > 0) {
-    console.log("🔍 Enabling enhanced libp2p services...");
-    console.log(
+    logger.info("🔍 Enabling enhanced libp2p services...");
+    logger.info(
       `   🔗 Bootstrap peers: ${RELAY_BOOTSTRAP_ADDR.length} configured`,
     );
     RELAY_BOOTSTRAP_ADDR.forEach((addr, i) => {
-      console.log(`     ${i + 1}. ${addr}`);
+      logger.info(`     ${i + 1}. ${addr}`);
     });
 
     services.bootstrap = bootstrap({
       list: RELAY_BOOTSTRAP_ADDR,
     });
 
-    console.log("🔄 Bootstrap service configured with addresses:");
+    logger.info("🔄 Bootstrap service configured with addresses:");
     RELAY_BOOTSTRAP_ADDR.forEach((addr, i) => {
-      console.log(`     Bootstrap ${i + 1}: ${addr}`);
+      logger.info(`     Bootstrap ${i + 1}: ${addr}`);
       if (addr.includes("127.0.0.1")) {
-        console.log("     🏠 ↳ This is your LOCAL RELAY!");
+        logger.info("     🏠 ↳ This is your LOCAL RELAY!");
       } else {
-        console.log("     🌐 ↳ This is a production relay");
+        logger.info("     🌐 ↳ This is a production relay");
       }
     });
 
     services.autonat = autoNAT();
     services.dcutr = dcutr();
 
-    console.log("✅ Services configured:");
-    console.log("   🔄 bootstrap: with timeout and tagging");
-    console.log("   🔍 autonat: NAT detection");
-    console.log("   🔗 dcutr: Direct connection upgrades");
+    logger.info("✅ Services configured:");
+    logger.info("   🔄 bootstrap: with timeout and tagging");
+    logger.info("   🔍 autonat: NAT detection");
+    logger.info("   🔗 dcutr: Direct connection upgrades");
   }
 
   // Configure circuit relay transport based on environment
@@ -273,9 +274,9 @@ export async function createLibp2pConfig(options = {}) {
         maxReservations: 0,
       };
 
-  console.log("🔄 Circuit relay configuration:");
-  console.log(`   🔍 Discover relays: ${circuitRelayConfig.discoverRelays}`);
-  console.log(`   📋 Max reservations: ${circuitRelayConfig.maxReservations}`);
+  logger.info("🔄 Circuit relay configuration:");
+  logger.info(`   🔍 Discover relays: ${circuitRelayConfig.discoverRelays}`);
+  logger.info(`   📋 Max reservations: ${circuitRelayConfig.maxReservations}`);
 
   return {
     ...(privateKey && { privateKey }),
@@ -330,7 +331,7 @@ export async function createLibp2pConfig(options = {}) {
  * @returns {Promise<Object>} Created libp2p node
  */
 export async function createLibp2pNode(options = {}) {
-  console.log("🚀 Creating libp2p node...");
+  logger.info("🚀 Creating libp2p node...");
   const config = await createLibp2pConfig(options);
   const libp2p = await createLibp2p(config);
 
@@ -341,28 +342,28 @@ export async function createLibp2pNode(options = {}) {
       .getConnections()
       .find((conn) => conn.remotePeer.toString() === peerId);
 
-    console.log(`✅ 🔗 Connected to peer: ${peerId.slice(-8)}`);
+    logger.info(`✅ 🔗 Connected to peer: ${peerId.slice(-8)}`);
     if (connection) {
-      console.log(
+      logger.info(
         `     🔌 Transport: ${connection.transports?.[0] || "unknown"}`,
       );
-      console.log(`     🔄 Direction: ${connection.direction}`);
-      console.log(
+      logger.info(`     🔄 Direction: ${connection.direction}`);
+      logger.info(
         `     📏 Remote Address: ${connection.remoteAddr.toString()}`,
       );
     }
 
     // Check if this is our relay
     if (RELAY_PEER_ID && peerId.includes(RELAY_PEER_ID)) {
-      console.log(`     🏠 ⭐ THIS IS YOUR LOCAL RELAY!`);
-      console.log(`     🆔 Relay PeerID: ${RELAY_PEER_ID}`);
+      logger.info(`     🏠 ⭐ THIS IS YOUR LOCAL RELAY!`);
+      logger.info(`     🆔 Relay PeerID: ${RELAY_PEER_ID}`);
 
       // Check if this was a WebSocket connection
       if (connection?.remoteAddr.toString().includes("/ws")) {
-        console.log(`     🔌 ✅ WebSocket connection established!`);
+        logger.info(`     🔌 ✅ WebSocket connection established!`);
       }
     } else {
-      console.log(
+      logger.info(
         `     🌐 Other peer: ${peerId.slice(0, 12)}...${peerId.slice(-12)}`,
       );
     }
@@ -370,14 +371,14 @@ export async function createLibp2pNode(options = {}) {
 
   // Add transport-specific debugging
   libp2p.addEventListener("transport:listening", (event) => {
-    console.log(`👂 Transport listening:`, event);
+    logger.info(`👂 Transport listening:`, event);
   });
 
   libp2p.addEventListener("peer:disconnect", (event) => {
     const peerId = event.detail.toString();
-    console.log(`💔 Disconnected from: ${peerId.slice(-8)}`);
+    logger.info(`💔 Disconnected from: ${peerId.slice(-8)}`);
     if (RELAY_PEER_ID && peerId.includes(RELAY_PEER_ID)) {
-      console.log(`     ⚠️ Lost connection to LOCAL RELAY`);
+      logger.info(`     ⚠️ Lost connection to LOCAL RELAY`);
     }
   });
 
@@ -385,16 +386,16 @@ export async function createLibp2pNode(options = {}) {
   libp2p.addEventListener("peer:discovery", (event) => {
     const peerIdObj = event.detail.id; // This is the PeerId object
     const peerIdStr = peerIdObj.toString();
-    console.log(`🔍 Discovered peer: ${peerIdStr.slice(-8)}`);
+    logger.info(`🔍 Discovered peer: ${peerIdStr.slice(-8)}`);
 
     // Check if this discovered peer is our local relay
     if (RELAY_PEER_ID && peerIdStr.includes(RELAY_PEER_ID)) {
-      console.log("✅ 🏠 Discovered LOCAL RELAY via bootstrap!");
+      logger.info("✅ 🏠 Discovered LOCAL RELAY via bootstrap!");
     }
 
     // Auto-dial discovered peers (except relay)
     if (!RELAY_PEER_ID || !peerIdStr.includes(RELAY_PEER_ID)) {
-      console.log(`📞 Auto-dialing discovered peer: ${peerIdStr.slice(-8)}`);
+      logger.info(`📞 Auto-dialing discovered peer: ${peerIdStr.slice(-8)}`);
 
       // Use setTimeout to avoid blocking the discovery event
       setTimeout(async () => {
@@ -406,22 +407,22 @@ export async function createLibp2pNode(options = {}) {
           );
 
           if (alreadyConnected) {
-            console.log(
+            logger.info(
               `⏭️  Skipping dial - already connected to ${peerIdStr.slice(-8)}`,
             );
             return;
           }
 
-          console.log(`🔄 Attempting to dial peer: ${peerIdStr.slice(-8)}`);
+          logger.info(`🔄 Attempting to dial peer: ${peerIdStr.slice(-8)}`);
           // Dial using the PeerId object (not multiaddresses)
           const connection = await libp2p.dial(peerIdObj, {
             signal: AbortSignal.timeout(15000),
           });
-          console.log(`✅ Successfully dialed peer: ${peerIdStr.slice(-8)}`);
-          console.log(`   Connection direction: ${connection.direction}`);
-          console.log(`   Remote address: ${connection.remoteAddr.toString()}`);
+          logger.info(`✅ Successfully dialed peer: ${peerIdStr.slice(-8)}`);
+          logger.info(`   Connection direction: ${connection.direction}`);
+          logger.info(`   Remote address: ${connection.remoteAddr.toString()}`);
         } catch (error) {
-          console.log(
+          logger.info(
             `❌ Failed to dial peer ${peerIdStr.slice(-8)}: ${error.message}`,
           );
           // Don't log this as an error since it's expected that some dials may fail
@@ -432,7 +433,7 @@ export async function createLibp2pNode(options = {}) {
 
   libp2p.addEventListener("peer:disconnect", (event) => {
     const peerId = event.detail.toString();
-    console.log(`💔 Disconnected from peer: ${peerId.slice(-8)}`);
+    logger.info(`💔 Disconnected from peer: ${peerId.slice(-8)}`);
   });
 
   // Log when we get circuit relay addresses
@@ -442,20 +443,20 @@ export async function createLibp2pNode(options = {}) {
     //   addr.toString().includes('/p2p-circuit')
     // );
     // if (circuitAddrs.length > 0) {
-    //   console.log('🎯 Circuit relay addresses obtained:');
+    //   logger.info('🎯 Circuit relay addresses obtained:');
     //   circuitAddrs.forEach((addr, i) => {
-    //     console.log(`   ${i + 1}. ${addr.toString()}`);
+    //     logger.info(`   ${i + 1}. ${addr.toString()}`);
     //   });
     // }
   });
 
-  console.log(`✅ LibP2P node created with ID: ${libp2p.peerId.toString()}`);
+  logger.info(`✅ LibP2P node created with ID: ${libp2p.peerId.toString()}`);
 
   if (isUsingLocalRelay()) {
-    console.log(
+    logger.info(
       "🏠 Using local relay - bootstrap will automatically discover and connect",
     );
-    console.log(
+    logger.info(
       "🔍 Watch for peer:discovery and peer:connect events to see bootstrap in action",
     );
   }
@@ -471,14 +472,14 @@ export async function createLibp2pNode(options = {}) {
  * @returns {Promise<Object>} Created Helia IPFS node
  */
 export async function createHeliaNode(libp2p, blockstore, datastore) {
-  console.log("📦 Creating Helia IPFS node...");
+  logger.info("📦 Creating Helia IPFS node...");
   const heliaConfig = { libp2p };
 
   if (blockstore) heliaConfig.blockstore = blockstore;
   if (datastore) heliaConfig.datastore = datastore;
 
   const helia = await createHelia(heliaConfig);
-  console.log("✅ Helia IPFS node created");
+  logger.info("✅ Helia IPFS node created");
 
   return helia;
 }

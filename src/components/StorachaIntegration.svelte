@@ -23,6 +23,7 @@
 	import { todosStore } from './db-actions.js';
 	import { initializationStore, orbitDBStore, libp2pStore, peerIdStore } from './p2p.js';
 	import { initializeDatabase, loadTodos, todoDBStore } from './db-actions.js';
+	import { logger } from '../lib/logger.js';
 	// Add imports for creating fresh instances
 	import { createLibp2p } from 'libp2p';
 	import { createHelia } from 'helia';
@@ -89,9 +90,11 @@
 
 		// Set up progress event listeners
 		bridge.on('uploadProgress', (progress) => {
-			console.log(
-				`Upload Progress: ${progress.current}/${progress.total} (${progress.percentage}%)`
-			);
+			logger.info({
+				current: progress.current,
+				total: progress.total,
+				percentage: progress.percentage
+			}, `Upload Progress: ${progress.current}/${progress.total} (${progress.percentage}%)`);
 
 			progressType = 'upload';
 			progressCurrent = progress.current;
@@ -112,9 +115,11 @@
 		});
 
 		bridge.on('downloadProgress', (progress) => {
-			console.log(
-				`Download Progress: ${progress.current}/${progress.total} (${progress.percentage}%)`
-			);
+			logger.info({
+				current: progress.current,
+				total: progress.total,
+				percentage: progress.percentage
+			}, `Download Progress: ${progress.current}/${progress.total} (${progress.percentage}%)`);
 
 			progressType = 'download';
 			progressCurrent = progress.current;
@@ -150,31 +155,31 @@
 	// LocalStorage functions
 	function saveCredentials(key, proof) {
 		try {
-			console.log('💾 Saving credentials to localStorage...');
+			logger.info('💾 Saving credentials to localStorage...');
 			localStorage.setItem(STORAGE_KEYS.STORACHA_KEY, key);
 			localStorage.setItem(STORAGE_KEYS.STORACHA_PROOF, proof);
 			localStorage.setItem(STORAGE_KEYS.AUTO_LOGIN, 'true');
-			console.log('✅ Credentials saved successfully');
+			logger.info('✅ Credentials saved successfully');
 		} catch (err) {
-			console.warn('❌ Failed to save credentials to localStorage:', err);
+			logger.warn({ error: err.message }, '❌ Failed to save credentials to localStorage');
 		}
 	}
 
 	function loadCredentials() {
 		try {
-			console.log('📖 Checking localStorage for credentials...');
+			logger.info('📖 Checking localStorage for credentials...');
 			const key = localStorage.getItem(STORAGE_KEYS.STORACHA_KEY);
 			const proof = localStorage.getItem(STORAGE_KEYS.STORACHA_PROOF);
 			const autoLogin = localStorage.getItem(STORAGE_KEYS.AUTO_LOGIN);
 
 			if (key && proof && autoLogin === 'true') {
-				console.log('✅ Valid credentials found!');
+				logger.info('✅ Valid credentials found!');
 				return { key, proof };
 			} else {
-				console.log('❌ No valid credentials found');
+				logger.info('❌ No valid credentials found');
 			}
 		} catch (err) {
-			console.warn('❌ Failed to load credentials from localStorage:', err);
+			logger.warn({ error: err.message }, '❌ Failed to load credentials from localStorage');
 		}
 		return null;
 	}
@@ -185,7 +190,7 @@
 			localStorage.removeItem(STORAGE_KEYS.STORACHA_PROOF);
 			localStorage.removeItem(STORAGE_KEYS.AUTO_LOGIN);
 		} catch (err) {
-			console.warn('Failed to clear credentials from localStorage:', err);
+			logger.warn({ error: err.message }, 'Failed to clear credentials from localStorage');
 		}
 	}
 
@@ -244,35 +249,30 @@
 
 	// Login with credentials
 	async function handleCredentialsLogin(useStoredCredentials = false) {
-		console.log(
-			'🚀 handleCredentialsLogin called with useStoredCredentials =',
-			useStoredCredentials
-		);
-
+		logger.info({ useStoredCredentials }, '🚀 handleCredentialsLogin called with useStoredCredentials =');
 		let keyToUse = storachaKey.trim();
 		let proofToUse = storachaProof.trim();
 
-		console.log('🔍 Form values:', {
-			hasKey: !!storachaKey.trim(),
-			hasProof: !!storachaProof.trim(),
-			keyLength: storachaKey.trim().length,
-			proofLength: storachaProof.trim().length
-		});
+		logger.info({
+			storachaKey: storachaKey ? '***' : 'empty',
+			storachaProof: storachaProof ? '***' : 'empty',
+			selectedSpace: selectedSpace?.did() || 'none'
+		}, '🔍 Form values');
 
 		// If using stored credentials, load them
 		if (useStoredCredentials) {
-			console.log('🔄 Loading stored credentials for auto-login...');
+			logger.info('🔄 Loading stored credentials for auto-login...');
 			const stored = loadCredentials();
 			if (!stored) {
-				console.log('⚠️ Auto-login failed: no stored credentials');
+				logger.info('⚠️ Auto-login failed: no stored credentials');
 				showMessage('No stored credentials found', 'error');
 				return;
 			}
 			keyToUse = stored.key;
 			proofToUse = stored.proof;
-			console.log('✅ Loaded stored credentials successfully');
+			logger.info('✅ Loaded stored credentials successfully');
 		} else {
-			console.log('🔐 Manual login with form credentials');
+			logger.info('🔐 Manual login with form credentials');
 		}
 
 		if (!keyToUse || !proofToUse) {
@@ -366,6 +366,7 @@
 
 		try {
 			spaces = await listSpaces(client);
+			logger.info({ count: spaces.length, spaces: spaces.map(s => s.did()) }, '📋 Available spaces loaded');
 		} catch (err) {
 			showMessage(`Failed to load spaces: ${err.message}`, 'error');
 		} finally {
@@ -441,7 +442,7 @@
 		status = 'Preparing backup...';
 
 		try {
-			console.log('🚀 Starting backup with real progress tracking...', $todoDBStore);
+			logger.info('🚀 Starting backup with real progress tracking...', $todoDBStore);
 
 			const result = await bridge.backup($orbitDBStore, $todoDBStore.address);
 
@@ -477,20 +478,20 @@
 
 	// Auto-login on component mount
 	onMount(async () => {
-		console.log('🚀 StorachaIntegration component mounted');
+		logger.info('🚀 StorachaIntegration component mounted');
 
 		// Try to auto-login with stored credentials (but don't show error for first-time users)
 		const stored = loadCredentials();
 		if (stored) {
-			console.log('🔐 Found stored Storacha credentials, attempting auto-login...');
+			logger.info('🔐 Found stored Storacha credentials, attempting auto-login...');
 			try {
 				await handleCredentialsLogin(true);
 			} catch (err) {
-				console.warn('⚠️ Auto-login failed, clearing stored credentials:', err);
+				logger.warn({ error: err.message }, '⚠️ Auto-login failed, clearing stored credentials:');
 				clearStoredCredentials();
 			}
 		} else {
-			console.log('🔒 No stored credentials found, user needs to login manually');
+			logger.info('🔒 No stored credentials found, user needs to login manually');
 		}
 	});
 
@@ -507,7 +508,7 @@
 		status = 'Preparing restore...';
 
 		try {
-			console.log('🔄 Starting restore from Storacha space with fresh OrbitDB instance...');
+			logger.info('🔄 Starting restore from Storacha space with fresh OrbitDB instance...');
 
 			// Get Storacha credentials
 			const storachaKey = localStorage.getItem('storacha_key') || '';
@@ -519,7 +520,7 @@
 
 			// Step 1: Create fresh instances for restore
 			status = 'Creating fresh OrbitDB instance for restore...';
-			console.log('🔧 Creating fresh OrbitDB instance for restore...');
+			logger.info('🔧 Creating fresh OrbitDB instance for restore...');
 
 			// Create unique libp2p config
 			const config = await createLibp2pConfig({
@@ -530,37 +531,37 @@
 
 			// Create fresh libp2p instance
 			const newLibp2p = await createLibp2p(config);
-			console.log('✅ Fresh libp2p instance created');
+			logger.info('✅ Fresh libp2p instance created');
 
 			// Create fresh Helia instance with persistent initializeDatabasestorage
-			console.log('🗄️ Initializing fresh Helia with persistent storage...');
+			logger.info('🗄️ Initializing fresh Helia with persistent storage...');
 			const blockstore = new LevelBlockstore(`./helia-blocks-restore-${Date.now()}`);
 			const datastore = new LevelDatastore(`./helia-data-restore-${Date.now()}`);
 			const newHelia = await createHelia({ libp2p: newLibp2p, blockstore, datastore });
-			console.log('✅ Fresh Helia instance created');
+			logger.info('✅ Fresh Helia instance created');
 
 			// Create fresh OrbitDB instance
 			const newOrbitDB = await createOrbitDB({
 				ipfs: newHelia,
 				id: `restored-instance-${Date.now()}`
 			});
-			console.log('✅ Fresh OrbitDB instance created:', newOrbitDB.id);
+			logger.info('✅ Fresh OrbitDB instance created:', newOrbitDB.id);
 
 			// Step 2: Restore from Storacha backup
 			status = 'Restoring database from Storacha backup...';
-			console.log('🔄 Restoring database from Storacha backup...');
+			logger.info('🔄 Restoring database from Storacha backup...');
 
 			const result = await restoreDatabaseFromSpace(newOrbitDB, {
 				storachaKey,
 				storachaProof,
 				timeout: 60000
 			});
-			console.log('Restore result:', result);
+			logger.info('Restore result:', result);
 
 			if (result.success) {
 				// Step 3: Replace the current instances with the restored ones
 				status = 'Replacing current database with restored data...';
-				console.log('🔄 Replacing current database with restored data...');
+				logger.info('🔄 Replacing current database with restored data...');
 
 				// Close existing instances (if any)
 				try {
@@ -568,7 +569,7 @@
 						await $todoDBStore.close();
 					}
 				} catch (closeError) {
-					console.warn('⚠️ Error closing existing database:', closeError);
+					logger.warn({ error: closeError.message }, '⚠️ Error closing existing database:');
 				}
 
 				// Update the stores with new instances
@@ -590,7 +591,7 @@
 					`Database restored successfully! ${result.entriesRecovered} entries recovered from Storacha space. Fresh OrbitDB instance created.`
 				);
 
-				console.log('🎉 Restore completed with fresh instance:', {
+				logger.info('🎉 Restore completed with fresh instance:', {
 					newOrbitDBId: newOrbitDB.id,
 					newPeerId: newLibp2p.peerId.toString(),
 					restoredAddress: result.database.address,
@@ -604,13 +605,13 @@
 					await newHelia.stop();
 					await newLibp2p.stop();
 				} catch (cleanupError) {
-					console.warn('⚠️ Error cleaning up failed restore instances:', cleanupError);
+					logger.warn({ error: cleanupError.message }, '⚠️ Error cleaning up failed restore instances:');
 				}
 				showMessage(`Restore failed: ${result.error}`, 'error');
 			}
 
 		} catch (error) {
-			console.error('❌ Restore failed:', error);
+			logger.error({ error }, '❌ Restore failed:');
 			showMessage(`Restore failed: ${error.message}`, 'error');
 		} finally {
 			isLoading = false;

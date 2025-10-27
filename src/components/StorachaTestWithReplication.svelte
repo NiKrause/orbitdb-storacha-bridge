@@ -38,6 +38,7 @@
     clearStorachaSpace,
     OrbitDBStorachaBridge,
   } from "./orbitdb-storacha-bridge";
+  import { logger } from "../lib/logger.js";
   import { Identities, useIdentityProvider } from "@orbitdb/core";
   import OrbitDBIdentityProviderDID from "@orbitdb/identity-provider-did";
   import { Ed25519Provider } from "key-did-provider-ed25519";
@@ -77,6 +78,7 @@
     Connect,
     Disconnect,
   } from "carbon-icons-svelte";
+  import { logger } from "../lib/logger.js";
 
   // Storacha authentication state
   let storachaAuthenticated = false;
@@ -186,7 +188,7 @@
     // Configure peer discovery based on enablePeerConnections
     const peerDiscoveryServices = [];
     if (enablePeerConnections && enableNetworkConnection) {
-      console.log('🔍 Enabling pubsub peer discovery');
+      logger.info('🔍 Enabling pubsub peer discovery');
       peerDiscoveryServices.push(
         pubsubPeerDiscovery({
           interval: 5000, // More frequent broadcasting
@@ -208,7 +210,7 @@
 
     // Only add bootstrap service if network connections are enabled
     if (enableNetworkConnection) {
-      console.log('🔍 Enabling bootstrap, pubsub, autonat, dcutr services');
+      logger.info('🔍 Enabling bootstrap, pubsub, autonat, dcutr services');
       services.bootstrap = bootstrap({ list: RELAY_BOOTSTRAP_ADDR });
       services.autonat = autoNAT();
       services.dcutr = dcutr();
@@ -286,7 +288,7 @@
           bridgeOptions.spaceDID = currentSpace.did();
         }
       } catch (error) {
-        console.warn('Could not get current space DID:', error.message);
+        logger.warn({ error: error.message }, 'Could not get current space DID');
       }
     } else {
       throw new Error(
@@ -298,7 +300,7 @@
     
     // Set up progress event listeners
     bridge.on('uploadProgress', (progress) => {
-      console.log('📤 Upload Progress:', progress);
+      logger.info({ progress }, '📤 Upload Progress:');
       if (progress && typeof progress === 'object') {
         uploadProgress = progress;
         showProgress = true;
@@ -313,12 +315,12 @@
           showProgress = false;
         }
       } else {
-        console.warn('Invalid upload progress data:', progress);
+        logger.warn({ progress }, 'Invalid upload progress data');
       }
     });
     
     bridge.on('downloadProgress', (progress) => {
-      console.log('📥 Download Progress:', progress);
+      logger.info({ progress }, '📥 Download Progress:');
       if (progress && typeof progress === 'object') {
         downloadProgress = progress;
         showProgress = true;
@@ -333,7 +335,7 @@
           showProgress = false;
         }
       } else {
-        console.warn('Invalid download progress data:', progress);
+        logger.warn({ progress }, 'Invalid download progress data');
       }
     });
     
@@ -342,7 +344,7 @@
 
   // Handle Storacha authentication events
   function handleStorachaAuthenticated(event) {
-    console.log("🔐 Storacha authenticated:", event.detail);
+    logger.info({ detail: event.detail }, "🔐 Storacha authenticated:");
     storachaAuthenticated = true;
     storachaClient = event.detail.client;
     storachaCredentials = {
@@ -354,28 +356,29 @@
     // Store credentials for backup/restore operations
     if (event.detail.method === "credentials") {
       // For key/proof authentication, we need to extract the credentials
-      console.log(
-        "📝 Credentials-based authentication - storing for backup operations",
+      logger.info(
+        "📝 Credentials-based authentication - storing for backup operations"
       );
     } else if (
       event.detail.method === "ucan" ||
       event.detail.method === "seed"
     ) {
-      console.log(
-        `📝 ${event.detail.method}-based authentication - ready for operations`,
+      logger.info(
+        { method: event.detail.method },
+        `📝 ${event.detail.method}-based authentication - ready for operations`
       );
     }
   }
 
   function handleStorachaLogout() {
-    console.log("🚪 Storacha logged out");
+    logger.info("🚪 Storacha logged out");
     storachaAuthenticated = false;
     storachaClient = null;
     storachaCredentials = null;
   }
 
   function handleSpaceChanged(event) {
-    console.log("🔄 Storacha space changed:", event.detail.space);
+    logger.info({ space: event.detail.space }, "🔄 Storacha space changed:");
     // Update any space-dependent operations
   }
 
@@ -406,7 +409,7 @@
    * Create a reusable OrbitDB identity from seed
    */
   async function createReusableIdentity(persona = "shared") {
-    console.log(`🆔 Creating ${persona} identity...`);
+    logger.info({ persona }, `🆔 Creating ${persona} identity...`);
 
     // Generate a test seed phrase for consistent identity
     const seedPhrase = generateMnemonic(english);
@@ -431,7 +434,7 @@
       }),
     });
 
-    console.log(`✅ ${persona} identity created: ${identity.id}`);
+    logger.info({ persona, identityId: identity.id }, `✅ ${persona} identity created: ${identity.id}`);
     return { identity, identities, seedPhrase, masterSeed };
   }
 
@@ -449,7 +452,7 @@
     } else {
       bobResults = [...bobResults, result];
     }
-    console.log(`🧪 ${persona}: ${step} - ${status} - ${message}`, data || "");
+    logger.info({ persona, step, status, message, data }, `🧪 ${persona}: ${step} - ${status} - ${message}`);
   }
 
   function updateLastResult(persona, status, message, data = null) {
@@ -476,7 +479,7 @@
       data: event.data,
     };
     replicationEvents = [...replicationEvents, replicationEvent].slice(-20); // Keep last 20 events
-    console.log("🔄 Replication Event:", replicationEvent);
+    logger.info({ replicationEvent }, "🔄 Replication Event:");
   }
 
   async function createOrbitDBInstance(
@@ -486,7 +489,7 @@
     databaseConfig,
     useSharedAddress = false,
   ) {
-    console.log(`🔧 Creating OrbitDB instance for ${persona}...`);
+    logger.info({ persona }, `🔧 Creating OrbitDB instance for ${persona}...`);
 
     // Create libp2p configuration with replication enabled
     const libp2pConfig = await createLibp2pConfig({
@@ -496,24 +499,25 @@
 
     // Create libp2p instance
     const libp2p = await createLibp2p(libp2pConfig);
-    console.log(`${persona} libp2p created with peer discovery enabled:`, replicationEnabled);
+    logger.info({ persona, replicationEnabled }, `${persona} libp2p created with peer discovery enabled:`);
 
     // Set up enhanced connection monitoring (replaces polling)
-    console.log(`🎧 [ReplicationTest] Event listeners set up for database instance ${persona}`);
-    console.log(`🎧 [ALICE] EVENT LISTENER VERIFICATION:`);
-    console.log(`   ✅ 'join' event listener: ACTIVE`);
-    console.log(`   ✅ 'update' event listener: ACTIVE`);
-    console.log(`   📊 Tracking database address: ${database.address}`);
-    console.log(`   🗑️ Total tracked addresses: ${replicationTestDatabaseAddresses.size}`);
-    console.log(`   🔍 All tracked: [${Array.from(replicationTestDatabaseAddresses).map(addr => `'${addr}'`).join(', ')}]`);
+    logger.info({ persona }, `🎧 [ReplicationTest] Event listeners set up for database instance ${persona}`);
+    logger.info(`🎧 [ALICE] EVENT LISTENER VERIFICATION:`);
+    logger.info(`   ✅ 'join' event listener: ACTIVE`);
+    logger.info(`   ✅ 'update' event listener: ACTIVE`);
+    logger.info({ databaseAddress: database.address }, `   📊 Tracking database address: ${database.address}`);
+    logger.info({ trackedCount: replicationTestDatabaseAddresses.size }, `   🗑️ Total tracked addresses: ${replicationTestDatabaseAddresses.size}`);
+    logger.info({ trackedAddresses: Array.from(replicationTestDatabaseAddresses) }, `   🔍 All tracked: [${Array.from(replicationTestDatabaseAddresses).map(addr => `'${addr}'`).join(', ')}]`);
     
     // Use enhanced connection monitoring instead of basic event listeners
     setupEnhancedConnectionMonitoring(libp2p, persona, database);
 
     // Create Helia instance
-    console.log(`🗄️ Initializing ${persona}'s Helia with memory storage for testing...`);
+    logger.info({ persona }, `🗄️ Initializing ${persona}'s Helia with memory storage for testing...`);
+    logger.info({ persona }, `🗄️ Initializing ${persona}'s Helia with memory storage for testing...`);
     const helia = await createHelia({ libp2p });
-    console.log(`${persona} Helia created with memory storage`);
+    logger.info({ persona }, `${persona} Helia created with memory storage`);
 
     // Create OrbitDB instance with unique ID
     const orbitdbConfig = {
@@ -525,23 +529,23 @@
     };
 
     const orbitdb = await createOrbitDB(orbitdbConfig);
-    console.log(`${persona} orbitdb:`, orbitdb);
+    logger.info({ persona, orbitdbId: orbitdb.id }, `${persona} orbitdb created`);
 
     // Create or open database - use shared address for replication
     let database;
     if (useSharedAddress && sharedDatabaseAddress) {
-      console.log(`🔗 ${persona} opening shared database at address:`, sharedDatabaseAddress);
+      logger.info({ persona, sharedDatabaseAddress }, `🔗 ${persona} opening shared database at address:`);
       database = await orbitdb.open(sharedDatabaseAddress);
     } else {
-      console.log(`🆕 ${persona} creating new database:`, databaseName);
+      logger.info({ persona, databaseName }, `🆕 ${persona} creating new database:`);
       database = await orbitdb.open(databaseName, databaseConfig);
       if (!sharedDatabaseAddress) {
         sharedDatabaseAddress = database.address;
-        console.log(`📍 Shared database address set:`, sharedDatabaseAddress);
+        logger.info({ sharedDatabaseAddress }, `📍 Shared database address set:`);
       }
     }
     
-    console.log(`${persona} database:`, database);
+    logger.info({ persona, databaseAddress: database.address }, `${persona} database created`);
 
     // Set up event listeners for this database
     setupDatabaseEventListeners(database, persona);
@@ -569,7 +573,7 @@
    * Replaces polling with event-driven connection state updates
    */
   function setupEnhancedConnectionMonitoring(libp2p, persona, database = null) {
-    console.log(`🔧 Setting up enhanced connection monitoring for ${persona}`);
+    logger.info({ persona }, `🔧 Setting up enhanced connection monitoring for ${persona}`);
     
     // Track connection states for this persona
     const personaConnectionStates = new Map();
@@ -578,7 +582,7 @@
     // Peer connection events (high-level)
     libp2p.addEventListener('peer:connect', (event) => {
       const peerId = event.detail.toString();
-      console.log(`🔗 [${persona.toUpperCase()}] Peer connected: ${peerId}`);
+      logger.info({ persona, peerId }, `🔗 [${persona.toUpperCase()}] Peer connected:`);
       
       // Update connection tracking immediately
       personaConnectionStates.set(peerId, {
@@ -620,7 +624,7 @@
     
     libp2p.addEventListener('peer:disconnect', (event) => {
       const peerId = event.detail.toString();
-      console.log(`🔌 [${persona.toUpperCase()}] Peer disconnected: ${peerId}`);
+      logger.info({ persona, peerId }, `🔌 [${persona.toUpperCase()}] Peer disconnected:`);
       
       // Update connection tracking immediately
       personaConnectionStates.set(peerId, {
@@ -652,13 +656,14 @@
       const connection = event.detail;
       const peerId = connection.remotePeer.toString();
       
-      console.log(`🚀 [${persona.toUpperCase()}] Connection opened:`, {
+      logger.info({
+        persona,
         peer: peerId,
         direction: connection.direction,
         status: connection.status,
         transient: connection.transient,
         limited: connection.limits != null
-      });
+      }, `🚀 [${persona.toUpperCase()}] Connection opened:`);
       
       // Update connection tracking with detailed info
       personaConnectionStates.set(`${peerId}-connection`, {
@@ -691,7 +696,7 @@
       const connection = event.detail;
       const peerId = connection.remotePeer.toString();
       
-      console.log(`🔌 [${persona.toUpperCase()}] Connection closed: ${peerId}`);
+      logger.info({ persona, peerId }, `🔌 [${persona.toUpperCase()}] Connection closed:`);
       
       // Update connection tracking
       personaConnectionStates.set(`${peerId}-connection`, {
@@ -714,7 +719,7 @@
     // Peer discovery events
     libp2p.addEventListener('peer:discovery', (event) => {
       const peerId = event.detail.toString();
-      console.log(`🔍 [${persona.toUpperCase()}] Discovered peer: ${peerId}`);
+      logger.info({ persona, peerId }, `🔍 [${persona.toUpperCase()}] Discovered peer:`);
       
       // Add discovered peer to tracking (not connected yet)
       personaConnectionStates.set(`${peerId}-discovered`, {
@@ -731,7 +736,7 @@
       });
     });
     
-    console.log(`✅ [${persona.toUpperCase()}] Enhanced connection monitoring active`);
+    logger.info({ persona }, `✅ [${persona.toUpperCase()}] Enhanced connection monitoring active`);
   }
   
   /**
@@ -747,7 +752,7 @@
       aliceDatabaseReady = hasAliceConnections && hasSharedDatabase;
       
       if (aliceDatabaseReady && !databaseReadyStates.get('alice')) {
-        console.log('✅ [ALICE] Database ready for replication - connections available');
+        logger.info('✅ [ALICE] Database ready for replication - connections available');
         databaseReadyStates.set('alice', true);
         
         addReplicationEvent({
@@ -759,7 +764,7 @@
           }
         });
       } else if (!aliceDatabaseReady && databaseReadyStates.get('alice')) {
-        console.log('⚠️ [ALICE] Database no longer ready for replication');
+        logger.info('⚠️ [ALICE] Database no longer ready for replication');
         databaseReadyStates.set('alice', false);
       }
     }
@@ -772,7 +777,7 @@
       bobDatabaseReady = hasBobConnections && hasSharedDatabase;
       
       if (bobDatabaseReady && !databaseReadyStates.get('bob')) {
-        console.log('✅ [BOB] Database ready for replication - connections available');
+        logger.info('✅ [BOB] Database ready for replication - connections available');
         databaseReadyStates.set('bob', true);
         
         addReplicationEvent({
@@ -784,7 +789,7 @@
           }
         });
       } else if (!bobDatabaseReady && databaseReadyStates.get('bob')) {
-        console.log('⚠️ [BOB] Database no longer ready for replication');
+        logger.info('⚠️ [BOB] Database no longer ready for replication');
         databaseReadyStates.set('bob', false);
       }
     }
@@ -800,7 +805,7 @@
     const peerId = connection.remotePeer.toString();
     const isDirectConnection = !connection.transient && !connection.limits;
     
-    console.log(`🔍 [${persona.toUpperCase()}] Checking sync readiness for connection to ${peerId}:`, {
+    logger.info(`🔍 [${persona.toUpperCase()}] Checking sync readiness for connection to ${peerId}:`, {
       direct: isDirectConnection,
       transient: connection.transient,
       limited: connection.limits != null,
@@ -808,7 +813,7 @@
     });
     
     if (isDirectConnection) {
-      console.log(`🚀 [${persona.toUpperCase()}] Direct connection available - database sync optimal`);
+      logger.info(`🚀 [${persona.toUpperCase()}] Direct connection available - database sync optimal`);
       
       addReplicationEvent({
         type: 'direct_connection_ready',
@@ -819,7 +824,7 @@
         }
       });
     } else {
-      console.log(`🔄 [${persona.toUpperCase()}] Relay connection available - database sync possible`);
+      logger.info(`🔄 [${persona.toUpperCase()}] Relay connection available - database sync possible`);
       
       addReplicationEvent({
         type: 'relay_connection_ready',
@@ -839,8 +844,8 @@
   function setupDatabaseEventListeners(database, persona) {
     if (!database) return;
 
-    console.log(`🎧 Setting up replication event listeners for ${persona}'s database...`);
-    console.log(`🎯 [ReplicationTest] Database address: ${database.address}`);
+    logger.info(`🎧 Setting up replication event listeners for ${persona}'s database...`);
+    logger.info(`🎯 [ReplicationTest] Database address: ${database.address}`);
 
     // Add this database address to our tracking set
     replicationTestDatabaseAddresses.add(
@@ -853,7 +858,7 @@
       const eventAddress = address?.toString() || address;
 
       if (replicationTestDatabaseAddresses.has(eventAddress)) {
-        console.log(`🔗 [ReplicationTest-${persona}] JOIN EVENT:`, {
+        logger.info(`🔗 [ReplicationTest-${persona}] JOIN EVENT:`, {
           address: eventAddress,
           entry: {
             hash: entry?.hash?.toString() || entry?.hash,
@@ -891,7 +896,7 @@
             bobTodos = await bobDatabase.all();
           }
         } catch (error) {
-          console.warn(`Failed to update ${persona}'s todos:`, error);
+          logger.warn(`Failed to update ${persona}'s todos:`, error);
         }
 
         // Add replication event
@@ -913,7 +918,7 @@
       const eventAddress = address?.toString() || address;
 
       if (replicationTestDatabaseAddresses.has(eventAddress)) {
-        console.log(`🔄 [ReplicationTest-${persona}] UPDATE EVENT:`, {
+        logger.info(`🔄 [ReplicationTest-${persona}] UPDATE EVENT:`, {
           address: eventAddress,
           entry: {
             hash: entry?.hash?.toString() || entry?.hash,
@@ -943,18 +948,18 @@
       }
     });
 
-    console.log(
+    logger.info(
       `✅ [ReplicationTest] Event listeners set up for database instance ${persona}`,
     );
   }
 
   async function clearIndexedDB() {
-    console.log("🗑️ Clearing IndexedDB...");
+    logger.info("🗑️ Clearing IndexedDB...");
 
     // Get all IndexedDB databases
     if ("databases" in indexedDB) {
       const databases = await indexedDB.databases();
-      console.log(
+      logger.info(
         "📋 Found databases:",
         databases.map((db) => db.name),
       );
@@ -972,7 +977,7 @@
 
       for (const db of dbsToDelete) {
         try {
-          console.log(`🗑️ Deleting database: ${db.name}`);
+          logger.info(`🗑️ Deleting database: ${db.name}`);
 
           // Add timeout to prevent hanging
           await Promise.race([
@@ -981,7 +986,7 @@
               deleteReq.onsuccess = () => resolve();
               deleteReq.onerror = () => reject(deleteReq.error);
               deleteReq.onblocked = () => {
-                console.warn(`⚠️ Database deletion blocked for: ${db.name}`);
+                logger.warn(`⚠️ Database deletion blocked for: ${db.name}`);
                 // Don't reject immediately, give it more time
               };
             }),
@@ -990,18 +995,18 @@
             ),
           ]);
 
-          console.log(`✅ Deleted database: ${db.name}`);
+          logger.info(`✅ Deleted database: ${db.name}`);
         } catch (error) {
           if (error.message === "Timeout") {
-            console.warn(`⏱️ Timeout deleting database ${db.name} - skipping`);
+            logger.warn(`⏱️ Timeout deleting database ${db.name} - skipping`);
           } else {
-            console.warn(`⚠️ Failed to delete database ${db.name}:`, error);
+            logger.warn(`⚠️ Failed to delete database ${db.name}:`, error);
           }
         }
       }
     }
 
-    console.log("🧹 IndexedDB cleanup completed");
+    logger.info("🧹 IndexedDB cleanup completed");
   }
 
   // Alice's functions
@@ -1080,7 +1085,7 @@
 
       aliceStep = "Alice ready to add todos and replicate with Bob";
     } catch (error) {
-      console.error("❌ Alice initialization failed:", error);
+      logger.error("❌ Alice initialization failed:", error);
       aliceError = error.message;
       aliceStep = `Alice initialization failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -1106,7 +1111,7 @@
       for (let i = 0; i < originalTodos.length; i++) {
         const todo = originalTodos[i];
         await aliceDatabase.put(todo.id, todo);
-        console.log(`✅ Alice added todo ${i + 1} (will replicate to Bob):`, todo);
+        logger.info(`✅ Alice added todo ${i + 1} (will replicate to Bob):`, todo);
       }
 
       // Get all todos to verify and display
@@ -1129,7 +1134,7 @@
 
       aliceStep = "Alice ready to backup (Bob should see replicated todos)";
     } catch (error) {
-      console.error("❌ Adding todos failed:", error);
+      logger.error("❌ Adding todos failed:", error);
       aliceError = error.message;
       aliceStep = `Adding todos failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -1197,7 +1202,7 @@
 
       aliceStep = "Alice backup complete - Bob can restore while maintaining replication";
     } catch (error) {
-      console.error("❌ Backup failed:", error);
+      logger.error("❌ Backup failed:", error);
       aliceError = error.message;
       aliceStep = `Backup failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -1284,7 +1289,7 @@
 
       bobStep = "Bob ready - should see Alice's todos via replication";
     } catch (error) {
-      console.error("❌ Bob initialization failed:", error);
+      logger.error("❌ Bob initialization failed:", error);
       bobError = error.message;
       bobStep = `Bob initialization failed: ${error.message}`;
       updateLastResult("bob", "error", error.message);
@@ -1380,7 +1385,7 @@
 
       bobStep = "Bob restore complete - replication with Alice maintained";
     } catch (error) {
-      console.error("❌ Restore failed:", error);
+      logger.error("❌ Restore failed:", error);
       bobError = error.message;
       bobStep = `Restore failed: ${error.message}`;
       updateLastResult("bob", "error", error.message);
@@ -1406,7 +1411,7 @@
       };
 
       await bobDatabase.put(bobTodo.id, bobTodo);
-      console.log("✅ Bob added todo (should replicate to Alice):", bobTodo);
+      logger.info("✅ Bob added todo (should replicate to Alice):", bobTodo);
 
       // Wait a bit for replication
       await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -1425,7 +1430,7 @@
 
       bobStep = "Bob added todo - check Alice's list for replication";
     } catch (error) {
-      console.error("❌ Bob todo add failed:", error);
+      logger.error("❌ Bob todo add failed:", error);
       bobError = error.message;
       bobStep = `Bob todo add failed: ${error.message}`;
       addResult("bob", "Replication Test", "error", error.message);
@@ -1436,7 +1441,7 @@
 
   // Cleanup functions
   async function cleanup() {
-    console.log("🧹 Cleaning up all instances...");
+    logger.info("🧹 Cleaning up all instances...");
 
     // Cleanup Alice
     try {
@@ -1445,7 +1450,7 @@
       if (aliceHelia) await aliceHelia.stop();
       if (aliceLibp2p) await aliceLibp2p.stop();
     } catch (error) {
-      console.warn("⚠️ Alice cleanup error:", error.message);
+      logger.warn("⚠️ Alice cleanup error:", error.message);
     }
 
     // Cleanup Bob
@@ -1455,7 +1460,7 @@
       if (bobHelia) await bobHelia.stop();
       if (bobLibp2p) await bobLibp2p.stop();
     } catch (error) {
-      console.warn("⚠️ Bob cleanup error:", error.message);
+      logger.warn("⚠️ Bob cleanup error:", error.message);
     }
 
     await clearIndexedDB();
@@ -1474,7 +1479,7 @@
     aliceDatabaseReady = false;
     bobDatabaseReady = false;
     
-    console.log('🧹 Cleared enhanced connection monitoring state');
+    logger.info('🧹 Cleared enhanced connection monitoring state');
 
     // Reset state
     aliceOrbitDB = null;
