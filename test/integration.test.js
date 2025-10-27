@@ -290,7 +290,7 @@ describe('OrbitDB Storacha Bridge Integration', () => {
   
   /**
    * @test MappingIndependentRestore
-   * @description Tests the breakthrough mapping-independent restore feature
+   * @description Tests the mapping-independent restore feature
    * 
    * **Test Flow:**
    * 1. Creates a source OrbitDB database with test entries
@@ -301,7 +301,7 @@ describe('OrbitDB Storacha Bridge Integration', () => {
    * 6. Validates complete restoration without any stored mappings
    * 
    * **Key Innovation:**
-   * This test validates the breakthrough feature that allows restoration
+   * This test validates the feature that allows restoration
    * without requiring stored CID mappings, making the library more robust
    * and user-friendly.
    * 

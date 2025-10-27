@@ -1,15 +1,21 @@
 .env
 .DS_Store
 node_modules/
-pnpm-lock.yaml
 orbitdb/
+orbitdb-bridge-*
 
 # orbitdb-storacha-svelte-backup-restore-demo/
 # orbitdb-storacha-svelte-backup-restore-demo*/
 recipient-key.txt 
 delegation-token.txt
-ucan-* 
 orbitdb-ucan.car
+ucan-delegation.car
+*.car
+relay-datastore/
 demo-test*
 cid-bridge-test*
 ucan-bridge-test*
+
+# Build directories
+examples/svelte/*/build/
+examples/svelte/*/dist/

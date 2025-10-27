@@ -421,7 +421,7 @@
     });
     
     // Verify the identity can be resolved by the identities system
-    console.log('🔍 Testing identity resolution...');
+    // Testing identity resolution
     const resolvedIdentity = await identities.getIdentity(identity.id);
     if (resolvedIdentity) {
       console.log('✅ Identity resolution test passed - access controller should work');
@@ -430,7 +430,7 @@
     }
     
     // Test identity verification
-    console.log('🔍 Testing identity verification...');
+    // Testing identity verification
     try {
       const verificationResult = await identities.verifyIdentity(identity);
       if (verificationResult) {

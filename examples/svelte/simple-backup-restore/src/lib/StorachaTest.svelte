@@ -14,8 +14,6 @@
     ArrowRight,
     ToggleLeft,
     ToggleRight,
-    Wifi,
-    WifiOff,
   } from "lucide-svelte";
   import { createLibp2p } from "libp2p";
   import { createHelia } from "helia";
@@ -25,11 +23,7 @@
   import { noise } from "@chainsafe/libp2p-noise";
   import { yamux } from "@chainsafe/libp2p-yamux";
   import { identify } from "@libp2p/identify";
-  import { dcutr } from "@libp2p/dcutr";
-  import { autoNAT } from "@libp2p/autonat";
   import { gossipsub } from "@chainsafe/libp2p-gossipsub";
-  import { pubsubPeerDiscovery } from "@libp2p/pubsub-peer-discovery";
-  import { bootstrap } from "@libp2p/bootstrap";
   import { all } from "@libp2p/websockets/filters";
   import { createOrbitDB, IPFSAccessController } from "@orbitdb/core";
   import {
@@ -74,8 +68,6 @@
     Reset,
     Checkmark,
     Warning,
-    Connect,
-    Disconnect,
   } from "carbon-icons-svelte";
 
   // Storacha authentication state
@@ -93,10 +85,8 @@
   let aliceResults = [];
   let aliceStep = "";
   let aliceError = null;
-  let alicePeerId = null;
-  let aliceConnectedPeers = [];
 
-  // Bob's state (restores data and replicates)
+  // Bob's state (restores data)
   let bobRunning = false;
   let bobOrbitDB = null;
   let bobDatabase = null;
@@ -106,148 +96,49 @@
   let bobResults = [];
   let bobStep = "";
   let bobError = null;
-  let bobPeerId = null;
-  let bobConnectedPeers = [];
+  let bobUseSameIdentity = true; // Toggle for Bob's identity choice
+  let bobIdentity = null; // Bob's own identity if he creates one
+  let bobIdentities = null; // Bob's own identities instance
 
-  // Shared state
-  let sharedIdentity = null;
-  let sharedIdentities = null;
-  let sharedDatabaseAddress = null;
-  let backupResult = null;
-  let restoreResult = null;
-  let showDetails = false;
-  let replicationEnabled = true;
+// Shared state
+let sharedIdentity = null;
+let sharedIdentities = null;
+let backupResult = null;
+let restoreResult = null;
+let showDetails = false;
 
-  // Progress tracking state
-  let uploadProgress = null;
-  let downloadProgress = null;
-  let showProgress = false;
+// Progress tracking state
+let uploadProgress = null;
+let downloadProgress = null;
+let showProgress = false;
 
-  // Connection state
-  let peersConnected = false;
-  let replicationEvents = [];
-  
-  // Enhanced connection tracking
-  let connectionStates = new Map();
-  let databaseReadyStates = new Map();
-  let connectionTimeouts = new Map();
-  
-  // Track database readiness separately from peer connections
-  let aliceDatabaseReady = false;
-  let bobDatabaseReady = false;
+  // Test data
+  let originalTodos = [
+    {
+      id: "test_todo_1",
+      text: "Buy groceries for the week",
+      completed: false,
+      createdAt: new Date().toISOString(),
+      createdBy: "alice",
+    },
+    {
+      id: "test_todo_2",
+      text: "Walk the dog in the park",
+      completed: true,
+      createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
+      createdBy: "alice",
+    },
+    {
+      id: "test_todo_3",
+      text: "Finish the OrbitDB project",
+      completed: false,
+      createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+      createdBy: "alice",
+    },
+  ];
 
-  // Generate replication test data dynamically
-  function generateReplicationTestTodos(createdBy = "alice") {
-    return [
-      {
-        id: `replication_todo_1_${Date.now()}`,
-        text: "Test P2P replication with Alice & Bob",
-        completed: false,
-        createdAt: new Date().toISOString(),
-        createdBy,
-      },
-      {
-        id: `replication_todo_2_${Date.now()}`,
-        text: "Backup database to Storacha",
-        completed: false,
-        createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-        createdBy,
-      },
-      {
-        id: `replication_todo_3_${Date.now()}`,
-        text: "Restore and maintain replication",
-        completed: false,
-        createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-        createdBy,
-      },
-    ];
-  }
-
-  let originalTodos = generateReplicationTestTodos();
-
-  // Keep track of database addresses for replication demo
-  let replicationTestDatabaseAddresses = new Set();
-
-  // LibP2P Configuration (from simple-todo)
-  const RELAY_BOOTSTRAP_ADDR_DEV = '/ip4/127.0.0.1/tcp/4001/ws/p2p/12D3KooWAJjbRkp8FPF5MKgMU53aUTxWkqvDrs4zc1VMbwRwfsbE';
-  const RELAY_BOOTSTRAP_ADDR_PROD = '/dns4/91-99-67-170.k51qzi5uqu5dl6dk0zoaocksijnghdrkxir5m4yfcodish4df6re6v3wbl6njf.libp2p.direct/tcp/4002/wss/p2p/12D3KooWPJYEZSwfmRL9SHehYAeQKEbCvzFu7vtKWb6jQfMSMb8W';
-  const PUBSUB_TOPICS = ['orbitdb-replication._peer-discovery._p2p._pubsub'];
-  
-  // Use production relay for replication demo
-  const RELAY_BOOTSTRAP_ADDR = [RELAY_BOOTSTRAP_ADDR_PROD];
-
-  async function createLibp2pConfig(options = {}) {
-    const {
-      privateKey = null,
-      enablePeerConnections = true,
-      enableNetworkConnection = true
-    } = options;
-
-    // Configure peer discovery based on enablePeerConnections
-    const peerDiscoveryServices = [];
-    if (enablePeerConnections && enableNetworkConnection) {
-      console.log('🔍 Enabling pubsub peer discovery');
-      peerDiscoveryServices.push(
-        pubsubPeerDiscovery({
-          interval: 5000, // More frequent broadcasting
-          topics: PUBSUB_TOPICS, // Configurable topics
-          listenOnly: false,
-          emitSelf: true // Enable even when no peers are present initially
-        })
-      );
-    }
-
-    // Configure services based on network connection preference
-    const services = {
-      identify: identify(),
-      pubsub: gossipsub({
-        emitSelf: true, // Enable to see our own messages
-        allowPublishToZeroTopicPeers: true
-      })
-    };
-
-    // Only add bootstrap service if network connections are enabled
-    if (enableNetworkConnection) {
-      console.log('🔍 Enabling bootstrap, pubsub, autonat, dcutr services');
-      services.bootstrap = bootstrap({ list: RELAY_BOOTSTRAP_ADDR });
-      services.autonat = autoNAT();
-      services.dcutr = dcutr();
-    }
-
-    return {
-      ...(privateKey && { privateKey: privateKey }),
-      addresses: {
-        listen: enableNetworkConnection
-          ? ['/p2p-circuit', '/webrtc', '/webtransport', '/wss', '/ws']
-          : ['/webrtc'] // Only local WebRTC when network connection is disabled
-      },
-      transports: enableNetworkConnection
-        ? [
-            webSockets({
-              filter: all
-            }),
-            webRTC(),
-            circuitRelayTransport({
-              discoverRelays: 1
-            })
-          ]
-        : [webRTC(), circuitRelayTransport({ discoverRelays: 1 })], // Only WebRTC transport when network connection is disabled
-      connectionEncrypters: [noise()],
-      connectionGater: {
-        denyDialMultiaddr: () => false,
-        denyDialPeer: () => false,
-        denyInboundConnection: () => false,
-        denyOutboundConnection: () => false,
-        denyInboundEncryptedConnection: () => false,
-        denyOutboundEncryptedConnection: () => false,
-        denyInboundUpgradedConnection: () => false,
-        denyOutboundUpgradedConnection: () => false
-      },
-      streamMuxers: [yamux()],
-      peerDiscovery: peerDiscoveryServices,
-      services
-    };
-  }
+  // Keep track of database addresses
+  let storachaTestDatabaseAddresses = new Set();
 
   // Create and setup bridge with progress tracking
   function createStorachaBridge(credentials) {
@@ -468,80 +359,59 @@
     }
   }
 
-  function addReplicationEvent(event) {
-    const replicationEvent = {
-      timestamp: new Date().toISOString(),
-      type: event.type,
-      peer: event.peer,
-      data: event.data,
-    };
-    replicationEvents = [...replicationEvents, replicationEvent].slice(-20); // Keep last 20 events
-    console.log("🔄 Replication Event:", replicationEvent);
-  }
-
   async function createOrbitDBInstance(
     persona,
     instanceId,
     databaseName,
     databaseConfig,
-    useSharedAddress = false,
+    useSharedIdentity = true,
   ) {
     console.log(`🔧 Creating OrbitDB instance for ${persona}...`);
 
-    // Create libp2p configuration with replication enabled
-    const libp2pConfig = await createLibp2pConfig({
-      enablePeerConnections: replicationEnabled,
-      enableNetworkConnection: replicationEnabled,
-    });
+    // Use minimal libp2p config to avoid relay connections
+    const config = DefaultLibp2pBrowserOptions;
 
     // Create libp2p instance
-    const libp2p = await createLibp2p(libp2pConfig);
-    console.log(`${persona} libp2p created with peer discovery enabled:`, replicationEnabled);
+    const libp2p = await createLibp2p(config);
+    console.log("libp2p created");
 
-    // Set up enhanced connection monitoring (replaces polling)
-    console.log(`🎧 [ReplicationTest] Event listeners set up for database instance ${persona}`);
-    console.log(`🎧 [ALICE] EVENT LISTENER VERIFICATION:`);
-    console.log(`   ✅ 'join' event listener: ACTIVE`);
-    console.log(`   ✅ 'update' event listener: ACTIVE`);
-    console.log(`   📊 Tracking database address: ${database.address}`);
-    console.log(`   🗑️ Total tracked addresses: ${replicationTestDatabaseAddresses.size}`);
-    console.log(`   🔍 All tracked: [${Array.from(replicationTestDatabaseAddresses).map(addr => `'${addr}'`).join(', ')}]`);
-    
-    // Use enhanced connection monitoring instead of basic event listeners
-    setupEnhancedConnectionMonitoring(libp2p, persona, database);
-
-    // Create Helia instance
-    console.log(`🗄️ Initializing ${persona}'s Helia with memory storage for testing...`);
+    // Create Helia instance with memory storage for tests to avoid persistence conflicts
+    console.log("🗄️ Initializing Helia with memory storage for testing...");
+    // Use memory storage to avoid filesystem conflicts and faster cleanup
     const helia = await createHelia({ libp2p });
-    console.log(`${persona} Helia created with memory storage`);
+    console.log("Helia created with memory storage");
 
-    // Create OrbitDB instance with unique ID
+    // Create OrbitDB instance with unique ID and memory storage
     const orbitdbConfig = {
       ipfs: helia,
       id: `${persona}-${instanceId}-${Date.now()}-${Math.random()}`,
-      directory: `./orbitdb-replication-${persona}-${instanceId}`,
-      identity: sharedIdentity,
-      identities: sharedIdentities,
+      directory: `./orbitdb-${persona}-${instanceId}`,
     };
 
-    const orbitdb = await createOrbitDB(orbitdbConfig);
-    console.log(`${persona} orbitdb:`, orbitdb);
-
-    // Create or open database - use shared address for replication
-    let database;
-    if (useSharedAddress && sharedDatabaseAddress) {
-      console.log(`🔗 ${persona} opening shared database at address:`, sharedDatabaseAddress);
-      database = await orbitdb.open(sharedDatabaseAddress);
-    } else {
-      console.log(`🆕 ${persona} creating new database:`, databaseName);
-      database = await orbitdb.open(databaseName, databaseConfig);
-      if (!sharedDatabaseAddress) {
-        sharedDatabaseAddress = database.address;
-        console.log(`📍 Shared database address set:`, sharedDatabaseAddress);
+    // Choose identity based on persona and settings
+    if (persona === "alice" && sharedIdentity && sharedIdentities) {
+      orbitdbConfig.identity = sharedIdentity;
+      orbitdbConfig.identities = sharedIdentities;
+    } else if (persona === "bob") {
+      if (useSharedIdentity && sharedIdentity && sharedIdentities) {
+        orbitdbConfig.identity = sharedIdentity;
+        orbitdbConfig.identities = sharedIdentities;
+        console.log(
+          `🔗 Bob using Alice's shared identity: ${sharedIdentity.id}`,
+        );
+      } else if (bobIdentity && bobIdentities) {
+        orbitdbConfig.identity = bobIdentity;
+        orbitdbConfig.identities = bobIdentities;
+        console.log(`🆔 Bob using his own identity: ${bobIdentity.id}`);
       }
     }
-    
-    console.log(`${persona} database:`, database);
+
+    const orbitdb = await createOrbitDB(orbitdbConfig);
+    console.log("orbitdb", orbitdb);
+
+    // Create database with access controller (like working integration test)
+    const database = await orbitdb.open(databaseName, databaseConfig);
+    console.log("database", database);
 
     // Set up event listeners for this database
     setupDatabaseEventListeners(database, persona);
@@ -549,311 +419,25 @@
     return { libp2p, helia, orbitdb, database };
   }
 
-  function updatePeerConnectionStatus() {
-    // Check if Alice and Bob can potentially see each other
-    peersConnected = aliceConnectedPeers.length > 0 && bobConnectedPeers.length > 0;
-    
-    // Also check if they share any common peers or are directly connected
-    if (alicePeerId && bobPeerId) {
-      const directConnection = aliceConnectedPeers.includes(bobPeerId) || bobConnectedPeers.includes(alicePeerId);
-      const commonPeers = aliceConnectedPeers.some(peer => bobConnectedPeers.includes(peer));
-      peersConnected = peersConnected || directConnection || commonPeers;
-    }
-    
-    // Trigger database readiness check when peer connections change
-    checkDatabaseReadiness();
-  }
-  
-  /**
-   * Enhanced connection monitoring setup for libp2p instances
-   * Replaces polling with event-driven connection state updates
-   */
-  function setupEnhancedConnectionMonitoring(libp2p, persona, database = null) {
-    console.log(`🔧 Setting up enhanced connection monitoring for ${persona}`);
-    
-    // Track connection states for this persona
-    const personaConnectionStates = new Map();
-    connectionStates.set(persona, personaConnectionStates);
-    
-    // Peer connection events (high-level)
-    libp2p.addEventListener('peer:connect', (event) => {
-      const peerId = event.detail.toString();
-      console.log(`🔗 [${persona.toUpperCase()}] Peer connected: ${peerId}`);
-      
-      // Update connection tracking immediately
-      personaConnectionStates.set(peerId, {
-        connected: true,
-        timestamp: Date.now(),
-        type: 'peer'
-      });
-      
-      // Update UI state immediately
-      if (persona === "alice") {
-        if (!aliceConnectedPeers.includes(peerId)) {
-          aliceConnectedPeers = [...aliceConnectedPeers, peerId];
-        }
-        alicePeerId = libp2p.peerId.toString();
-      } else if (persona === "bob") {
-        if (!bobConnectedPeers.includes(peerId)) {
-          bobConnectedPeers = [...bobConnectedPeers, peerId];
-        }
-        bobPeerId = libp2p.peerId.toString();
-      }
-      
-      // Immediately update peer connection status and check database readiness
-      updatePeerConnectionStatus();
-      
-      // Add replication event
-      addReplicationEvent({
-        type: 'peer_connected',
-        peer: persona,
-        data: { connectedTo: peerId }
-      });
-      
-      // Clear any connection timeout for this peer
-      const timeoutKey = `${persona}-${peerId}`;
-      if (connectionTimeouts.has(timeoutKey)) {
-        clearTimeout(connectionTimeouts.get(timeoutKey));
-        connectionTimeouts.delete(timeoutKey);
-      }
-    });
-    
-    libp2p.addEventListener('peer:disconnect', (event) => {
-      const peerId = event.detail.toString();
-      console.log(`🔌 [${persona.toUpperCase()}] Peer disconnected: ${peerId}`);
-      
-      // Update connection tracking immediately
-      personaConnectionStates.set(peerId, {
-        connected: false,
-        timestamp: Date.now(),
-        type: 'peer'
-      });
-      
-      // Update UI state immediately
-      if (persona === "alice") {
-        aliceConnectedPeers = aliceConnectedPeers.filter(p => p !== peerId);
-      } else if (persona === "bob") {
-        bobConnectedPeers = bobConnectedPeers.filter(p => p !== peerId);
-      }
-      
-      // Immediately update peer connection status and check database readiness
-      updatePeerConnectionStatus();
-      
-      // Add replication event
-      addReplicationEvent({
-        type: 'peer_disconnected',
-        peer: persona,
-        data: { disconnectedFrom: peerId }
-      });
-    });
-    
-    // Individual connection events (more granular)
-    libp2p.addEventListener('connection:open', (event) => {
-      const connection = event.detail;
-      const peerId = connection.remotePeer.toString();
-      
-      console.log(`🚀 [${persona.toUpperCase()}] Connection opened:`, {
-        peer: peerId,
-        direction: connection.direction,
-        status: connection.status,
-        transient: connection.transient,
-        limited: connection.limits != null
-      });
-      
-      // Update connection tracking with detailed info
-      personaConnectionStates.set(`${peerId}-connection`, {
-        connected: true,
-        timestamp: Date.now(),
-        type: 'connection',
-        direction: connection.direction,
-        transient: connection.transient,
-        limited: connection.limits != null,
-        connection: connection
-      });
-      
-      // Immediately check if database can start syncing
-      checkDatabaseSyncReadiness(connection, persona, database);
-      
-      // Add replication event for connection details
-      addReplicationEvent({
-        type: 'connection_opened',
-        peer: persona,
-        data: {
-          connectedTo: peerId,
-          direction: connection.direction,
-          transient: connection.transient,
-          limited: connection.limits != null
-        }
-      });
-    });
-    
-    libp2p.addEventListener('connection:close', (event) => {
-      const connection = event.detail;
-      const peerId = connection.remotePeer.toString();
-      
-      console.log(`🔌 [${persona.toUpperCase()}] Connection closed: ${peerId}`);
-      
-      // Update connection tracking
-      personaConnectionStates.set(`${peerId}-connection`, {
-        connected: false,
-        timestamp: Date.now(),
-        type: 'connection'
-      });
-      
-      // Check database readiness
-      checkDatabaseReadiness();
-      
-      // Add replication event
-      addReplicationEvent({
-        type: 'connection_closed',
-        peer: persona,
-        data: { disconnectedFrom: peerId }
-      });
-    });
-    
-    // Peer discovery events
-    libp2p.addEventListener('peer:discovery', (event) => {
-      const peerId = event.detail.toString();
-      console.log(`🔍 [${persona.toUpperCase()}] Discovered peer: ${peerId}`);
-      
-      // Add discovered peer to tracking (not connected yet)
-      personaConnectionStates.set(`${peerId}-discovered`, {
-        connected: false,
-        timestamp: Date.now(),
-        type: 'discovery'
-      });
-      
-      // Add replication event
-      addReplicationEvent({
-        type: 'peer_discovered',
-        peer: persona,
-        data: { discovered: peerId }
-      });
-    });
-    
-    console.log(`✅ [${persona.toUpperCase()}] Enhanced connection monitoring active`);
-  }
-  
-  /**
-   * Check if database is ready for replication operations
-   * Replaces polling with immediate event-driven checks
-   */
-  function checkDatabaseReadiness() {
-    // Check Alice's database readiness
-    if (aliceDatabase && aliceLibp2p) {
-      const hasAliceConnections = aliceConnectedPeers.length > 0;
-      const hasSharedDatabase = sharedDatabaseAddress !== null;
-      
-      aliceDatabaseReady = hasAliceConnections && hasSharedDatabase;
-      
-      if (aliceDatabaseReady && !databaseReadyStates.get('alice')) {
-        console.log('✅ [ALICE] Database ready for replication - connections available');
-        databaseReadyStates.set('alice', true);
-        
-        addReplicationEvent({
-          type: 'database_ready',
-          peer: 'alice',
-          data: {
-            connections: aliceConnectedPeers.length,
-            hasSharedAddress: hasSharedDatabase
-          }
-        });
-      } else if (!aliceDatabaseReady && databaseReadyStates.get('alice')) {
-        console.log('⚠️ [ALICE] Database no longer ready for replication');
-        databaseReadyStates.set('alice', false);
-      }
-    }
-    
-    // Check Bob's database readiness
-    if (bobDatabase && bobLibp2p) {
-      const hasBobConnections = bobConnectedPeers.length > 0;
-      const hasSharedDatabase = sharedDatabaseAddress !== null;
-      
-      bobDatabaseReady = hasBobConnections && hasSharedDatabase;
-      
-      if (bobDatabaseReady && !databaseReadyStates.get('bob')) {
-        console.log('✅ [BOB] Database ready for replication - connections available');
-        databaseReadyStates.set('bob', true);
-        
-        addReplicationEvent({
-          type: 'database_ready',
-          peer: 'bob',
-          data: {
-            connections: bobConnectedPeers.length,
-            hasSharedAddress: hasSharedDatabase
-          }
-        });
-      } else if (!bobDatabaseReady && databaseReadyStates.get('bob')) {
-        console.log('⚠️ [BOB] Database no longer ready for replication');
-        databaseReadyStates.set('bob', false);
-      }
-    }
-  }
-  
-  /**
-   * Check if a specific connection enables database syncing
-   * Called immediately when a connection opens
-   */
-  function checkDatabaseSyncReadiness(connection, persona, database) {
-    if (!connection || !database) return;
-    
-    const peerId = connection.remotePeer.toString();
-    const isDirectConnection = !connection.transient && !connection.limits;
-    
-    console.log(`🔍 [${persona.toUpperCase()}] Checking sync readiness for connection to ${peerId}:`, {
-      direct: isDirectConnection,
-      transient: connection.transient,
-      limited: connection.limits != null,
-      direction: connection.direction
-    });
-    
-    if (isDirectConnection) {
-      console.log(`🚀 [${persona.toUpperCase()}] Direct connection available - database sync optimal`);
-      
-      addReplicationEvent({
-        type: 'direct_connection_ready',
-        peer: persona,
-        data: {
-          connectedTo: peerId,
-          optimal: true
-        }
-      });
-    } else {
-      console.log(`🔄 [${persona.toUpperCase()}] Relay connection available - database sync possible`);
-      
-      addReplicationEvent({
-        type: 'relay_connection_ready',
-        peer: persona,
-        data: {
-          connectedTo: peerId,
-          viaRelay: true
-        }
-      });
-    }
-    
-    // Trigger overall database readiness check
-    checkDatabaseReadiness();
-  }
-
-  // Set up event listeners for replication demo databases
+  // Add this new function to set up event listeners for StorachaTest databases only
   function setupDatabaseEventListeners(database, persona) {
     if (!database) return;
 
-    console.log(`🎧 Setting up replication event listeners for ${persona}'s database...`);
-    console.log(`🎯 [ReplicationTest] Database address: ${database.address}`);
+    console.log(`🎧 Setting up event listeners for ${persona}'s database...`);
+    console.log(`🎯 [StorachaTest] Database address: ${database.address}`);
 
     // Add this database address to our tracking set
-    replicationTestDatabaseAddresses.add(
+    storachaTestDatabaseAddresses.add(
       database.address?.toString() || database.address,
     );
 
     // Listen for new entries being added (join event)
     database.events.on("join", async (address, entry, heads) => {
-      // Check if this event is for any replication test database
+      // Check if this event is for any StorachaTest database
       const eventAddress = address?.toString() || address;
 
-      if (replicationTestDatabaseAddresses.has(eventAddress)) {
-        console.log(`🔗 [ReplicationTest-${persona}] JOIN EVENT:`, {
+      if (storachaTestDatabaseAddresses.has(eventAddress)) {
+        console.log(`🔗 [StorachaTest-${persona}] JOIN EVENT:`, {
           address: eventAddress,
           entry: {
             hash: entry?.hash?.toString() || entry?.hash,
@@ -866,54 +450,43 @@
         });
 
         // Add to test results if test is running
-        const replicationSource = entry?.identity !== database.identity.id ? 'replicated' : 'local';
-        addResult(
-          persona,
-          "Replication Event",
-          "success",
-          `Entry ${replicationSource}: ${entry?.key || "unknown key"}`,
-          {
-            address: eventAddress,
-            entryHash: entry?.hash?.toString() || entry?.hash,
-            entryKey: entry?.key,
-            entryValue: entry?.value,
-            replicationSource,
-            entryIdentity: entry?.identity,
-            localIdentity: database.identity.id,
-          },
-        );
-
-        // Update the todo list for this persona
-        try {
-          if (persona === "alice") {
-            aliceTodos = await aliceDatabase.all();
-          } else if (persona === "bob" && bobDatabase) {
-            bobTodos = await bobDatabase.all();
-          }
-        } catch (error) {
-          console.warn(`Failed to update ${persona}'s todos:`, error);
+        if (persona === "alice") {
+          addResult(
+            "alice",
+            "Join Event",
+            "success",
+            `New entry joined: ${entry?.key || "unknown key"}`,
+            {
+              address: eventAddress,
+              entryHash: entry?.hash?.toString() || entry?.hash,
+              entryKey: entry?.key,
+              entryValue: entry?.value,
+            },
+          );
+        } else if (persona === "bob") {
+          addResult(
+            "bob",
+            "Join Event",
+            "success",
+            `New entry joined: ${entry?.key || "unknown key"}`,
+            {
+              address: eventAddress,
+              entryHash: entry?.hash?.toString() || entry?.hash,
+              entryKey: entry?.key,
+              entryValue: entry?.value,
+            },
+          );
         }
-
-        // Add replication event
-        addReplicationEvent({
-          type: 'data_replicated',
-          peer: persona,
-          data: {
-            key: entry?.key,
-            replicationSource,
-            from: entry?.identity?.slice(-8) || 'unknown'
-          }
-        });
       }
     });
 
     // Listen for entries being updated (update event)
     database.events.on("update", async (address, entry, heads) => {
-      // Check if this event is for any replication test database
+      // Check if this event is for any StorachaTest database
       const eventAddress = address?.toString() || address;
 
-      if (replicationTestDatabaseAddresses.has(eventAddress)) {
-        console.log(`🔄 [ReplicationTest-${persona}] UPDATE EVENT:`, {
+      if (storachaTestDatabaseAddresses.has(eventAddress)) {
+        console.log(`🔄 [StorachaTest-${persona}] UPDATE EVENT:`, {
           address: eventAddress,
           entry: {
             hash: entry?.hash?.toString() || entry?.hash,
@@ -926,25 +499,38 @@
         });
 
         // Add to test results if test is running
-        const replicationSource = entry?.identity !== database.identity.id ? 'replicated' : 'local';
-        addResult(
-          persona,
-          "Database Update",
-          "success",
-          `Entry updated ${replicationSource}: ${entry?.key || "unknown key"}`,
-          {
-            address: eventAddress,
-            entryHash: entry?.hash?.toString() || entry?.hash,
-            entryKey: entry?.key,
-            entryValue: entry?.value,
-            replicationSource,
-          },
-        );
+        if (persona === "alice") {
+          addResult(
+            "alice",
+            "Update Event",
+            "success",
+            `Entry updated: ${entry?.key || "unknown key"}`,
+            {
+              address: eventAddress,
+              entryHash: entry?.hash?.toString() || entry?.hash,
+              entryKey: entry?.key,
+              entryValue: entry?.value,
+            },
+          );
+        } else if (persona === "bob") {
+          addResult(
+            "bob",
+            "Update Event",
+            "success",
+            `Entry updated: ${entry?.key || "unknown key"}`,
+            {
+              address: eventAddress,
+              entryHash: entry?.hash?.toString() || entry?.hash,
+              entryKey: entry?.key,
+              entryValue: entry?.value,
+            },
+          );
+        }
       }
     });
 
     console.log(
-      `✅ [ReplicationTest] Event listeners set up for database instance ${persona}`,
+      `✅ [StorachaTest] Event listeners set up for database instance ${persona}`,
     );
   }
 
@@ -965,7 +551,8 @@
           db.name.includes("helia") ||
           db.name.includes("orbit") ||
           db.name.includes("level") ||
-          db.name.includes("replication-test") ||
+          db.name.includes("simple-todo") ||
+          db.name.includes("storacha-test") ||
           db.name.includes("alice") ||
           db.name.includes("bob"),
       );
@@ -1031,7 +618,7 @@
           "alice",
           "Identity",
           "running",
-          "Creating shared identity for replication...",
+          "Creating shared identity...",
         );
         const identityResult = await createReusableIdentity("shared");
         sharedIdentity = identityResult.identity;
@@ -1048,7 +635,7 @@
         "alice",
         "Setup",
         "running",
-        "Setting up Alice's OrbitDB instance with P2P replication...",
+        "Setting up Alice's OrbitDB instance...",
       );
 
       const databaseConfig = {
@@ -1060,25 +647,23 @@
 
       const instance = await createOrbitDBInstance(
         "alice",
-        "replication-instance",
-        "shared-todos-replication",
+        "instance",
+        "shared-todos",
         databaseConfig,
-        false, // Alice creates the initial database
+        true,
       );
       aliceOrbitDB = instance.orbitdb;
       aliceDatabase = instance.database;
       aliceHelia = instance.helia;
       aliceLibp2p = instance.libp2p;
 
-      updateLastResult("alice", "success", `Alice's OrbitDB instance ready with P2P replication`, {
+      updateLastResult("alice", "success", `Alice's OrbitDB instance ready`, {
         orbitDBId: aliceOrbitDB.id,
         identityId: aliceOrbitDB.identity.id,
         databaseAddress: aliceDatabase.address,
-        peerId: aliceLibp2p.peerId.toString(),
-        replicationEnabled,
       });
 
-      aliceStep = "Alice ready to add todos and replicate with Bob";
+      aliceStep = "Alice ready to add todos";
     } catch (error) {
       console.error("❌ Alice initialization failed:", error);
       aliceError = error.message;
@@ -1093,20 +678,20 @@
     if (aliceRunning || !aliceDatabase) return;
 
     aliceRunning = true;
-    aliceStep = "Adding todos with replication...";
+    aliceStep = "Adding todos...";
 
     try {
       addResult(
         "alice",
         "Adding Todos",
         "running",
-        "Adding test todos to replicated database...",
+        "Adding test todos to database...",
       );
 
       for (let i = 0; i < originalTodos.length; i++) {
         const todo = originalTodos[i];
         await aliceDatabase.put(todo.id, todo);
-        console.log(`✅ Alice added todo ${i + 1} (will replicate to Bob):`, todo);
+        console.log(`✅ Alice added todo ${i + 1}:`, todo);
       }
 
       // Get all todos to verify and display
@@ -1115,19 +700,17 @@
       updateLastResult(
         "alice",
         "success",
-        `Successfully added ${aliceTodos.length} todos - awaiting replication to Bob`,
+        `Successfully added ${aliceTodos.length} todos`,
         {
           todosAdded: aliceTodos.map((t) => ({
             key: t.key,
             text: t.value.text,
             completed: t.value.completed,
           })),
-          databaseAddress: aliceDatabase.address,
-          replicationEnabled,
         },
       );
 
-      aliceStep = "Alice ready to backup (Bob should see replicated todos)";
+      aliceStep = "Alice ready to backup";
     } catch (error) {
       console.error("❌ Adding todos failed:", error);
       aliceError = error.message;
@@ -1153,10 +736,10 @@
     }
 
     aliceRunning = true;
-    aliceStep = "Creating backup while maintaining replication...";
+    aliceStep = "Creating backup...";
 
     try {
-      addResult("alice", "Backup", "running", "Creating backup to Storacha while preserving replication...");
+      addResult("alice", "Backup", "running", "Creating backup to Storacha...");
 
       const databaseConfig = {
         type: "keyvalue",
@@ -1185,17 +768,16 @@
       updateLastResult(
         "alice",
         "success",
-        `Backup created successfully with ${backupResult.blocksUploaded}/${backupResult.blocksTotal} blocks - replication preserved`,
+        `Backup created successfully with ${backupResult.blocksUploaded}/${backupResult.blocksTotal} blocks`,
         {
           manifestCID: backupResult.manifestCID,
           databaseAddress: backupResult.databaseAddress,
           blocksTotal: backupResult.blocksTotal,
           blocksUploaded: backupResult.blocksUploaded,
-          replicationStillActive: true,
         },
       );
 
-      aliceStep = "Alice backup complete - Bob can restore while maintaining replication";
+      aliceStep = "Alice backup complete - Bob can now restore";
     } catch (error) {
       console.error("❌ Backup failed:", error);
       aliceError = error.message;
@@ -1208,9 +790,9 @@
 
   // Bob's functions
   async function initializeBob() {
-    if (bobRunning) return;
+    if (bobRunning || !backupResult) return;
 
-    // Check requirements
+    // Check Storacha authentication first
     if (!storachaAuthenticated || !storachaClient) {
       addResult(
         "bob",
@@ -1221,27 +803,45 @@
       return;
     }
 
-    if (!sharedIdentity || !sharedDatabaseAddress) {
-      addResult(
-        "bob",
-        "Error",
-        "error",
-        "Alice must initialize first to create shared identity and database address",
-      );
-      return;
-    }
-
     bobRunning = true;
     bobError = null;
     bobResults = [];
-    bobStep = "Initializing Bob for replication...";
+    bobStep = "Initializing Bob...";
 
     try {
+      if (!sharedIdentity && bobUseSameIdentity) {
+        throw new Error(
+          "Shared identity not available. Alice must initialize first.",
+        );
+      }
+
+      // Create Bob's own identity if needed
+      if (!bobUseSameIdentity && !bobIdentity) {
+        addResult(
+          "bob",
+          "Identity",
+          "running",
+          "Creating Bob's own identity...",
+        );
+        const identityResult = await createReusableIdentity("bob");
+        bobIdentity = identityResult.identity;
+        bobIdentities = identityResult.identities;
+        updateLastResult(
+          "bob",
+          "success",
+          `Bob's identity created: ${bobIdentity.id}`,
+          {
+            identityId: bobIdentity.id,
+            identityType: bobIdentity.type,
+          },
+        );
+      }
+
       addResult(
         "bob",
         "Setup",
         "running",
-        "Setting up Bob's OrbitDB instance for P2P replication with shared database...",
+        `Setting up Bob's OrbitDB instance with ${bobUseSameIdentity ? "shared" : "own"} identity...`,
       );
 
       const databaseConfig = {
@@ -1253,36 +853,32 @@
 
       const instance = await createOrbitDBInstance(
         "bob",
-        "replication-instance",
-        "shared-todos-replication",
+        "instance",
+        "shared-todos",
         databaseConfig,
-        true, // Bob opens the shared database
+        bobUseSameIdentity,
       );
       bobOrbitDB = instance.orbitdb;
       bobDatabase = instance.database;
       bobHelia = instance.helia;
       bobLibp2p = instance.libp2p;
 
-      // Wait a bit for initial replication
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-      bobTodos = await bobDatabase.all();
-
+      const identityUsed = bobUseSameIdentity ? sharedIdentity : bobIdentity;
       updateLastResult(
         "bob",
         "success",
-        `Bob's OrbitDB instance ready - connected to shared database with ${bobTodos.length} replicated todos`,
+        `Bob's OrbitDB instance ready with ${bobUseSameIdentity ? "shared" : "own"} identity`,
         {
           orbitDBId: bobOrbitDB.id,
           identityId: bobOrbitDB.identity.id,
           databaseAddress: bobDatabase.address,
-          sharedAddress: sharedDatabaseAddress,
-          peerId: bobLibp2p.peerId.toString(),
-          replicatedTodos: bobTodos.length,
-          addressesMatch: bobDatabase.address === sharedDatabaseAddress,
+          usingSameIdentity: bobUseSameIdentity,
+          identityMatches:
+            bobOrbitDB.identity.id === (sharedIdentity?.id || "none"),
         },
       );
 
-      bobStep = "Bob ready - should see Alice's todos via replication";
+      bobStep = "Bob ready to restore";
     } catch (error) {
       console.error("❌ Bob initialization failed:", error);
       bobError = error.message;
@@ -1308,14 +904,17 @@
     }
 
     bobRunning = true;
-    bobStep = "Restoring from backup while preserving replication...";
+    bobStep = "Restoring from backup...";
 
     try {
+      const identityInfo = bobUseSameIdentity
+        ? "same identity as Alice"
+        : "his own identity";
       addResult(
         "bob",
         "Restore",
         "running",
-        "Restoring database from Storacha backup while maintaining P2P replication...",
+        `Restoring database from Storacha backup using ${identityInfo}...`,
       );
 
       const databaseConfig = {
@@ -1332,7 +931,7 @@
       restoreResult = await bridge.restoreLogEntriesOnly(
         bobOrbitDB,
         {
-          dbName: "shared-todos-replication",
+          dbName: "shared-todos",
           dbConfig: databaseConfig,
           timeout: 120000,
         },
@@ -1342,19 +941,19 @@
         throw new Error(`Restore failed: ${restoreResult.error}`);
       }
 
-      // Get restored database and wait for replication to sync
+      // Get restored todos
       const restoredDatabase = restoreResult.database;
 
       // Add restored database to tracking
       if (restoredDatabase && restoredDatabase.address) {
-        replicationTestDatabaseAddresses.add(
+        storachaTestDatabaseAddresses.add(
           restoredDatabase.address?.toString() || restoredDatabase.address,
         );
       }
 
-      // Wait for indexing and potential replication sync
+      // Wait for indexing
       await new Promise((resolve) => setTimeout(resolve, 5000));
-      bobTodos = await (bobDatabase || restoredDatabase).all();
+      bobTodos = await restoredDatabase.all();
 
       const optimizationInfo = restoreResult.optimizationSavings
         ? `(${restoreResult.optimizationSavings.percentageSaved}% fewer downloads)`
@@ -1363,7 +962,7 @@
       updateLastResult(
         "bob",
         "success",
-        `Database restored successfully with ${restoreResult.entriesRecovered} entries - replication maintained ${optimizationInfo}`,
+        `Database restored successfully with ${restoreResult.entriesRecovered} entries using ${identityInfo} ${optimizationInfo}`,
         {
           manifestCID: restoreResult.manifestCID,
           databaseAddress: restoreResult.address,
@@ -1373,62 +972,17 @@
             text: t.value.text,
             completed: t.value.completed,
           })),
-          replicationPreserved: true,
-          sharedDatabase: bobDatabase?.address === sharedDatabaseAddress,
+          usingSameIdentity: bobUseSameIdentity,
+          identityUsed: bobOrbitDB.identity.id,
         },
       );
 
-      bobStep = "Bob restore complete - replication with Alice maintained";
+      bobStep = "Bob restore complete";
     } catch (error) {
       console.error("❌ Restore failed:", error);
       bobError = error.message;
       bobStep = `Restore failed: ${error.message}`;
       updateLastResult("bob", "error", error.message);
-    } finally {
-      bobRunning = false;
-    }
-  }
-
-  // Test replication by having Bob add a todo
-  async function addBobTodo() {
-    if (bobRunning || !bobDatabase) return;
-
-    bobRunning = true;
-    bobStep = "Bob adding todo to test replication...";
-
-    try {
-      const bobTodo = {
-        id: "bob_replication_test_" + Date.now(),
-        text: "Added by Bob - should replicate to Alice",
-        completed: false,
-        createdAt: new Date().toISOString(),
-        createdBy: "bob",
-      };
-
-      await bobDatabase.put(bobTodo.id, bobTodo);
-      console.log("✅ Bob added todo (should replicate to Alice):", bobTodo);
-
-      // Wait a bit for replication
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-      bobTodos = await bobDatabase.all();
-
-      addResult(
-        "bob",
-        "Replication Test",
-        "success",
-        "Bob added todo - should appear in Alice's database via replication",
-        {
-          todoAdded: bobTodo,
-          totalTodos: bobTodos.length,
-        }
-      );
-
-      bobStep = "Bob added todo - check Alice's list for replication";
-    } catch (error) {
-      console.error("❌ Bob todo add failed:", error);
-      bobError = error.message;
-      bobStep = `Bob todo add failed: ${error.message}`;
-      addResult("bob", "Replication Test", "error", error.message);
     } finally {
       bobRunning = false;
     }
@@ -1460,22 +1014,6 @@
 
     await clearIndexedDB();
 
-    // Clear enhanced connection monitoring state
-    connectionStates.clear();
-    databaseReadyStates.clear();
-    
-    // Clear any pending connection timeouts
-    for (const timeout of connectionTimeouts.values()) {
-      clearTimeout(timeout);
-    }
-    connectionTimeouts.clear();
-    
-    // Reset database ready states
-    aliceDatabaseReady = false;
-    bobDatabaseReady = false;
-    
-    console.log('🧹 Cleared enhanced connection monitoring state');
-
     // Reset state
     aliceOrbitDB = null;
     aliceDatabase = null;
@@ -1485,8 +1023,6 @@
     aliceResults = [];
     aliceStep = "";
     aliceError = null;
-    alicePeerId = null;
-    aliceConnectedPeers = [];
 
     bobOrbitDB = null;
     bobDatabase = null;
@@ -1496,17 +1032,15 @@
     bobResults = [];
     bobStep = "";
     bobError = null;
-    bobPeerId = null;
-    bobConnectedPeers = [];
+    bobUseSameIdentity = true;
+    bobIdentity = null;
+    bobIdentities = null;
 
     sharedIdentity = null;
     sharedIdentities = null;
-    sharedDatabaseAddress = null;
     backupResult = null;
     restoreResult = null;
-    replicationTestDatabaseAddresses.clear();
-    replicationEvents = [];
-    peersConnected = false;
+    storachaTestDatabaseAddresses.clear();
   }
 
   // Utility functions
@@ -1539,6 +1073,31 @@
         return "text-gray-600 dark:text-gray-400";
     }
   }
+
+  /**
+   * A basic Libp2p configuration for browser nodes.
+   */
+  const DefaultLibp2pBrowserOptions = {
+    addresses: {
+      listen: ["/webrtc", "/p2p-circuit"],
+    },
+    transports: [
+      webSockets({
+        filter: all,
+      }),
+      webRTC(),
+      circuitRelayTransport(),
+    ],
+    connectionEncrypters: [noise()],
+    streamMuxers: [yamux()],
+    connectionGater: {
+      denyDialMultiaddr: () => false,
+    },
+    services: {
+      identify: identify(),
+      pubsub: gossipsub({ allowPublishToZeroTopicPeers: true }),
+    },
+  };
 </script>
 
 <Grid>
@@ -1578,109 +1137,14 @@
         >
           <img src="/orbitdb.png" alt="OrbitDB" style="width:32px;height:32px;object-fit:contain;" />
           <h3 style="font-size:1.25rem;font-weight:bold;margin:0;">
-            Alice & Bob P2P Replication + Backup/Restore Demo
+            Alice & Bob Backup/Restore Demo
           </h3>
         </div>
         <p style="color:var(--cds-text-secondary);margin:0;">
-          Alice & Bob connect via libp2p, share the same database address for real-time replication,
-          and can backup/restore to Storacha while preserving P2P connections.
+          Alice creates todos and backs them up to Storacha. Bob restores the
+          data from the backup using either the same identity or his own.
         </p>
       </div>
-    </Column>
-  </Row>
-
-  <!-- Replication Status -->
-  <Row>
-    <Column>
-      <Tile style="margin-bottom: 2rem;">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;">
-          <h5 style="font-size:1rem;font-weight:600;margin:0;">P2P Replication Status</h5>
-          <Toggle
-            size="sm"
-            labelText=""
-            toggled={replicationEnabled}
-            on:toggle={() => (replicationEnabled = !replicationEnabled)}
-            disabled={aliceOrbitDB || bobOrbitDB}
-          >
-            Replication: {replicationEnabled ? 'Enabled' : 'Disabled'}
-          </Toggle>
-        </div>
-        
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1rem;margin-bottom:1rem;">
-          <div style="text-align:center;">
-            <div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.25rem;">
-              {#if peersConnected}
-                <Connect size={16} style="color:var(--cds-support-success);" />
-              {:else}
-                <Disconnect size={16} style="color:var(--cds-support-error);" />
-              {/if}
-              <span style="font-size:0.875rem;font-weight:500;">Peer Connection</span>
-            </div>
-            <span style="font-size:0.75rem;color:var(--cds-text-secondary);">
-              {peersConnected ? 'Connected' : 'Disconnected'}
-            </span>
-          </div>
-          
-          <div style="text-align:center;">
-            <div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.25rem;">
-              <DataBase size={16} style="color:var(--cds-support-info);" />
-              <span style="font-size:0.875rem;font-weight:500;">Shared Database</span>
-            </div>
-            <span style="font-size:0.75rem;color:var(--cds-text-secondary);">
-              {sharedDatabaseAddress ? 'Created' : 'Not Created'}
-            </span>
-          </div>
-          
-          <div style="text-align:center;">
-            <div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.25rem;">
-              <Users size={16} style="color:var(--cds-support-warning);" />
-              <span style="font-size:0.875rem;font-weight:500;">Replication Events</span>
-            </div>
-            <span style="font-size:0.75rem;color:var(--cds-text-secondary);">
-              {replicationEvents.length} events
-            </span>
-          </div>
-        </div>
-        
-        <!-- Database Readiness Indicators -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-top:1rem;padding:1rem;border:1px solid var(--cds-border-subtle);border-radius:4px;background:var(--cds-layer-01);">
-          <div style="text-align:center;">
-            <div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.25rem;">
-              {#if aliceDatabaseReady}
-                <Checkmark size={16} style="color:var(--cds-support-success);" />
-              {:else}
-                <Warning size={16} style="color:var(--cds-support-error);" />
-              {/if}
-              <span style="font-size:0.875rem;font-weight:500;">Alice DB Ready</span>
-            </div>
-            <span style="font-size:0.75rem;color:var(--cds-text-secondary);">
-              {aliceDatabaseReady ? 'Ready for Replication' : 'Waiting for Connections'}
-            </span>
-          </div>
-          
-          <div style="text-align:center;">
-            <div style="display:flex;align-items:center;justify-content:center;gap:0.5rem;margin-bottom:0.25rem;">
-              {#if bobDatabaseReady}
-                <Checkmark size={16} style="color:var(--cds-support-success);" />
-              {:else}
-                <Warning size={16} style="color:var(--cds-support-error);" />
-              {/if}
-              <span style="font-size:0.875rem;font-weight:500;">Bob DB Ready</span>
-            </div>
-            <span style="font-size:0.75rem;color:var(--cds-text-secondary);">
-              {bobDatabaseReady ? 'Ready for Replication' : 'Waiting for Connections'}
-            </span>
-          </div>
-        </div>
-
-        {#if sharedDatabaseAddress}
-          <div style="margin-top:1rem;">
-            <CodeSnippet type="single" light wrapText>
-              Shared DB: {sharedDatabaseAddress}
-            </CodeSnippet>
-          </div>
-        {/if}
-      </Tile>
     </Column>
   </Row>
 
@@ -1807,27 +1271,9 @@
             <UserAvatar size={16} style="color:white;" />
           </div>
           <h4 style="font-size:1.125rem;font-weight:600;margin:0;">
-            Alice (Data Creator & Replicator)
+            Alice (Data Creator)
           </h4>
         </div>
-
-        <!-- Alice's P2P Info -->
-        {#if alicePeerId}
-          <Tile style="margin-bottom:1rem;">
-            <div style="margin-bottom:0.5rem;">
-              <span style="font-size:0.875rem;font-weight:500;">Peer ID:</span>
-              <CodeSnippet type="single" style="margin-top:0.25rem;">
-                {alicePeerId.slice(-16)}
-              </CodeSnippet>
-            </div>
-            <div>
-              <span style="font-size:0.875rem;font-weight:500;">Connected Peers:</span>
-              <span style="font-size:0.875rem;color:var(--cds-text-secondary);margin-left:0.5rem;">
-                {aliceConnectedPeers.length}
-              </span>
-            </div>
-          </Tile>
-        {/if}
 
         <!-- Alice's Status -->
         {#if aliceStep}
@@ -1867,7 +1313,7 @@
             style="width:100%;"
           >
             {#if aliceRunning}<Loading withOverlay={false} small />{/if}
-            1. Initialize Alice (Creates Shared DB)
+            1. Initialize Alice
           </Button>
 
           <Button
@@ -1879,7 +1325,7 @@
             style="width:100%;"
           >
             {#if aliceRunning}<Loading withOverlay={false} small />{/if}
-            2. Add Todos (Will Replicate to Bob)
+            2. Add Todos
           </Button>
 
           <Button
@@ -1920,9 +1366,6 @@
                       : ""}
                   >
                     {todo.value.text}
-                  </span>
-                  <span style="margin-left:auto;font-size:0.625rem;color:var(--cds-text-secondary);">
-                    👤 {todo.value.createdBy}
                   </span>
                 </div>
               {/each}
@@ -1996,27 +1439,40 @@
             <UserAvatar size={16} style="color:white;" />
           </div>
           <h4 style="font-size:1.125rem;font-weight:600;margin:0;">
-            Bob (Replicator & Restorer)
+            Bob (Data Restorer)
           </h4>
         </div>
 
-        <!-- Bob's P2P Info -->
-        {#if bobPeerId}
-          <Tile style="margin-bottom:1rem;">
-            <div style="margin-bottom:0.5rem;">
-              <span style="font-size:0.875rem;font-weight:500;">Peer ID:</span>
-              <CodeSnippet type="single" style="margin-top:0.25rem;">
-                {bobPeerId.slice(-16)}
-              </CodeSnippet>
-            </div>
-            <div>
-              <span style="font-size:0.875rem;font-weight:500;">Connected Peers:</span>
-              <span style="font-size:0.875rem;color:var(--cds-text-secondary);margin-left:0.5rem;">
-                {bobConnectedPeers.length}
-              </span>
-            </div>
-          </Tile>
-        {/if}
+        <!-- Bob's Identity Toggle -->
+        <Tile style="margin-bottom:1rem;">
+          <div
+            style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;"
+          >
+            <span style="font-size:0.875rem;font-weight:500;"
+              >Identity Choice:</span
+            >
+            <Toggle
+              size="sm"
+              labelText=""
+              toggled={bobUseSameIdentity}
+              on:toggle={() => (bobUseSameIdentity = !bobUseSameIdentity)}
+              disabled={bobRunning || bobOrbitDB}
+            >
+              {bobUseSameIdentity ? "Same as Alice" : "Own Identity"}
+            </Toggle>
+          </div>
+          <p
+            style="font-size:0.75rem;color:var(--cds-text-secondary);margin:0;"
+          >
+            {#if bobUseSameIdentity}
+              🔗 Bob will use Alice's shared identity (DID) - typical for same
+              user restoring data
+            {:else}
+              🆔 Bob will create his own identity (DID) - demonstrates
+              cross-identity data sharing
+            {/if}
+          </p>
+        </Tile>
 
         <!-- Bob's Status -->
         {#if bobStep}
@@ -2054,25 +1510,13 @@
             icon={bobRunning ? undefined : DataBase}
             on:click={initializeBob}
             disabled={bobRunning ||
-              !sharedDatabaseAddress ||
+              !backupResult ||
               bobOrbitDB ||
               !storachaAuthenticated}
             style="width:100%;"
           >
             {#if bobRunning}<Loading withOverlay={false} small />{/if}
-            1. Initialize Bob (Connect to Shared DB)
-          </Button>
-
-          <Button
-            size="sm"
-            kind="secondary"
-            icon={bobRunning ? undefined : Add}
-            on:click={addBobTodo}
-            disabled={bobRunning || !bobDatabase}
-            style="width:100%;"
-          >
-            {#if bobRunning}<Loading withOverlay={false} small />{/if}
-            2. Add Todo (Test Replication to Alice)
+            1. Initialize Bob
           </Button>
 
           <Button
@@ -2082,57 +1526,39 @@
             on:click={restoreBob}
             disabled={bobRunning ||
               !bobOrbitDB ||
-              !backupResult ||
               restoreResult ||
               !storachaAuthenticated}
             style="width:100%;"
           >
             {#if bobRunning}<Loading withOverlay={false} small />{/if}
-            3. Restore from Storacha
+            2. Restore from Storacha
           </Button>
         </div>
-
-        <!-- Shared Database Status -->
-        {#if !sharedDatabaseAddress}
-          <InlineNotification
-            kind="info"
-            title="Waiting"
-            subtitle="Waiting for Alice to create shared database..."
-            style="margin-bottom:1rem;"
-          />
-        {:else}
-          <InlineNotification
-            kind="success"
-            title="Ready"
-            subtitle="Shared database available for replication"
-            style="margin-bottom:1rem;"
-          />
-        {/if}
 
         <!-- Backup Status Indicator -->
         {#if !backupResult}
           <InlineNotification
             kind="info"
-            title="Backup Status"
+            title="Waiting"
             subtitle="Waiting for Alice to create backup..."
             style="margin-bottom:1rem;"
           />
         {:else}
           <InlineNotification
             kind="success"
-            title="Backup Available"
-            subtitle="Alice's backup ready for restore"
+            title="Ready"
+            subtitle="Backup available from Alice"
             style="margin-bottom:1rem;"
           />
         {/if}
 
-        <!-- Bob's Replicated Todos -->
+        <!-- Bob's Restored Todos -->
         {#if bobTodos.length > 0}
           <div style="margin-bottom:1rem;">
             <h5
               style="font-size:0.875rem;font-weight:500;margin-bottom:0.5rem;"
             >
-              Bob's Replicated Todos:
+              Bob's Restored Todos:
             </h5>
             <div style="display:flex;flex-direction:column;gap:0.25rem;">
               {#each bobTodos as todo}
@@ -2150,8 +1576,7 @@
                     {todo.value.text}
                   </span>
                   <span style="margin-left:auto;font-size:0.625rem;color:var(--cds-text-secondary);">
-                    {todo.value.createdBy === 'alice' ? '🔄 from Alice' : 
-                     todo.value.createdBy === 'bob' ? '👤 by Bob' : '✨ replicated'}
+                    ✨ restored
                   </span>
                 </div>
               {/each}
@@ -2210,9 +1635,9 @@
         {#if bobTodos.length > 0 || bobResults.length > 0}
           <div style="margin-top:1rem;padding:0.5rem;background:var(--cds-layer-01);border-radius:0.25rem;">
             <p style="font-size:0.75rem;color:var(--cds-text-secondary);margin:0;text-align:center;">
-              📊 {bobTodos.length} replicated todos • {bobResults.length} progress items
-              {#if peersConnected}
-                • 🔗 P2P Connected
+              📊 {bobTodos.length} restored todos • {bobResults.length} progress items
+              {#if bobTodos.length > 0}
+                • Identity: {bobUseSameIdentity ? "🔗 Same as Alice" : "🆔 Own Identity"}
               {/if}
             </p>
           </div>
@@ -2221,52 +1646,23 @@
     </Column>
   </Row>
 
-  <!-- Replication Events -->
-  {#if replicationEvents.length > 0 && showDetails}
-    <Row>
-      <Column>
-        <Tile>
-          <h5 style="font-size:1rem;font-weight:600;margin-bottom:1rem;">
-            Recent Replication Events
-          </h5>
-          <div style="display:flex;flex-direction:column;gap:0.5rem;">
-            {#each replicationEvents.slice(-10) as event}
-              <div style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem;background:var(--cds-layer-accent);border-radius:0.25rem;font-size:0.75rem;">
-                <span style="color:var(--cds-text-secondary);">
-                  {formatTimestamp(event.timestamp)}
-                </span>
-                <span style="font-weight:500;color:var(--cds-support-info);">
-                  {event.type}
-                </span>
-                <span>
-                  {event.peer}:
-                </span>
-                <span style="color:var(--cds-text-secondary);">
-                  {JSON.stringify(event.data)}
-                </span>
-              </div>
-            {/each}
-          </div>
-        </Tile>
-      </Column>
-    </Row>
-  {/if}
-
   <!-- Success Summary -->
-  {#if aliceTodos.length > 0 && bobTodos.length > 0 && peersConnected}
+  {#if aliceTodos.length > 0 && bobTodos.length > 0 && aliceTodos.length === bobTodos.length}
     <Row>
       <Column>
         <InlineNotification
           kind="success"
-          title="Success! P2P Replication + Backup/Restore Working ✅"
-          subtitle={`Alice created ${aliceTodos.length} todos, Bob replicated ${bobTodos.length} todos via P2P connection, and backup/restore functionality is available while preserving replication!`}
+          title="Success! Data Successfully Transferred ✅"
+          subtitle={`Alice created ${aliceTodos.length} todos and backed them up to Storacha. Bob successfully restored all ${bobTodos.length} todos from the backup using ${bobUseSameIdentity ? "the same identity" : "his own identity"}!`}
           style="margin-top:2rem;"
         >
           {#if backupResult && restoreResult}
             <p style="font-size:0.75rem;margin-top:0.5rem;">
               Backup: {backupResult.blocksUploaded}/{backupResult.blocksTotal} blocks
-              • Restore: {restoreResult.entriesRecovered} entries recovered • P2P Replication: Active
-              • Connection Status: {peersConnected ? 'Connected' : 'Disconnected'}
+              • Restore: {restoreResult.entriesRecovered} entries recovered • Identity:
+              {bobUseSameIdentity
+                ? "Shared (Same DID)"
+                : "Separate (Different DID)"}
             </p>
           {/if}
         </InlineNotification>

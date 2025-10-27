@@ -136,34 +136,30 @@
   let aliceDatabaseReady = false;
   let bobDatabaseReady = false;
 
-  // Generate replication test data dynamically
-  function generateReplicationTestTodos(createdBy = "alice") {
-    return [
-      {
-        id: `replication_todo_1_${Date.now()}`,
-        text: "Test P2P replication with Alice & Bob",
-        completed: false,
-        createdAt: new Date().toISOString(),
-        createdBy,
-      },
-      {
-        id: `replication_todo_2_${Date.now()}`,
-        text: "Backup database to Storacha",
-        completed: false,
-        createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
-        createdBy,
-      },
-      {
-        id: `replication_todo_3_${Date.now()}`,
-        text: "Restore and maintain replication",
-        completed: false,
-        createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-        createdBy,
-      },
-    ];
-  }
-
-  let originalTodos = generateReplicationTestTodos();
+  // Test data
+  let originalTodos = [
+    {
+      id: "replication_todo_1",
+      text: "Test P2P replication with Alice & Bob",
+      completed: false,
+      createdAt: new Date().toISOString(),
+      createdBy: "alice",
+    },
+    {
+      id: "replication_todo_2",
+      text: "Backup database to Storacha",
+      completed: false,
+      createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
+      createdBy: "alice",
+    },
+    {
+      id: "replication_todo_3",
+      text: "Restore and maintain replication",
+      completed: false,
+      createdAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
+      createdBy: "alice",
+    },
+  ];
 
   // Keep track of database addresses for replication demo
   let replicationTestDatabaseAddresses = new Set();
