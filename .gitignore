@@ -17,5 +17,6 @@ cid-bridge-test*
 ucan-bridge-test*
 
 # Build directories
+dist/
 examples/svelte/*/build/
 examples/svelte/*/dist/
