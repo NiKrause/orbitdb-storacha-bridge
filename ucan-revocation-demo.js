@@ -17,45 +17,46 @@ import { Signer } from '@storacha/client/principal/ed25519'
 import * as Proof from '@storacha/client/proof'
 import * as Delegation from '@ucanto/core/delegation'
 import { promises as fs } from 'fs'
+import { logger } from './lib/logger.js'
 
 async function demonstrateUCANRevocation() {
-  console.log('🚀 UCAN Revocation Demo with Storacha JavaScript Client')
-  console.log('=' .repeat(60))
+  logger.info(' UCAN Revocation Demo with Storacha JavaScript Client')
+  logger.info('=' .repeat(60))
   
   // Step 1: Check if we have the necessary Storacha credentials
   const storachaKey = process.env.STORACHA_KEY || process.env.NEXT_PUBLIC_STORACHA_PRIVATE_KEY
   const storachaProof = process.env.STORACHA_PROOF || process.env.NEXT_PUBLIC_STORACHA_DELEGATION
   
   if (!storachaKey || !storachaProof) {
-    console.error('❌ Missing Storacha credentials!')
-    console.error('   Need: STORACHA_KEY and STORACHA_PROOF in .env')
+    logger.error(' Missing Storacha credentials!')
+    logger.error('   Need: STORACHA_KEY and STORACHA_PROOF in .env')
     return null
   }
   
   try {
-    console.log('\\n🔐 Step 1: Initialize Storacha client with existing credentials...')
+    logger.info('\n Step 1: Initialize Storacha client with existing credentials...')
     
     // Initialize the "authority" client (the one that can create delegations)
     const authorityPrincipal = Signer.parse(storachaKey)
     const store = new StoreMemory()
     const authorityClient = await Client.create({ principal: authorityPrincipal, store })
     
-    console.log(`   ✅ Authority identity: ${authorityPrincipal.did()}`)
+    logger.info({ authorityDID: authorityPrincipal.did() }, `   Authority identity: ${authorityPrincipal.did()}`)
     
     // Add the existing proof to get space access
     const proof = await Proof.parse(storachaProof)
     const space = await authorityClient.addSpace(proof)
     await authorityClient.setCurrentSpace(space.did())
     
-    console.log(`   ✅ Space connected: ${space.did()}`)
+    logger.info({ spaceDID: space.did() }, `   Space connected: ${space.did()}`)
     
-    console.log('\\n🎯 Step 2: Create a new identity for delegation (recipient)...')
+    logger.info('\n Step 2: Create a new identity for delegation (recipient)...')
     
     // Create a NEW identity that will receive the delegation
     const recipientPrincipal = await Signer.generate()
-    console.log(`   ✅ Recipient identity: ${recipientPrincipal.did()}`)
+    logger.info({ recipientDID: recipientPrincipal.did() }, `   Recipient identity: ${recipientPrincipal.did()}`)
     
-    console.log('\\n📜 Step 3: Create UCAN delegation...')
+    logger.info('\n Step 3: Create UCAN delegation...')
     
     // Define the capabilities we want to delegate
     const capabilities = [
@@ -65,9 +66,9 @@ async function demonstrateUCANRevocation() {
       'upload/list'
     ]
     
-    console.log(`   📋 Delegating capabilities: ${capabilities.join(', ')}`)
-    console.log(`   🎯 To recipient: ${recipientPrincipal.did()}`)
-    console.log(`   ⏰ Expires in: 24 hours`)
+    logger.info({ capabilities, recipientDID: recipientPrincipal.did() }, `   Delegating capabilities: ${capabilities.join(', ')}`)
+    logger.info(`   To recipient: ${recipientPrincipal.did()}`)
+    logger.info(`   Expires in: 24 hours`)
     
     // Create the delegation
     const expiration = Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 hours
@@ -78,58 +79,58 @@ async function demonstrateUCANRevocation() {
       { expiration }
     )
     
-    console.log('   ✅ UCAN delegation created!')
+    logger.info('   UCAN delegation created!')
     
     // Get the delegation CID for revocation
     const delegationCID = delegation.cid
-    console.log(`   🆔 Delegation CID: ${delegationCID}`)
+    logger.info({ delegationCID: delegationCID.toString() }, `   Delegation CID: ${delegationCID}`)
     
-    console.log('\\n📋 Step 4: List current delegations...')
+    logger.info('\n Step 4: List current delegations...')
     
     // List delegations created by this agent
     const currentDelegations = authorityClient.delegations()
-    console.log(`   📊 Current delegations count: ${currentDelegations.length}`)
+    logger.info({ count: currentDelegations.length }, `   Current delegations count: ${currentDelegations.length}`)
     
     // Find our delegation in the list
     const ourDelegation = currentDelegations.find(d => d.cid.toString() === delegationCID.toString())
     if (ourDelegation) {
-      console.log(`   ✅ Found our delegation: ${ourDelegation.cid}`)
-      console.log(`   👥 Audience: ${ourDelegation.audience.did()}`)
-      console.log(`   📋 Capabilities: ${ourDelegation.capabilities.map(c => c.can).join(', ')}`)
+      logger.info({ delegationCID: ourDelegation.cid.toString(), audience: ourDelegation.audience.did() }, `   Found our delegation: ${ourDelegation.cid}`)
+      logger.info(`   Audience: ${ourDelegation.audience.did()}`)
+      logger.info({ capabilities: ourDelegation.capabilities.map(c => c.can) }, `   Capabilities: ${ourDelegation.capabilities.map(c => c.can).join(', ')}`)
     }
     
-    console.log('\\n🚫 Step 5: Revoke the delegation...')
+    logger.info('\n Step 5: Revoke the delegation...')
     
     try {
       // THIS IS THE KEY: Storacha JavaScript client DOES support revocation!
       const revocationResult = await authorityClient.revokeDelegation(delegationCID)
       
       if (revocationResult.ok) {
-        console.log('   ✅ Delegation successfully revoked!')
-        console.log(`   🆔 Revoked delegation CID: ${delegationCID}`)
+        logger.info({ delegationCID: delegationCID.toString() }, '   Delegation successfully revoked!')
+        logger.info(`   Revoked delegation CID: ${delegationCID}`)
       } else {
-        console.log('   ⚠️ Revocation returned an error:', revocationResult.error)
+        logger.warn({ error: revocationResult.error }, '   Revocation returned an error')
       }
       
     } catch (revocationError) {
-      console.error('   ❌ Revocation failed:', revocationError.message)
-      console.error('   🔍 This might be expected if the delegation was not found or already revoked')
+      logger.error({ error: revocationError.message }, '   Revocation failed')
+      logger.info('   This might be expected if the delegation was not found or already revoked')
     }
     
-    console.log('\\n🔍 Step 6: Verify revocation - List delegations again...')
+    logger.info('\n Step 6: Verify revocation - List delegations again...')
     
     // List delegations again to see if it was removed
     const delegationsAfterRevocation = authorityClient.delegations()
-    console.log(`   📊 Delegations count after revocation: ${delegationsAfterRevocation.length}`)
+    logger.info({ count: delegationsAfterRevocation.length }, `   Delegations count after revocation: ${delegationsAfterRevocation.length}`)
     
     const stillExists = delegationsAfterRevocation.find(d => d.cid.toString() === delegationCID.toString())
     if (stillExists) {
-      console.log('   ⚠️ Delegation still exists locally (might be cached)')
+      logger.warn('   Delegation still exists locally (might be cached)')
     } else {
-      console.log('   ✅ Delegation removed from local store')
+      logger.info('   Delegation removed from local store')
     }
     
-    console.log('\\n🧪 Step 7: Test if revoked delegation still works...')
+    logger.info('\n Step 7: Test if revoked delegation still works...')
     
     try {
       // Try to use the delegation with a new client
@@ -150,25 +151,25 @@ async function demonstrateUCANRevocation() {
       })
       
       const result = await recipientClient.uploadFile(testFile)
-      console.log('   ⚠️ Upload succeeded - revocation might not be immediate:', result)
+      logger.warn({ result: result.toString() }, '   Upload succeeded - revocation might not be immediate')
       
     } catch (testError) {
-      console.log('   ✅ Upload failed as expected - revocation is working!')
-      console.log(`   📝 Error: ${testError.message}`)
+      logger.info('   Upload failed as expected - revocation is working!')
+      logger.info({ error: testError.message }, `   Error: ${testError.message}`)
     }
     
-    console.log('\\n🎉 UCAN Revocation Demo Complete!')
-    console.log('\\n📋 Summary:')
-    console.log('   ✅ Created UCAN delegation')
-    console.log('   ✅ Successfully called revokeDelegation() method')
-    console.log('   ✅ Verified delegation removal from local store')
-    console.log('   ✅ Tested revoked delegation behavior')
+    logger.info('\n UCAN Revocation Demo Complete!')
+    logger.info('\n Summary:')
+    logger.info('   Created UCAN delegation')
+    logger.info('   Successfully called revokeDelegation() method')
+    logger.info('   Verified delegation removal from local store')
+    logger.info('   Tested revoked delegation behavior')
     
-    console.log('\\n💡 Key Findings:')
-    console.log('   🚀 Storacha JavaScript client DOES support UCAN revocation!')
-    console.log('   📱 Method: client.revokeDelegation(delegationCID, options)')
-    console.log('   🕒 Revocation may not be immediate due to caching/propagation')
-    console.log('   🔒 You need authority to revoke (issuer or chain of proofs)')
+    logger.info('\n Key Findings:')
+    logger.info('   Storacha JavaScript client DOES support UCAN revocation!')
+    logger.info('   Method: client.revokeDelegation(delegationCID, options)')
+    logger.info('   Revocation may not be immediate due to caching/propagation')
+    logger.info('   You need authority to revoke (issuer or chain of proofs)')
     
     return {
       success: true,
@@ -177,25 +178,24 @@ async function demonstrateUCANRevocation() {
     }
     
   } catch (error) {
-    console.error('❌ Demo failed:', error.message)
-    console.error(error.stack)
+    logger.error({ error: error.message, stack: error.stack }, ' Demo failed')
     return null
   }
 }
 
 // Additional function to demonstrate CLI-style revocation
 async function demonstrateCLIStyleRevocation() {
-  console.log('\\n' + '=' .repeat(60))
-  console.log('📱 CLI-Style Revocation Alternative')
-  console.log('=' .repeat(60))
+  logger.info('\n' + '=' .repeat(60))
+  logger.info(' CLI-Style Revocation Alternative')
+  logger.info('=' .repeat(60))
   
-  console.log('\\nIf you prefer using the CLI, you can also revoke delegations with:')
-  console.log('\\n🔧 Command:')
-  console.log('   w3 delegation ls                    # List all delegations with CIDs')
-  console.log('   w3 delegation revoke <delegation-cid> # Revoke specific delegation')
-  console.log('\\n📋 With proof file (if needed):')
-  console.log('   w3 delegation revoke <cid> -p proof.car')
-  console.log('\\n💡 The CLI and JavaScript client both use the same underlying capability!')
+  logger.info('\nIf you prefer using the CLI, you can also revoke delegations with:')
+  logger.info('\n Command:')
+  logger.info('   w3 delegation ls                    # List all delegations with CIDs')
+  logger.info('   w3 delegation revoke <delegation-cid> # Revoke specific delegation')
+  logger.info('\n With proof file (if needed):')
+  logger.info('   w3 delegation revoke <cid> -p proof.car')
+  logger.info('\n The CLI and JavaScript client both use the same underlying capability!')
 }
 
 // Run the demo
@@ -203,13 +203,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   demonstrateUCANRevocation()
     .then(result => {
       if (result && result.success) {
-        console.log('\\n🚀 Demo completed successfully!')
+        logger.info('\n Demo completed successfully!')
         demonstrateCLIStyleRevocation()
       } else {
-        console.log('\\n💥 Demo failed - check your Storacha credentials')
+        logger.error('\n Demo failed - check your Storacha credentials')
       }
     })
-    .catch(console.error)
+    .catch(err => logger.error({ error: err.message, stack: err.stack }, 'Demo error'))
 }
 
 export { demonstrateUCANRevocation }

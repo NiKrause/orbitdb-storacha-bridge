@@ -16,6 +16,7 @@ import * as Client from '@storacha/client'
 import { StoreMemory } from '@storacha/client/stores/memory'
 import { Signer } from '@storacha/client/principal/ed25519'
 import * as Proof from '@storacha/client/proof'
+import { logger } from '../lib/logger.js'
 import { 
   backupDatabase, 
   restoreDatabase,
@@ -51,9 +52,9 @@ const colors = {
  */
 async function displaySpaceAndDIDInfo(options) {
   try {
-    console.log(`${colors.bright}${colors.cyan}╔════════════════════════════════════════════════════════════════╗${colors.reset}`)
-    console.log(`${colors.bright}${colors.cyan}║                    STORACHA TEST CONFIGURATION                 ║${colors.reset}`)
-    console.log(`${colors.bright}${colors.cyan}╚════════════════════════════════════════════════════════════════╝${colors.reset}`)
+    logger.info(`${colors.bright}${colors.cyan}╔════════════════════════════════════════════════════════════════╗${colors.reset}`)
+    logger.info(`${colors.bright}${colors.cyan}║                    STORACHA TEST CONFIGURATION                 ║${colors.reset}`)
+    logger.info(`${colors.bright}${colors.cyan}╚════════════════════════════════════════════════════════════════╝${colors.reset}`)
     
     // Initialize Storacha client to get space/DID info
     const principal = Signer.parse(options.storachaKey)
@@ -68,12 +69,12 @@ async function displaySpaceAndDIDInfo(options) {
     const spaceDID = space.did()
     const agentDID = client.agent.did()
     
-    console.log(`${colors.bright}${colors.magenta}🆔 Agent DID: ${colors.yellow}${agentDID}${colors.reset}`)
-    console.log(`${colors.bright}${colors.green}🚀 Space DID: ${colors.yellow}${spaceDID}${colors.reset}`)
-    console.log(`${colors.bright}${colors.cyan}═══════════════════════════════════════════════════════════════════${colors.reset}\n`)
+    logger.info(`${colors.bright}${colors.magenta}🆔 Agent DID: ${colors.yellow}${agentDID}${colors.reset}`)
+    logger.info(`${colors.bright}${colors.green}🚀 Space DID: ${colors.yellow}${spaceDID}${colors.reset}`)
+    logger.info(`${colors.bright}${colors.cyan}═══════════════════════════════════════════════════════════════════${colors.reset}\n`)
     
   } catch (error) {
-    console.warn(`${colors.bright}${colors.yellow}⚠️ Could not retrieve space/DID info: ${error.message}${colors.reset}`)
+    logger.warn(`${colors.bright}${colors.yellow}⚠️ Could not retrieve space/DID info: ${error.message}${colors.reset}`)
   }
 }
 
@@ -100,7 +101,7 @@ describe('OrbitDB Storacha Bridge Integration', () => {
   beforeEach(async () => {
     // Skip tests if no credentials available
     if (!process.env.STORACHA_KEY || !process.env.STORACHA_PROOF) {
-      console.warn('⚠️ Skipping integration tests - no Storacha credentials')
+      logger.warn('⚠️ Skipping integration tests - no Storacha credentials')
       return
     }
     
@@ -111,19 +112,19 @@ describe('OrbitDB Storacha Bridge Integration', () => {
     })
     
     // Clear Storacha space before each test to ensure clean state
-    console.log('🧹 Clearing Storacha space before test...')
+    logger.info('🧹 Clearing Storacha space before test...')
     try {
       const clearResult = await clearStorachaSpace({
         storachaKey: process.env.STORACHA_KEY,
         storachaProof: process.env.STORACHA_PROOF
       })
       if (clearResult.success) {
-        console.log('✅ Space cleared successfully')
+        logger.info('✅ Space cleared successfully')
       } else {
-        console.warn(`⚠️ Space clearing incomplete: ${clearResult.totalFailed} failures`)
+        logger.warn(`⚠️ Space clearing incomplete: ${clearResult.totalFailed} failures`)
       }
     } catch (error) {
-      console.warn(`⚠️ Space clearing failed: ${error.message}`)
+      logger.warn(`⚠️ Space clearing failed: ${error.message}`)
       // Don't fail the test, just warn
     }
   })
@@ -150,7 +151,7 @@ describe('OrbitDB Storacha Bridge Integration', () => {
         await node.blockstore.close()
         await node.datastore.close()
       } catch (error) {
-        console.warn('Cleanup warning:', error.message)
+        logger.warn('Cleanup warning:', error.message)
       }
     }
     sourceNode = null
@@ -166,7 +167,7 @@ describe('OrbitDB Storacha Bridge Integration', () => {
    */
   afterAll(async () => {
     // Clean up any remaining OrbitDB directories
-    console.log('🧹 Final test cleanup...')
+    logger.info('🧹 Final test cleanup...')
     await cleanupOrbitDBDirectories()
   })
   
@@ -237,7 +238,7 @@ describe('OrbitDB Storacha Bridge Integration', () => {
         await sourceNode.datastore.close()
         sourceNode = null
       } catch (error) {
-        console.warn('Source cleanup warning:', error.message)
+        logger.warn('Source cleanup warning:', error.message)
       }
       
       // Create target node with different suffix for complete isolation
@@ -368,7 +369,7 @@ describe('OrbitDB Storacha Bridge Integration', () => {
       
       // Check that restored entries have the correct structure
       restoreResult.entries.forEach(entry => {
-        console.log("entry", entry)
+        logger.info("entry", entry)
         expect(entry).toHaveProperty('hash')
         expect(entry).toHaveProperty('value') 
         expect(typeof entry.hash).toBe('string')
@@ -381,7 +382,7 @@ describe('OrbitDB Storacha Bridge Integration', () => {
       const foundTestEntries = testEntries.filter(testEntry => restoredValues.includes(testEntry))
       expect(foundTestEntries.length).toBeGreaterThan(0)
       
-      console.log(`✅ Data validation: Found ${foundTestEntries.length}/${testEntries.length} test entries in restored data`)
+      logger.info(`✅ Data validation: Found ${foundTestEntries.length}/${testEntries.length} test entries in restored data`)
       
     } finally {
       if (sourceDB) {
@@ -487,12 +488,12 @@ describe('OrbitDB Storacha Bridge Integration', () => {
       // Add todo entries to key-value database
       for (const todo of todoEntries) {
         await sourceDB.put(todo.id, todo)
-        console.log(`   ✓ Added todo: ${todo.id} - "${todo.text}" (${todo.completed ? 'completed' : 'pending'})`)
+        logger.info(`   ✓ Added todo: ${todo.id} - "${todo.text}" (${todo.completed ? 'completed' : 'pending'})`)
       }
       
       // Verify source database state
       const allTodos = await sourceDB.all()
-      console.log(`   📊 Source database has ${Object.keys(allTodos).length} todos`)
+      logger.info(`   📊 Source database has ${Object.keys(allTodos).length} todos`)
       
       // Backup database with identity and access controller
       const backupResult = await backupDatabase(sourceNode.orbitdb, sourceDB.address, {
@@ -520,7 +521,7 @@ describe('OrbitDB Storacha Bridge Integration', () => {
         storachaKey: process.env.STORACHA_KEY,
         storachaProof: process.env.STORACHA_PROOF
       })
-      console.log("restoreResult", restoreResult)
+      logger.info("restoreResult", restoreResult)
       expect(restoreResult.success).toBe(true)
       expect(restoreResult.entriesRecovered).toBeGreaterThan(0)
       expect(restoreResult.blocksRestored).toBeGreaterThan(0)
@@ -534,14 +535,14 @@ describe('OrbitDB Storacha Bridge Integration', () => {
       
       // Check that restored entries have the correct key-value structure
       restoreResult.entries.forEach(entry => {
-        console.log("Key-value entry:", entry.payload || entry)
+        logger.info("Key-value entry:", entry.payload || entry)
         expect(entry).toHaveProperty('hash')
         expect(typeof entry.hash).toBe('string')
         expect(entry.hash).toMatch(/^zdpu/) // OrbitDB hash format
       
         // For key-value databases, entries should have key and value
         if (entry.payload) {
-          console.log("entry.payload", entry.payload)
+          logger.info("entry.payload", entry.payload)
           expect(entry.payload).toHaveProperty('key')
           expect(entry.payload).toHaveProperty('value')
         }
@@ -571,20 +572,20 @@ describe('OrbitDB Storacha Bridge Integration', () => {
           expect(todoData.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/) // ISO date format
           expect(todoData.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/) // ISO date format
           
-          console.log(`   ✅ Restored todo: ${todoData.id} - "${todoData.text}" (${todoData.completed ? 'completed' : 'pending'})`)
+          logger.info(`   ✅ Restored todo: ${todoData.id} - "${todoData.text}" (${todoData.completed ? 'completed' : 'pending'})`)
         }
       }
       
       expect(foundTodoEntries).toBeGreaterThan(0)
-      console.log(`✅ Key-value data validation: Found ${foundTodoEntries} todo entries in restored data`)
+      logger.info(`✅ Key-value data validation: Found ${foundTodoEntries} todo entries in restored data`)
       
       // Verify identity and access controller preservation
       if (restoreResult.analysis.identityBlocks.length > 0) {
-        console.log(`✅ Identity preservation: Found ${restoreResult.analysis.identityBlocks.length} identity blocks`)
+        logger.info(`✅ Identity preservation: Found ${restoreResult.analysis.identityBlocks.length} identity blocks`)
       }
       
       if (restoreResult.analysis.accessControllerBlocks && restoreResult.analysis.accessControllerBlocks.length > 0) {
-        console.log(`✅ Access controller preservation: Found ${restoreResult.analysis.accessControllerBlocks.length} access controller blocks`)
+        logger.info(`✅ Access controller preservation: Found ${restoreResult.analysis.accessControllerBlocks.length} access controller blocks`)
       }
       
     } finally {
@@ -647,10 +648,10 @@ describe('OrbitDB Storacha Bridge Integration', () => {
         accessController: IPFSAccessController({ write: ['*'] })
       })
       
-      console.log('\n🧪 Testing DEL operations in backup and restore cycle...')
+      logger.info('\n🧪 Testing DEL operations in backup and restore cycle...')
       
       // **Phase 1: Create initial todos**
-      console.log('📝 Phase 1: Creating initial todos...')
+      logger.info('📝 Phase 1: Creating initial todos...')
       const initialTodos = [
         { id: 'todo-1', text: 'Setup development environment', assignee: 'alice', completed: false, priority: 'high' },
         { id: 'todo-2', text: 'Write unit tests', assignee: 'bob', completed: true, priority: 'medium' },
@@ -661,22 +662,22 @@ describe('OrbitDB Storacha Bridge Integration', () => {
       
       for (const todo of initialTodos) {
         await sourceDB.put(todo.id, { ...todo, createdAt: new Date().toISOString() })
-        console.log(`   ✓ Added: ${todo.id} - "${todo.text}" (${todo.assignee}, ${todo.priority})`)
+        logger.info(`   ✓ Added: ${todo.id} - "${todo.text}" (${todo.assignee}, ${todo.priority})`)
       }
       
       let currentState = await sourceDB.all()
-      console.log(`   📊 After initial creation: ${currentState.length} todos`)
+      logger.info(`   📊 After initial creation: ${currentState.length} todos`)
       
       // **Phase 2: Delete completed task**
-      console.log('\n🗑️  Phase 2: Deleting completed task...')
+      logger.info('\n🗑️  Phase 2: Deleting completed task...')
       await sourceDB.del('todo-2') // Delete completed unit tests task
-      console.log('   ✓ Deleted: todo-2 (completed unit tests task)')
+      logger.info('   ✓ Deleted: todo-2 (completed unit tests task)')
       
       currentState = await sourceDB.all()
-      console.log(`   📊 After deletion: ${currentState.length} todos`)
+      logger.info(`   📊 After deletion: ${currentState.length} todos`)
       
       // **Phase 3: Update existing task**
-      console.log('\n✏️  Phase 3: Updating existing task...')
+      logger.info('\n✏️  Phase 3: Updating existing task...')
       await sourceDB.put('todo-1', {
         id: 'todo-1',
         text: 'Setup development environment - COMPLETED',
@@ -686,15 +687,15 @@ describe('OrbitDB Storacha Bridge Integration', () => {
         completedAt: new Date().toISOString(),
         createdAt: new Date().toISOString()
       })
-      console.log('   ✓ Updated: todo-1 (marked as completed)')
+      logger.info('   ✓ Updated: todo-1 (marked as completed)')
       
       // **Phase 4: Delete low priority task**
-      console.log('\n🗑️  Phase 4: Deleting cancelled task...')
+      logger.info('\n🗑️  Phase 4: Deleting cancelled task...')
       await sourceDB.del('todo-4') // Delete low priority documentation task
-      console.log('   ✓ Deleted: todo-4 (cancelled documentation task)')
+      logger.info('   ✓ Deleted: todo-4 (cancelled documentation task)')
       
       // **Phase 5: Add new urgent task**
-      console.log('\n➕ Phase 5: Adding new urgent task...')
+      logger.info('\n➕ Phase 5: Adding new urgent task...')
       await sourceDB.put('todo-6', {
         id: 'todo-6',
         text: 'Fix critical production bug',
@@ -703,12 +704,12 @@ describe('OrbitDB Storacha Bridge Integration', () => {
         priority: 'critical',
         createdAt: new Date().toISOString()
       })
-      console.log('   ✓ Added: todo-6 (critical production bug fix)')
+      logger.info('   ✓ Added: todo-6 (critical production bug fix)')
       
       // **Verify final source state**
       const finalSourceState = await sourceDB.all()
       const sourceIds = finalSourceState.map(entry => entry.key).sort()
-      console.log(`\n📊 Final source state: ${finalSourceState.length} todos: [${sourceIds.join(', ')}]`)
+      logger.info(`\n📊 Final source state: ${finalSourceState.length} todos: [${sourceIds.join(', ')}]`)
       
       // Expected: todo-1 (updated), todo-3, todo-5, todo-6
       const expectedIds = ['todo-1', 'todo-3', 'todo-5', 'todo-6']
@@ -719,31 +720,31 @@ describe('OrbitDB Storacha Bridge Integration', () => {
       expect(updatedTodo1.value.completed).toBe(true)
       expect(updatedTodo1.value.text).toContain('COMPLETED')
       
-      console.log('✅ Source database state verified before backup')
+      logger.info('✅ Source database state verified before backup')
       
       // **Inspect log entries to verify DEL operations are present**
-      console.log('\n🔍 Inspecting log entries for DEL operations...')
+      logger.info('\n🔍 Inspecting log entries for DEL operations...')
       const logEntries = []
       for await (const entry of sourceDB.log.iterator()) {
         logEntries.push(entry)
       }
       
       const delOperations = logEntries.filter(entry => entry.payload.op === 'DEL')
-      console.log(`   📋 Found ${delOperations.length} DEL operations in log:`)
+      logger.info(`   📋 Found ${delOperations.length} DEL operations in log:`)
       delOperations.forEach(entry => {
-        console.log(`     - DEL ${entry.payload.key} (clock time: ${entry.clock.time})`)
+        logger.info(`     - DEL ${entry.payload.key} (clock time: ${entry.clock.time})`)
       })
       expect(delOperations.length).toBe(2) // Should have 2 DEL operations
       
       // **Backup database including DEL operations**
-      console.log('\n💾 Backing up database with DEL operations to Storacha...')
+      logger.info('\n💾 Backing up database with DEL operations to Storacha...')
       const backupResult = await backupDatabase(sourceNode.orbitdb, sourceDB.address, {
         storachaKey: process.env.STORACHA_KEY,
         storachaProof: process.env.STORACHA_PROOF
       })
       expect(backupResult.success).toBe(true)
       expect(backupResult.blocksUploaded).toBeGreaterThan(0)
-      console.log(`   ✅ Backup completed: ${backupResult.blocksUploaded} blocks uploaded`)
+      logger.info(`   ✅ Backup completed: ${backupResult.blocksUploaded} blocks uploaded`)
       
       // **Close source and clean up completely**
       await sourceDB.close()
@@ -752,14 +753,14 @@ describe('OrbitDB Storacha Bridge Integration', () => {
       await sourceNode.blockstore.close()
       await sourceNode.datastore.close()
       sourceNode = null
-      console.log('   🧹 Source node completely destroyed')
+      logger.info('   🧹 Source node completely destroyed')
       
       // **Create isolated target node**
       targetNode = await createHeliaOrbitDB('-test-target-keyvalue-del')
-      console.log('\n🎯 Created isolated target node for restoration...')
+      logger.info('\n🎯 Created isolated target node for restoration...')
       
       // **Restore from space with DEL operations**
-      console.log('\n📥 Restoring database with DEL operations from Storacha...')
+      logger.info('\n📥 Restoring database with DEL operations from Storacha...')
       const restoreResult = await restoreDatabaseFromSpace(targetNode.orbitdb, {
         storachaKey: process.env.STORACHA_KEY,
         storachaProof: process.env.STORACHA_PROOF
@@ -768,23 +769,23 @@ describe('OrbitDB Storacha Bridge Integration', () => {
       expect(restoreResult.success).toBe(true)
       expect(restoreResult.entriesRecovered).toBeGreaterThan(0)
       expect(restoreResult.blocksRestored).toBeGreaterThan(0)
-      console.log(`   ✅ Restore completed: ${restoreResult.entriesRecovered} entries recovered`)
+      logger.info(`   ✅ Restore completed: ${restoreResult.entriesRecovered} entries recovered`)
       
       // **Critical validation: Verify DEL operations were processed correctly**
-      console.log('\n🔍 Validating DEL operations were processed during restore...')
+      logger.info('\n🔍 Validating DEL operations were processed during restore...')
       
       // Check that DEL operations are present in restored log entries
       const restoredDelOps = restoreResult.entries.filter(entry => 
         entry.payload && entry.payload.op === 'DEL'
       )
-      console.log(`   📋 Found ${restoredDelOps.length} DEL operations in restored data:`)
+      logger.info(`   📋 Found ${restoredDelOps.length} DEL operations in restored data:`)
       restoredDelOps.forEach(entry => {
-        console.log(`     - DEL ${entry.payload.key} (restored)`)
+        logger.info(`     - DEL ${entry.payload.key} (restored)`)
       })
       expect(restoredDelOps.length).toBe(2) // Should have restored 2 DEL operations
       
       // **Verify final restored database state matches expected state**
-      console.log('\n🎯 Verifying final restored database state...')
+      logger.info('\n🎯 Verifying final restored database state...')
       
       // Since this is space restore, we need to check the reconstructed database state
       // The restoration process should have applied all operations in chronological order
@@ -792,7 +793,7 @@ describe('OrbitDB Storacha Bridge Integration', () => {
       
       const restoredState = await restoreResult.database.all()
       const restoredIds = restoredState.map(entry => entry.key).sort()
-      console.log(`   📊 Restored state: ${restoredState.length} todos: [${restoredIds.join(', ')}]`)
+      logger.info(`   📊 Restored state: ${restoredState.length} todos: [${restoredIds.join(', ')}]`)
       
       // **Critical assertions: Final state should match source after all operations**
       expect(restoredIds).toEqual(expectedIds) // Should have todo-1, todo-3, todo-5, todo-6
@@ -819,15 +820,15 @@ describe('OrbitDB Storacha Bridge Integration', () => {
       expect(restoredTodo6.value.priority).toBe('critical')
       expect(restoredTodo6.value.text).toContain('critical production bug')
       
-      console.log('\n✅ DEL operations validation results:')
-      console.log('   ✓ Database type correctly inferred as keyvalue')
-      console.log('   ✓ All log entries including DEL operations backed up')
-      console.log('   ✓ All log entries including DEL operations restored')
-      console.log('   ✓ Operations applied in correct chronological order')
-      console.log('   ✓ DELETE operations correctly removed items from database')
-      console.log('   ✓ UPDATE operations correctly modified existing items')
-      console.log('   ✓ Final database state matches expected state after all operations')
-      console.log('   ✓ Cross-node database migration with DEL operations successful')
+      logger.info('\n✅ DEL operations validation results:')
+      logger.info('   ✓ Database type correctly inferred as keyvalue')
+      logger.info('   ✓ All log entries including DEL operations backed up')
+      logger.info('   ✓ All log entries including DEL operations restored')
+      logger.info('   ✓ Operations applied in correct chronological order')
+      logger.info('   ✓ DELETE operations correctly removed items from database')
+      logger.info('   ✓ UPDATE operations correctly modified existing items')
+      logger.info('   ✓ Final database state matches expected state after all operations')
+      logger.info('   ✓ Cross-node database migration with DEL operations successful')
       
       // **Cleanup restored database**
       if (restoreResult.database) {
@@ -884,7 +885,7 @@ describe('OrbitDB Storacha Bridge Integration', () => {
         accessController: IPFSAccessController({ write: ['*'] })
       })
       
-      console.log('\n📄 Testing documents database DEL operations...')
+      logger.info('\n📄 Testing documents database DEL operations...')
       
       // **Phase 1: Create initial documents**
       const initialDocs = [
@@ -896,12 +897,12 @@ describe('OrbitDB Storacha Bridge Integration', () => {
       
       for (const doc of initialDocs) {
         await sourceDB.put({ ...doc, createdAt: new Date().toISOString() })
-        console.log(`   ✓ Added: ${doc._id} - "${doc.title}" (${doc.author}, ${doc.published ? 'published' : 'draft'})`)
+        logger.info(`   ✓ Added: ${doc._id} - "${doc.title}" (${doc.author}, ${doc.published ? 'published' : 'draft'})`)
       }
       
       // **Phase 2: Delete draft document**
       await sourceDB.del('post-2') // Delete unpublished draft
-      console.log('   ✓ Deleted: post-2 (unpublished draft)')
+      logger.info('   ✓ Deleted: post-2 (unpublished draft)')
       
       // **Phase 3: Update existing document**
       await sourceDB.put({
@@ -913,16 +914,16 @@ describe('OrbitDB Storacha Bridge Integration', () => {
         updatedAt: new Date().toISOString(),
         createdAt: new Date().toISOString()
       })
-      console.log('   ✓ Updated: post-1 (added more content)')
+      logger.info('   ✓ Updated: post-1 (added more content)')
       
       // **Phase 4: Delete troubleshooting doc**
       await sourceDB.del('post-4') // Delete troubleshooting doc
-      console.log('   ✓ Deleted: post-4 (troubleshooting doc)')
+      logger.info('   ✓ Deleted: post-4 (troubleshooting doc)')
       
       // **Verify final source state**
       const finalSourceState = await sourceDB.all()
       const sourceIds = finalSourceState.map(doc => doc.value._id).sort()
-      console.log(`   📊 Final source state: ${finalSourceState.length} documents: [${sourceIds.join(', ')}]`)
+      logger.info(`   📊 Final source state: ${finalSourceState.length} documents: [${sourceIds.join(', ')}]`)
       
       // Expected: post-1 (updated), post-3
       expect(sourceIds).toEqual(['post-1', 'post-3'])
@@ -966,7 +967,7 @@ describe('OrbitDB Storacha Bridge Integration', () => {
       expect(restoredPost1.value.title).toContain('Updated')
       expect(restoredPost1.value).toHaveProperty('updatedAt')
       
-      console.log('✅ Documents database DEL operations test passed')
+      logger.info('✅ Documents database DEL operations test passed')
       
       if (restoreResult.database) {
         await restoreResult.database.close()

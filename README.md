@@ -87,6 +87,32 @@ Install the package via npm.
 
 Get Storacha credentials from [storacha.network quickstart](https://docs.storacha.network/quickstart/), install w3 for the console, get storacha key and proof then set up your environment variables (.env) for STORACHA_KEY and STORACHA_PROOF.
 
+### Logging Configuration
+
+The library uses [pino](https://github.com/pinojs/pino) for structured logging. Configure logging before running or importing:
+
+```bash
+# Set log level (default: 'info')
+export LOG_LEVEL=debug  # Options: trace, debug, info, warn, error, fatal, silent
+
+# Enable pretty-printed logs (human-readable)
+export LOG_PRETTY=true
+```
+
+Or in your `.env` file:
+```env
+LOG_LEVEL=info
+LOG_PRETTY=true
+```
+
+**Programmatic control:**
+```js
+import { setLogLevel, disableLogging } from 'orbitdb-storacha-bridge/lib/logger.js'
+
+setLogLevel('debug')     // Set level
+disableLogging()         // Silence all logs
+```
+
 ## Demo
 
 ### NodeJS Demo Scripts (full backup with Manifest, Identity and AccessController and entries blocks)
@@ -155,6 +181,34 @@ Full integration component for existing OrbitDB Svelte applications:
 3. **Block Discovery** - Lists all files in Storacha space using Storacha SDK APIs
 4. **CID Bridging** - Converts between Storacha CIDs (`bafkre*`) and OrbitDB CIDs (`zdpu*`)
 5. **Reconstruct Database** - Reassembles blocks and opens database with original identity
+
+## Logging
+
+The library uses **Pino** for structured, high-performance logging. Control logging with environment variables:
+
+```bash
+# Set log level (trace, debug, info, warn, error, fatal, silent)
+export LOG_LEVEL=debug
+
+# Enable pretty printing for development
+export LOG_PRETTY=true
+```
+
+**Quick example:**
+
+```javascript
+import { logger } from 'orbitdb-storacha-bridge/lib/logger.js';
+
+// Structured logging with context
+logger.info({ blockCount: 150, dbName: 'todos' }, 'Backup completed');
+
+// Control logging programmatically
+import { setLogLevel, disableLogging } from 'orbitdb-storacha-bridge/lib/logger.js';
+setLogLevel('debug');
+disableLogging(); // Silence all logs
+```
+
+📖 **See [docs/LOGGING_QUICKSTART.md](docs/LOGGING_QUICKSTART.md)** for quick reference or **[docs/LOGGING.md](docs/LOGGING.md)** for complete documentation.
 
 ## Testing
 

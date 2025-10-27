@@ -22,6 +22,8 @@ if (!globalThis.crypto) {
   globalThis.crypto = webcrypto
 }
 
+import { logger } from '../lib/logger.js'
+
 /**
  * SECURE: Enhanced UCAN Access Controller recipient logic
  * This does NOT create signers from DIDs (that would be insecure)
@@ -77,14 +79,14 @@ const mockStorachaClient = {
  * Simulate UCAN delegation creation (the secure way)
  */
 const createSecureUCANDelegation = async (identityId, client = mockStorachaClient) => {
-  console.log(`🔒 SECURE: Creating UCAN delegation for ${identityId}...`)
+  logger.info({ identityId }, `🔒 SECURE: Creating UCAN delegation for ${identityId}...`)
   
   // Get recipient info (SECURE - no private key derivation!)
   const recipientInfo = await getSecureRecipientFromOrbitDBIdentity(identityId)
   
-  console.log(`🔑 Security model: ${recipientInfo.securityModel}`)
-  console.log(`🎯 Direct delegation: ${recipientInfo.supportsDirectDelegation}`)
-  console.log(`🔐 Algorithm: ${recipientInfo.algorithm}`)
+  logger.info({ securityModel: recipientInfo.securityModel }, `🔑 Security model: ${recipientInfo.securityModel}`)
+  logger.info({ supportsDirectDelegation: recipientInfo.supportsDirectDelegation }, `🎯 Direct delegation: ${recipientInfo.supportsDirectDelegation}`)
+  logger.info({ algorithm: recipientInfo.algorithm }, `🔐 Algorithm: ${recipientInfo.algorithm}`)
   
   const capabilities = ['space/blob/add', 'upload/add', 'store/add']
   const expiration = Math.floor(Date.now() / 1000) + (24 * 60 * 60) // 24 hours

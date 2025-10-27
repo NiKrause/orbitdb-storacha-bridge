@@ -69,6 +69,11 @@ jobs:
         env:
           NODE_OPTIONS: '--experimental-vm-modules --no-warnings'
 
+      - name: Run CAR Backup Tests
+        run: npm run test:car-backup
+        env:
+          NODE_OPTIONS: '--experimental-vm-modules --no-warnings'
+
       - name: Run P-256 UCAN Security Tests
         run: npm run test:p256-ucan
         env:

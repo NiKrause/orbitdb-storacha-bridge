@@ -1,4 +1,5 @@
 import { writable } from "svelte/store";
+import { logger } from '../../lib/logger.js'
 
 // Create a writable store for the theme
 function createThemeStore() {
@@ -26,7 +27,7 @@ function createThemeStore() {
         "color-scheme",
         newTheme === "g100" ? "dark" : "light",
       );
-      console.log("Theme set to:", newTheme);
+      logger.info("Theme set to:", newTheme);
       set(newTheme);
     },
     toggle: () => {
@@ -39,13 +40,13 @@ function createThemeStore() {
           "color-scheme",
           currentTheme === "g100" ? "dark" : "light",
         );
-        console.log("Theme toggled to:", currentTheme);
+        logger.info("Theme toggled to:", currentTheme);
         return currentTheme;
       });
     },
     init: () => {
       const initialTheme = getInitialTheme();
-      console.log("Initializing theme:", initialTheme);
+      logger.info("Initializing theme:", initialTheme);
 
       // Apply theme to document
       document.documentElement.setAttribute("theme", initialTheme);
@@ -62,7 +63,7 @@ function createThemeStore() {
       mediaQuery.addEventListener("change", (e) => {
         if (!localStorage.getItem("carbon-theme")) {
           const newTheme = e.matches ? "g100" : "white";
-          console.log("System theme changed to:", newTheme);
+          logger.info("System theme changed to:", newTheme);
           document.documentElement.setAttribute("theme", newTheme);
           document.documentElement.style.setProperty(
             "color-scheme",

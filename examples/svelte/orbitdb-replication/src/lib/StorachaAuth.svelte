@@ -35,6 +35,7 @@
   } from "./storacha-backup.js";
 
   const dispatch = createEventDispatcher();
+  import { logger } from "../../../../../lib/logger.js";
 
   // Component props
   export let autoLogin = true;
@@ -124,7 +125,7 @@
           break;
       }
     } catch (err) {
-      console.warn("Failed to save credentials:", err);
+      logger.warn("Failed to save credentials:", err);
     }
   }
 
@@ -163,7 +164,7 @@
         }
       }
     } catch (err) {
-      console.warn("Failed to load credentials:", err);
+      logger.warn("Failed to load credentials:", err);
     }
     return null;
   }
@@ -175,7 +176,7 @@
         localStorage.removeItem(key);
       });
     } catch (err) {
-      console.warn("Failed to clear credentials:", err);
+      logger.warn("Failed to clear credentials:", err);
     }
   }
 
@@ -331,7 +332,7 @@
       spaces = await listSpaces(client);
       currentSpace = client.currentSpace();
     } catch (err) {
-      console.warn("Failed to load spaces:", err);
+      logger.warn("Failed to load spaces:", err);
       spaces = [];
     }
   }
@@ -420,12 +421,12 @@
     const stored = loadStoredCredentials();
     if (!stored) return;
 
-    console.log(`🔄 Auto-login with ${stored.method}...`);
+    logger.info(`🔄 Auto-login with ${stored.method}...`);
 
     // Check if the stored method is enabled
     const tabIndex = getTabIndex(stored.method);
     if (tabIndex === -1) {
-      console.warn(`Stored auth method '${stored.method}' is disabled`);
+      logger.warn(`Stored auth method '${stored.method}' is disabled`);
       clearStoredCredentials();
       return;
     }
@@ -446,7 +447,7 @@
         break;
       case "seed":
         if (!enableSeedAuth) {
-          console.warn("Seed auth is disabled");
+          logger.warn("Seed auth is disabled");
           return;
         }
         seedPhrase = stored.seedPhrase;

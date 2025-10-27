@@ -14,19 +14,20 @@ import { StoreMemory } from '@storacha/client/stores/memory'
 import { Signer } from '@storacha/client/principal/ed25519'
 import * as Delegation from '@ucanto/core/delegation'
 import { promises as fs } from 'fs'
+import { logger } from '../lib/logger.js'
 
 async function authenticateWithExistingUCAN() {
-  console.log('🔐 Authenticating with Existing UCAN Delegation')
-  console.log('=' .repeat(60))
+  logger.info('🔐 Authenticating with Existing UCAN Delegation')
+  logger.info('=' .repeat(60))
   
   try {
     // Read the saved recipient key and delegation token
     const recipientKeyData = JSON.parse(await fs.readFile('recipient-key.txt', 'utf8'))
     const delegationToken = await fs.readFile('delegation-token.txt', 'utf8')
     
-    console.log('📋 Loading credentials from files...')
-    console.log(`   🔑 Recipient DID: ${recipientKeyData.id}`)
-    console.log(`   📜 Delegation token length: ${delegationToken.length} characters`)
+    logger.info('📋 Loading credentials from files...')
+    logger.info({ recipientDid: recipientKeyData.id }, `   🔑 Recipient DID: ${recipientKeyData.id}`)
+    logger.info({ tokenLength: delegationToken.length }, `   📜 Delegation token length: ${delegationToken.length} characters`)
     
     // Step 1: Reconstruct the recipient identity from saved key
     const fixedArchive = {
@@ -37,8 +38,8 @@ async function authenticateWithExistingUCAN() {
     }
     const recipientPrincipal = Signer.from(fixedArchive)
     
-    console.log('✅ Recipient identity reconstructed')
-    console.log(`   🆔 DID: ${recipientPrincipal.did()}`)
+    logger.info('✅ Recipient identity reconstructed')
+    logger.info({ did: recipientPrincipal.did() }, `   🆔 DID: ${recipientPrincipal.did()}`)
     
     // Step 2: Create Storacha client with the recipient identity
     const store = new StoreMemory()
@@ -55,19 +56,19 @@ async function authenticateWithExistingUCAN() {
       throw new Error('Failed to extract delegation from token')
     }
     
-    console.log('✅ Delegation parsed successfully')
-    console.log(`   📋 Capabilities: ${delegation.ok.capabilities.map(cap => cap.can).join(', ')}`)
-    console.log(`   🎯 Audience: ${delegation.ok.audience.did()}`)
-    console.log(`   🔑 Issuer: ${delegation.ok.issuer.did()}`)
+    logger.info('✅ Delegation parsed successfully')
+    logger.info({ capabilities: delegation.ok.capabilities.map(cap => cap.can).join(', ') }, `   📋 Capabilities: ${delegation.ok.capabilities.map(cap => cap.can).join(', ')}`)
+    logger.info({ audience: delegation.ok.audience.did() }, `   🎯 Audience: ${delegation.ok.audience.did()}`)
+    logger.info({ issuer: delegation.ok.issuer.did() }, `   🔑 Issuer: ${delegation.ok.issuer.did()}`)
     
     // Step 4: Add the delegation as a space
     const space = await client.addSpace(delegation.ok)
     await client.setCurrentSpace(space.did())
     
-    console.log(`✅ Space connected: ${space.did()}`)
+    logger.info({ spaceDid: space.did() }, `✅ Space connected: ${space.did()}`)
     
     // Step 5: Test file upload
-    console.log('\n📤 Testing file upload...')
+    logger.info('\n📤 Testing file upload...')
     
     const testContent = `Hello from simplified UCAN! Uploaded at ${new Date().toISOString()}`
     const testFile = new File([testContent], 'simple-ucan-test.txt', {
@@ -76,16 +77,16 @@ async function authenticateWithExistingUCAN() {
     
     const result = await client.uploadFile(testFile)
     
-    console.log('✅ Upload successful!')
-    console.log(`   🔗 Uploaded CID: ${result}`)
-    console.log(`   🌐 IPFS URL: https://w3s.link/ipfs/${result}`)
+    logger.info('✅ Upload successful!')
+    logger.info({ cid: result }, `   🔗 Uploaded CID: ${result}`)
+    logger.info({ ipfsUrl: `https://w3s.link/ipfs/${result}` }, `   🌐 IPFS URL: https://w3s.link/ipfs/${result}`)
     
-    console.log('\n🎉 SUCCESS! Authentication with existing UCAN works!')
-    console.log('\n📋 Key Points:')
-    console.log('   ✅ Used existing recipient DID (no new key generation)')
-    console.log('   ✅ Used existing delegation token')
-    console.log('   ✅ Both DID private key AND delegation are required')
-    console.log('   ✅ Storacha validates the delegation on each request')
+    logger.info('\n🎉 SUCCESS! Authentication with existing UCAN works!')
+    logger.info('\n📋 Key Points:')
+    logger.info('   ✅ Used existing recipient DID (no new key generation)')
+    logger.info('   ✅ Used existing delegation token')
+    logger.info('   ✅ Both DID private key AND delegation are required')
+    logger.info('   ✅ Storacha validates the delegation on each request')
     
     return {
       success: true,
@@ -95,10 +96,10 @@ async function authenticateWithExistingUCAN() {
     }
     
   } catch (error) {
-    console.error('❌ Authentication failed:', error.message)
-    console.error('\n💡 Make sure you have run create-proper-ucan.js first to generate:')
-    console.error('   - recipient-key.txt (contains the recipient private key)')
-    console.error('   - delegation-token.txt (contains the UCAN delegation)')
+    logger.error({ error: error.message }, '❌ Authentication failed')
+    logger.error('\n💡 Make sure you have run create-proper-ucan.js first to generate:')
+    logger.error('   - recipient-key.txt (contains the recipient private key)')
+    logger.error('   - delegation-token.txt (contains the UCAN delegation)')
     
     return {
       success: false,
@@ -109,7 +110,7 @@ async function authenticateWithExistingUCAN() {
 
 // Alternative function that takes parameters directly
 export async function authenticateWithUCAN(recipientKey, delegationToken) {
-  console.log('🔐 Authenticating with provided UCAN credentials...')
+  logger.info('🔐 Authenticating with provided UCAN credentials...')
   
   try {
     // Parse recipient key (could be JSON string or object)
@@ -159,13 +160,13 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   authenticateWithExistingUCAN()
     .then(result => {
       if (result.success) {
-        console.log('\n🚀 Ready to use this pattern in your OrbitDB bridge!')
-        console.log('\n💡 Integration tips:')
-        console.log('   1. Store recipient key and delegation token securely')
-        console.log('   2. Both are required for every authentication')
-        console.log('   3. Delegation tokens can expire - check expiration dates')
-        console.log('   4. You can create multiple delegations for different recipients')
+        logger.info('\n🚀 Ready to use this pattern in your OrbitDB bridge!')
+        logger.info('\n💡 Integration tips:')
+        logger.info('   1. Store recipient key and delegation token securely')
+        logger.info('   2. Both are required for every authentication')
+        logger.info('   3. Delegation tokens can expire - check expiration dates')
+        logger.info('   4. You can create multiple delegations for different recipients')
       }
     })
-    .catch(console.error)
+    .catch(error => logger.error({ error: error.message, stack: error.stack }, 'Authentication failed'))
 }

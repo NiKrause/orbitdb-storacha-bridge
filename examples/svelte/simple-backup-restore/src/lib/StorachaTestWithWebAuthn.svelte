@@ -84,6 +84,7 @@
     Checkmark,
     Warning,
   } from "carbon-icons-svelte";
+  import { logger } from "../../../../lib/logger.js";
 
   // Storacha authentication state
   let storachaAuthenticated = false;
@@ -174,9 +175,9 @@
       webAuthnSupportMessage = support.message;
 
       // WebAuthn provider will be registered when needed (not automatically)
-      console.log('WebAuthn support detected, provider will be registered when creating identity');
+      logger.info('WebAuthn support detected, provider will be registered when creating identity');
     } catch (error) {
-      console.error("WebAuthn support check failed:", error);
+      logger.error("WebAuthn support check failed:", error);
       webAuthnSupportMessage = "Unable to check WebAuthn support";
     } finally {
       webAuthnChecking = false;
@@ -223,7 +224,7 @@
           bridgeOptions.spaceDID = currentSpace.did();
         }
       } catch (error) {
-        console.warn("Could not get current space DID:", error.message);
+        logger.warn("Could not get current space DID:", error.message);
       }
     } else {
       throw new Error(
@@ -235,7 +236,7 @@
 
     // Set up progress event listeners
     bridge.on("uploadProgress", (progress) => {
-      console.log("📤 Upload Progress:", progress);
+      logger.info("📤 Upload Progress:", progress);
       if (progress && typeof progress === "object") {
         uploadProgress = progress;
         showProgress = true;
@@ -250,12 +251,12 @@
           showProgress = false;
         }
       } else {
-        console.warn("Invalid upload progress data:", progress);
+        logger.warn("Invalid upload progress data:", progress);
       }
     });
 
     bridge.on("downloadProgress", (progress) => {
-      console.log("📥 Download Progress:", progress);
+      logger.info("📥 Download Progress:", progress);
       if (progress && typeof progress === "object") {
         downloadProgress = progress;
         showProgress = true;
@@ -270,7 +271,7 @@
           showProgress = false;
         }
       } else {
-        console.warn("Invalid download progress data:", progress);
+        logger.warn("Invalid download progress data:", progress);
       }
     });
 
@@ -279,7 +280,7 @@
 
   // Handle Storacha authentication events
   function handleStorachaAuthenticated(event) {
-    console.log("🔐 Storacha authenticated:", event.detail);
+    logger.info("🔐 Storacha authenticated:", event.detail);
     storachaAuthenticated = true;
     storachaClient = event.detail.client;
     storachaCredentials = {
@@ -291,28 +292,28 @@
     // Store credentials for backup/restore operations
     if (event.detail.method === "credentials") {
       // For key/proof authentication, we need to extract the credentials
-      console.log(
+      logger.info(
         "📝 Credentials-based authentication - storing for backup operations",
       );
     } else if (
       event.detail.method === "ucan" ||
       event.detail.method === "seed"
     ) {
-      console.log(
+      logger.info(
         `📝 ${event.detail.method}-based authentication - ready for operations`,
       );
     }
   }
 
   function handleStorachaLogout() {
-    console.log("🚪 Storacha logged out");
+    logger.info("🚪 Storacha logged out");
     storachaAuthenticated = false;
     storachaClient = null;
     storachaCredentials = null;
   }
 
   function handleSpaceChanged(event) {
-    console.log("🔄 Storacha space changed:", event.detail.space);
+    logger.info("🔄 Storacha space changed:", event.detail.space);
     // Update any space-dependent operations
   }
 
@@ -343,7 +344,7 @@
    * Create a reusable OrbitDB identity from seed (mnemonic-based)
    */
   async function createMnemonicIdentity(persona = "shared") {
-    console.log(`🆔 Creating ${persona} identity from mnemonic...`);
+    logger.info(`🆔 Creating ${persona} identity from mnemonic...`);
 
     // Generate a test seed phrase for consistent identity
     const seedPhrase = generateMnemonic(english);
@@ -368,7 +369,7 @@
       }),
     });
 
-    console.log(`✅ ${persona} mnemonic identity created: ${identity.id}`);
+    logger.info(`✅ ${persona} mnemonic identity created: ${identity.id}`);
     return { identity, identities, seedPhrase, masterSeed };
   }
 
@@ -376,7 +377,7 @@
    * Create a reusable OrbitDB identity using WebAuthn
    */
   async function createWebAuthnIdentity(persona = "shared") {
-    console.log(`🆔 Creating ${persona} identity with WebAuthn...`);
+    logger.info(`🆔 Creating ${persona} identity with WebAuthn...`);
 
     if (!webAuthnSupported) {
       throw new Error("WebAuthn is not supported in this browser");
@@ -392,9 +393,9 @@
       });
       // Store credential for future use
       storeWebAuthnCredential(webauthnCredential);
-      console.log('🔐 New WebAuthn credential created and stored');
+      logger.info('🔐 New WebAuthn credential created and stored');
     } else {
-      console.log('🔐 Existing WebAuthn credential loaded from storage');
+      logger.info('🔐 Existing WebAuthn credential loaded from storage');
     }
 
     // Register the WebAuthn provider (like DID provider does)
@@ -408,31 +409,31 @@
     // This ensures proper identity resolution and verification in access controller
     
     // Ensure the WebAuthn provider is registered with OrbitDB
-    console.log('🔧 Registering WebAuthn identity provider with OrbitDB...');
+    logger.info('🔧 Registering WebAuthn identity provider with OrbitDB...');
     
     // Debug: Check if provider is already registered
-    console.log('🔍 Checking OrbitDB identity providers before registration...');
+    logger.info('🔍 Checking OrbitDB identity providers before registration...');
     
     const registrationSuccess = registerWebAuthnProvider();
-    console.log('📋 Registration result:', registrationSuccess);
+    logger.info('📋 Registration result:', registrationSuccess);
     
     if (!registrationSuccess) {
       throw new Error('Failed to register WebAuthn provider with OrbitDB');
     }
     
     // Debug: Verify the provider function
-    console.log('🔍 WebAuthn Provider Function:', OrbitDBWebAuthnIdentityProviderFunction);
-    console.log('🔍 Provider Type:', OrbitDBWebAuthnIdentityProviderFunction.type);
-    console.log('🔍 Provider verifyIdentity:', typeof OrbitDBWebAuthnIdentityProviderFunction.verifyIdentity);
+    logger.info('🔍 WebAuthn Provider Function:', OrbitDBWebAuthnIdentityProviderFunction);
+    logger.info('🔍 Provider Type:', OrbitDBWebAuthnIdentityProviderFunction.type);
+    logger.info('🔍 Provider verifyIdentity:', typeof OrbitDBWebAuthnIdentityProviderFunction.verifyIdentity);
     
     // Create the identity using OrbitDB's standard identity creation
     // This ensures proper serialization, resolution via getIdentity(), and verification
-    console.log('🆔 Creating WebAuthn identity via OrbitDB identities.createIdentity...');
+    logger.info('🆔 Creating WebAuthn identity via OrbitDB identities.createIdentity...');
     const identity = await identities.createIdentity({
       provider: OrbitDBWebAuthnIdentityProviderFunction({ webauthnCredential })
     });
     
-    console.log('✅ Created OrbitDB-compatible WebAuthn identity:', {
+    logger.info('✅ Created OrbitDB-compatible WebAuthn identity:', {
       id: identity.id,
       type: identity.type,
       publicKey: identity.publicKey,
@@ -442,56 +443,56 @@
     });
     
     // 🔍 CRITICAL DEBUG: Test the signing function directly
-    console.log('🔍 Testing WebAuthn identity signing function directly...');
+    logger.info('🔍 Testing WebAuthn identity signing function directly...');
     try {
       const testData = 'test-signing-data';
-      console.log('🧪 Calling identity.sign() with test data - this should trigger WebAuthn!');
+      logger.info('🧪 Calling identity.sign() with test data - this should trigger WebAuthn!');
       
       const testSignature = await identity.sign(identity, testData);
-      console.log('✅ Direct signing test successful!');
-      console.log('   📏 Signature length:', testSignature?.length);
-      console.log('   🔤 Signature preview:', testSignature?.slice(0, 64) + '...');
+      logger.info('✅ Direct signing test successful!');
+      logger.info('   📏 Signature length:', testSignature?.length);
+      logger.info('   🔤 Signature preview:', testSignature?.slice(0, 64) + '...');
       
       // Try to decode as WebAuthn proof
       try {
         const proofBytes = new Uint8Array(Array.from(atob(testSignature.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0)));
         const proofText = new TextDecoder().decode(proofBytes);
         const webauthnProof = JSON.parse(proofText);
-        console.log('   🎉 SUCCESS: Direct signing produced WebAuthn proof format!');
-        console.log('   🆔 Credential ID in proof:', webauthnProof.credentialId?.slice(0, 16) + '...');
+        logger.info('   🎉 SUCCESS: Direct signing produced WebAuthn proof format!');
+        logger.info('   🆔 Credential ID in proof:', webauthnProof.credentialId?.slice(0, 16) + '...');
       } catch (decodeError) {
-        console.log('   ⚠️ WARNING: Direct signing did NOT produce WebAuthn proof format');
-        console.log('   📝 Signature appears to be:', testSignature?.startsWith('30') ? 'DER-encoded ECDSA' : 'Unknown format');
+        logger.info('   ⚠️ WARNING: Direct signing did NOT produce WebAuthn proof format');
+        logger.info('   📝 Signature appears to be:', testSignature?.startsWith('30') ? 'DER-encoded ECDSA' : 'Unknown format');
       }
       
     } catch (signError) {
-      console.log('❌ Direct signing test failed:', signError.message);
-      console.log('   ⚠️ This explains why OrbitDB falls back to default signing!');
+      logger.info('❌ Direct signing test failed:', signError.message);
+      logger.info('   ⚠️ This explains why OrbitDB falls back to default signing!');
     }
     
     // Verify the identity can be resolved by the identities system
-    console.log('🔍 Testing identity resolution...');
+    logger.info('🔍 Testing identity resolution...');
     const resolvedIdentity = await identities.getIdentity(identity.id);
     if (resolvedIdentity) {
-      console.log('✅ Identity resolution test passed - access controller should work');
+      logger.info('✅ Identity resolution test passed - access controller should work');
     } else {
-      console.warn('⚠️ Identity resolution test failed - this may cause access control issues');
+      logger.warn('⚠️ Identity resolution test failed - this may cause access control issues');
     }
     
     // Test identity verification
-    console.log('🔍 Testing identity verification...');
+    logger.info('🔍 Testing identity verification...');
     try {
       const verificationResult = await identities.verifyIdentity(identity);
       if (verificationResult) {
-        console.log('✅ Identity verification test passed');
+        logger.info('✅ Identity verification test passed');
       } else {
-        console.warn('⚠️ Identity verification test failed');
+        logger.warn('⚠️ Identity verification test failed');
       }
     } catch (verifyError) {
-      console.warn('⚠️ Identity verification test error:', verifyError.message);
+      logger.warn('⚠️ Identity verification test error:', verifyError.message);
     }
 
-    console.log(`✅ ${persona} WebAuthn identity created: ${identity.id}`);
+    logger.info(`✅ ${persona} WebAuthn identity created: ${identity.id}`);
     return { identity, identities, webauthnCredential };
   }
 
@@ -509,7 +510,7 @@
     } else {
       bobResults = [...bobResults, result];
     }
-    console.log(`🧪 ${persona}: ${step} - ${status} - ${message}`, data || "");
+    logger.info(`🧪 ${persona}: ${step} - ${status} - ${message}`, data || "");
   }
 
   function updateLastResult(persona, status, message, data = null) {
@@ -535,20 +536,20 @@
     databaseConfig,
     useSharedIdentity = true,
   ) {
-    console.log(`🔧 Creating OrbitDB instance for ${persona}...`);
+    logger.info(`🔧 Creating OrbitDB instance for ${persona}...`);
 
     // Use minimal libp2p config to avoid relay connections
     const config = DefaultLibp2pBrowserOptions;
 
     // Create libp2p instance
     const libp2p = await createLibp2p(config);
-    console.log("libp2p created");
+    logger.info("libp2p created");
 
     // Create Helia instance with memory storage for tests to avoid persistence conflicts
-    console.log("🗄️ Initializing Helia with memory storage for testing...");
+    logger.info("🗄️ Initializing Helia with memory storage for testing...");
     // Use memory storage to avoid filesystem conflicts and faster cleanup
     const helia = await createHelia({ libp2p });
-    console.log("Helia created with memory storage");
+    logger.info("Helia created with memory storage");
 
     // Create OrbitDB instance configuration
     const orbitdbConfig = {
@@ -561,30 +562,30 @@
       // Use WebAuthn identity - pass identities instance and specific identity
       orbitdbConfig.identities = sharedIdentities;
       orbitdbConfig.identity = sharedIdentity;
-      console.log(`🔑 Alice using WebAuthn identity: ${sharedIdentity.id}`);
+      logger.info(`🔑 Alice using WebAuthn identity: ${sharedIdentity.id}`);
     } else if (persona === "bob") {
       if (useSharedIdentity && sharedIdentity && sharedIdentities) {
         // Bob shares Alice's WebAuthn identity
         orbitdbConfig.identities = sharedIdentities;
         orbitdbConfig.identity = sharedIdentity;
-        console.log(`🔗 Bob using Alice's shared WebAuthn identity: ${sharedIdentity.id}`);
+        logger.info(`🔗 Bob using Alice's shared WebAuthn identity: ${sharedIdentity.id}`);
       } else if (bobIdentity && bobIdentities) {
         // Bob has his own identity
         orbitdbConfig.identities = bobIdentities;
         orbitdbConfig.identity = bobIdentity;
-        console.log(`🆔 Bob using his own identity: ${bobIdentity.id}`);
+        logger.info(`🆔 Bob using his own identity: ${bobIdentity.id}`);
       } else {
         // Fallback: let OrbitDB create default identity with unique ID
         orbitdbConfig.id = `${persona}-${instanceId}-${Date.now()}-${Math.random()}`;
-        console.log(`⚠️ ${persona} using default OrbitDB identity`);
+        logger.info(`⚠️ ${persona} using default OrbitDB identity`);
       }
     } else {
       // Fallback: let OrbitDB create default identity with unique ID
       orbitdbConfig.id = `${persona}-${instanceId}-${Date.now()}-${Math.random()}`;
-      console.log(`⚠️ ${persona} using default OrbitDB identity`);
+      logger.info(`⚠️ ${persona} using default OrbitDB identity`);
     }
 
-    console.log('🔧 OrbitDB config about to be used:', {
+    logger.info('🔧 OrbitDB config about to be used:', {
       hasIPFS: !!orbitdbConfig.ipfs,
       hasIdentity: !!orbitdbConfig.identity,
       hasIdentities: !!orbitdbConfig.identities,
@@ -596,7 +597,7 @@
     
     const orbitdb = await createOrbitDB(orbitdbConfig);
     
-    console.log('🆔 OrbitDB instance created:', {
+    logger.info('🆔 OrbitDB instance created:', {
       orbitDBId: orbitdb.id,
       actualIdentityId: orbitdb.identity?.id,
       actualIdentityType: orbitdb.identity?.type,
@@ -607,11 +608,11 @@
       signMethodString: orbitdb.identity?.sign?.toString().slice(0, 100) + '...'
     });
     
-    console.log("📂 OrbitDB instance created with WebAuthn identity");
+    logger.info("📂 OrbitDB instance created with WebAuthn identity");
 
     // Create database with access controller
     const database = await orbitdb.open(databaseName, databaseConfig);
-    console.log("📊 Database created:", database.name);
+    logger.info("📊 Database created:", database.name);
 
     // Set up event listeners for this database
     setupDatabaseEventListeners(database, persona);
@@ -623,8 +624,8 @@
   function setupDatabaseEventListeners(database, persona) {
     if (!database) return;
 
-    console.log(`🎧 Setting up event listeners for ${persona}'s database...`);
-    console.log(`🎯 [StorachaTest] Database address: ${database.address}`);
+    logger.info(`🎧 Setting up event listeners for ${persona}'s database...`);
+    logger.info(`🎯 [StorachaTest] Database address: ${database.address}`);
 
     // Add this database address to our tracking set
     storachaTestDatabaseAddresses.add(
@@ -637,7 +638,7 @@
       const eventAddress = address?.toString() || address;
 
       if (storachaTestDatabaseAddresses.has(eventAddress)) {
-        console.log(`🔗 [StorachaTest-${persona}] JOIN EVENT:`, {
+        logger.info(`🔗 [StorachaTest-${persona}] JOIN EVENT:`, {
           address: eventAddress,
           entry: {
             hash: entry?.hash?.toString() || entry?.hash,
@@ -686,7 +687,7 @@
       const eventAddress = address?.toString() || address;
 
       if (storachaTestDatabaseAddresses.has(eventAddress)) {
-        console.log(`🔄 [StorachaTest-${persona}] UPDATE EVENT:`, {
+        logger.info(`🔄 [StorachaTest-${persona}] UPDATE EVENT:`, {
           address: eventAddress,
           entry: {
             hash: entry?.hash?.toString() || entry?.hash,
@@ -729,18 +730,18 @@
       }
     });
 
-    console.log(
+    logger.info(
       `✅ [StorachaTest] Event listeners set up for database instance ${persona}`,
     );
   }
 
   async function clearIndexedDB() {
-    console.log("🗑️ Clearing IndexedDB...");
+    logger.info("🗑️ Clearing IndexedDB...");
 
     // Get all IndexedDB databases
     if ("databases" in indexedDB) {
       const databases = await indexedDB.databases();
-      console.log(
+      logger.info(
         "📋 Found databases:",
         databases.map((db) => db.name),
       );
@@ -759,7 +760,7 @@
 
       for (const db of dbsToDelete) {
         try {
-          console.log(`🗑️ Deleting database: ${db.name}`);
+          logger.info(`🗑️ Deleting database: ${db.name}`);
 
           // Add timeout to prevent hanging
           await Promise.race([
@@ -768,7 +769,7 @@
               deleteReq.onsuccess = () => resolve();
               deleteReq.onerror = () => reject(deleteReq.error);
               deleteReq.onblocked = () => {
-                console.warn(`⚠️ Database deletion blocked for: ${db.name}`);
+                logger.warn(`⚠️ Database deletion blocked for: ${db.name}`);
                 // Don't reject immediately, give it more time
               };
             }),
@@ -777,18 +778,18 @@
             ),
           ]);
 
-          console.log(`✅ Deleted database: ${db.name}`);
+          logger.info(`✅ Deleted database: ${db.name}`);
         } catch (error) {
           if (error.message === "Timeout") {
-            console.warn(`⏱️ Timeout deleting database ${db.name} - skipping`);
+            logger.warn(`⏱️ Timeout deleting database ${db.name} - skipping`);
           } else {
-            console.warn(`⚠️ Failed to delete database ${db.name}:`, error);
+            logger.warn(`⚠️ Failed to delete database ${db.name}:`, error);
           }
         }
       }
     }
 
-    console.log("🧹 IndexedDB cleanup completed");
+    logger.info("🧹 IndexedDB cleanup completed");
   }
 
   // Alice's functions
@@ -848,15 +849,15 @@
       );
 
       // 🔐 ACCESS CONTROLLER CONFIGURATION
-      console.log('\n🔐 Configuring Access Controller for Alice:');
-      console.log('   🆔 WebAuthn Identity ID:', sharedIdentity.id);
-      console.log('   🏷️ Identity Type:', sharedIdentity.type);
-      console.log('   🔑 Identity Key (for access):', sharedIdentity.key?.slice(0, 32) + '...' || 'NO KEY');
+      logger.info('\n🔐 Configuring Access Controller for Alice:');
+      logger.info('   🆔 WebAuthn Identity ID:', sharedIdentity.id);
+      logger.info('   🏷️ Identity Type:', sharedIdentity.type);
+      logger.info('   🔑 Identity Key (for access):', sharedIdentity.key?.slice(0, 32) + '...' || 'NO KEY');
       
       const writePermissions = [sharedIdentity.id];
-      console.log('   ✍️ Write Permissions Array:', writePermissions);
-      console.log('   🌟 Using Wildcard (*)?', writePermissions.includes('*') ? 'YES' : 'NO');
-      console.log('   🔒 Access Control Type: EXPLICIT IDENTITY-BASED');
+      logger.info('   ✍️ Write Permissions Array:', writePermissions);
+      logger.info('   🌟 Using Wildcard (*)?', writePermissions.includes('*') ? 'YES' : 'NO');
+      logger.info('   🔒 Access Control Type: EXPLICIT IDENTITY-BASED');
       
       const databaseConfig = {
         type: "keyvalue",
@@ -869,7 +870,7 @@
         }),
       };
       
-      console.log('   ⚙️ Final Database Config:', {
+      logger.info('   ⚙️ Final Database Config:', {
         type: databaseConfig.type,
         accessControllerType: 'IPFSAccessController',
         writePermissions: writePermissions
@@ -896,7 +897,7 @@
 
       aliceStep = "Alice ready to add todos";
     } catch (error) {
-      console.error("❌ Alice initialization failed:", error);
+      logger.error("❌ Alice initialization failed:", error);
       aliceError = error.message;
       aliceStep = `Alice initialization failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -922,36 +923,36 @@
       for (let i = 0; i < originalTodos.length; i++) {
         const todo = originalTodos[i];
         
-        console.log(`📝 Adding todo ${i + 1}: ${todo.text}`);
+        logger.info(`📝 Adding todo ${i + 1}: ${todo.text}`);
         
         const hash = await aliceDatabase.put(todo.id, todo);
         
-        console.log(`✅ Todo ${i + 1} added with hash: ${hash.slice(0, 16)}...`);
+        logger.info(`✅ Todo ${i + 1} added with hash: ${hash.slice(0, 16)}...`);
         
         // 🔍 DETAILED WEBAUTHN SIGNATURE VERIFICATION
         const entry = await aliceDatabase.log.get(hash);
         if (entry) {
-          console.log(`\n🔐 =============== TODO ${i + 1} SIGNATURE ANALYSIS ===============`);
-          console.log('📄 Entry Hash:', hash);
-          console.log('🆔 Entry Identity:', entry.identity);
-          console.log('🔑 Expected Identity (WebAuthn):', aliceOrbitDB.identity.id);
-          console.log('🔑 Expected Identity Hash:', aliceOrbitDB.identity.hash);
+          logger.info(`\n🔐 =============== TODO ${i + 1} SIGNATURE ANALYSIS ===============`);
+          logger.info('📄 Entry Hash:', hash);
+          logger.info('🆔 Entry Identity:', entry.identity);
+          logger.info('🔑 Expected Identity (WebAuthn):', aliceOrbitDB.identity.id);
+          logger.info('🔑 Expected Identity Hash:', aliceOrbitDB.identity.hash);
           
           // Check both DID and hash matches (OrbitDB may convert DID to hash for oplog)
           const didMatch = entry.identity === aliceOrbitDB.identity.id;
           const hashMatch = entry.identity === aliceOrbitDB.identity.hash;
           const isMatch = didMatch || hashMatch;
           
-          console.log('✅ Identity Match:', isMatch ? '✅ YES' : '❌ NO');
-          console.log('   📊 DID Match:', didMatch ? '✅ YES' : '❌ NO');
-          console.log('   📊 Hash Match:', hashMatch ? '✅ YES' : '❌ NO');
+          logger.info('✅ Identity Match:', isMatch ? '✅ YES' : '❌ NO');
+          logger.info('   📊 DID Match:', didMatch ? '✅ YES' : '❌ NO');
+          logger.info('   📊 Hash Match:', hashMatch ? '✅ YES' : '❌ NO');
           
           // Signature Analysis
           if (entry.sig) {
-            console.log('🔐 Signature Present: ✅ YES');
-            console.log('   📏 Signature Length:', entry.sig.length, 'characters');
-            console.log('   🔤 Signature Preview:', entry.sig.slice(0, 64) + '...');
-            console.log('   🔍 Signature Type: WebAuthn (base64url encoded)');
+            logger.info('🔐 Signature Present: ✅ YES');
+            logger.info('   📏 Signature Length:', entry.sig.length, 'characters');
+            logger.info('   🔤 Signature Preview:', entry.sig.slice(0, 64) + '...');
+            logger.info('   🔍 Signature Type: WebAuthn (base64url encoded)');
             
             // Try to decode and analyze the WebAuthn proof
             try {
@@ -959,41 +960,41 @@
               const proofText = new TextDecoder().decode(proofBytes);
               const webauthnProof = JSON.parse(proofText);
               
-              console.log('   🧪 WebAuthn Proof Structure:');
-              console.log('      🆔 Credential ID:', webauthnProof.credentialId?.slice(0, 16) + '...' || 'MISSING');
-              console.log('      📊 Data Hash:', webauthnProof.dataHash?.slice(0, 16) + '...' || 'MISSING');
-              console.log('      🔐 Auth Data:', webauthnProof.authenticatorData ? 'PRESENT' : 'MISSING');
-              console.log('      📱 Client Data:', webauthnProof.clientDataJSON ? 'PRESENT' : 'MISSING');
-              console.log('      ⏰ Timestamp:', webauthnProof.timestamp ? new Date(webauthnProof.timestamp).toISOString() : 'MISSING');
+              logger.info('   🧪 WebAuthn Proof Structure:');
+              logger.info('      🆔 Credential ID:', webauthnProof.credentialId?.slice(0, 16) + '...' || 'MISSING');
+              logger.info('      📊 Data Hash:', webauthnProof.dataHash?.slice(0, 16) + '...' || 'MISSING');
+              logger.info('      🔐 Auth Data:', webauthnProof.authenticatorData ? 'PRESENT' : 'MISSING');
+              logger.info('      📱 Client Data:', webauthnProof.clientDataJSON ? 'PRESENT' : 'MISSING');
+              logger.info('      ⏰ Timestamp:', webauthnProof.timestamp ? new Date(webauthnProof.timestamp).toISOString() : 'MISSING');
               
               // Verify the credential ID matches our WebAuthn credential
               if (sharedWebAuthnCredential && sharedWebAuthnCredential.credentialId) {
                 const credentialMatch = webauthnProof.credentialId === sharedWebAuthnCredential.credentialId;
-                console.log('      🔗 Credential Match:', credentialMatch ? '✅ YES' : '❌ NO');
+                logger.info('      🔗 Credential Match:', credentialMatch ? '✅ YES' : '❌ NO');
                 if (!credentialMatch) {
-                  console.log('         Expected:', sharedWebAuthnCredential.credentialId?.slice(0, 16) + '...');
-                  console.log('         Got:', webauthnProof.credentialId?.slice(0, 16) + '...');
+                  logger.info('         Expected:', sharedWebAuthnCredential.credentialId?.slice(0, 16) + '...');
+                  logger.info('         Got:', webauthnProof.credentialId?.slice(0, 16) + '...');
                 }
               }
               
-              console.log('   ✅ WebAuthn Proof Successfully Decoded and Analyzed!');
+              logger.info('   ✅ WebAuthn Proof Successfully Decoded and Analyzed!');
             } catch (decodeError) {
-              console.log('   ⚠️ Could not decode WebAuthn proof:', decodeError.message);
-              console.log('   📄 Raw signature might not be WebAuthn format');
+              logger.info('   ⚠️ Could not decode WebAuthn proof:', decodeError.message);
+              logger.info('   📄 Raw signature might not be WebAuthn format');
             }
           } else {
-            console.log('🔐 Signature Present: ❌ NO - This entry is NOT SIGNED!');
-            console.log('   ⚠️ WARNING: Missing signature indicates signing failure!');
+            logger.info('🔐 Signature Present: ❌ NO - This entry is NOT SIGNED!');
+            logger.info('   ⚠️ WARNING: Missing signature indicates signing failure!');
           }
           
           // Clock and Payload Analysis
-          console.log('⏰ Clock Info:', entry.clock ? `{id: ${entry.clock.id?.slice(0, 16)}..., time: ${entry.clock.time}}` : 'NO CLOCK');
-          console.log('📦 Payload Operation:', entry.payload?.op || 'NO OPERATION');
-          console.log('🔑 Payload Key:', entry.payload?.key || entry.key || 'NO KEY');
+          logger.info('⏰ Clock Info:', entry.clock ? `{id: ${entry.clock.id?.slice(0, 16)}..., time: ${entry.clock.time}}` : 'NO CLOCK');
+          logger.info('📦 Payload Operation:', entry.payload?.op || 'NO OPERATION');
+          logger.info('🔑 Payload Key:', entry.payload?.key || entry.key || 'NO KEY');
           
-          console.log(`🔐 =============== END TODO ${i + 1} ANALYSIS ===============\n`);
+          logger.info(`🔐 =============== END TODO ${i + 1} ANALYSIS ===============\n`);
         } else {
-          console.log(`❌ Could not retrieve oplog entry for hash: ${hash}`);
+          logger.info(`❌ Could not retrieve oplog entry for hash: ${hash}`);
         }
       }
 
@@ -1001,18 +1002,18 @@
       aliceTodos = await aliceDatabase.all();
 
       // 🔍 ITERATE OVER THE ENTIRE OPLOG HISTORY
-      console.log('\n🗂️ =============== COMPLETE OPLOG HISTORY ===============');
-      console.log('📊 Database:', aliceDatabase.name);
-      console.log('📍 Address:', aliceDatabase.address);
-      console.log('🆔 Database Identity:', aliceDatabase.identity?.id);
-      console.log('📝 Total Todos Added:', aliceTodos.length);
+      logger.info('\n🗂️ =============== COMPLETE OPLOG HISTORY ===============');
+      logger.info('📊 Database:', aliceDatabase.name);
+      logger.info('📍 Address:', aliceDatabase.address);
+      logger.info('🆔 Database Identity:', aliceDatabase.identity?.id);
+      logger.info('📝 Total Todos Added:', aliceTodos.length);
       
       try {
-        console.log('\n🔄 Iterating through oplog entries...');
+        logger.info('\n🔄 Iterating through oplog entries...');
         
         // Get the oplog from the database
         const oplog = aliceDatabase.log;
-        console.log('📋 Oplog basic info:', {
+        logger.info('📋 Oplog basic info:', {
           hasIterator: typeof oplog.iterator === 'function',
           length: oplog.length || 'unknown'
         });
@@ -1020,29 +1021,29 @@
         // Method 1: Use the correct OrbitDB API - log.iterator() 
         let entryCount = 0;
         if (typeof oplog.iterator === 'function') {
-          console.log('\n📖 Using log.iterator() to traverse ALL entries:');
+          logger.info('\n📖 Using log.iterator() to traverse ALL entries:');
           
           try {
             for await (const entry of oplog.iterator()) {
               entryCount++;
-              console.log(`\n📄 Entry #${entryCount}:`);
-              console.log('   🔗 Hash:', entry.hash?.toString() || entry.hash);
-              console.log('   🆔 Identity:', entry.identity);
-              console.log('   🔑 Key:', entry.key || entry.payload?.key);
-              console.log('   📋 Operation:', entry.payload?.op);
-              console.log('   💾 Value Preview:', JSON.stringify(entry.payload?.value || entry.value)?.slice(0, 100) + '...');
-              console.log('   🔐 Signature:', entry.sig ? `${entry.sig.slice(0, 32)}... (${entry.sig.length} chars)` : 'NO SIGNATURE');
-              console.log('   ⏰ Clock:', entry.clock ? `{id: ${entry.clock.id?.slice(0, 16)}..., time: ${entry.clock.time}}` : 'NO CLOCK');
+              logger.info(`\n📄 Entry #${entryCount}:`);
+              logger.info('   🔗 Hash:', entry.hash?.toString() || entry.hash);
+              logger.info('   🆔 Identity:', entry.identity);
+              logger.info('   🔑 Key:', entry.key || entry.payload?.key);
+              logger.info('   📋 Operation:', entry.payload?.op);
+              logger.info('   💾 Value Preview:', JSON.stringify(entry.payload?.value || entry.value)?.slice(0, 100) + '...');
+              logger.info('   🔐 Signature:', entry.sig ? `${entry.sig.slice(0, 32)}... (${entry.sig.length} chars)` : 'NO SIGNATURE');
+              logger.info('   ⏰ Clock:', entry.clock ? `{id: ${entry.clock.id?.slice(0, 16)}..., time: ${entry.clock.time}}` : 'NO CLOCK');
               
               // Handle next and refs arrays safely
               const nextRefs = Array.isArray(entry.next) ? entry.next.map(n => n.toString().slice(0, 16) + '...') : (entry.next ? [entry.next.toString().slice(0, 16) + '...'] : []);
               const refs = Array.isArray(entry.refs) ? entry.refs.map(r => r.toString().slice(0, 16) + '...') : (entry.refs ? [entry.refs.toString().slice(0, 16) + '...'] : []);
               
-              console.log('   🔗 Next:', nextRefs.length > 0 ? nextRefs : 'NO NEXT');
-              console.log('   📎 Refs:', refs.length > 0 ? refs : 'NO REFS');
+              logger.info('   🔗 Next:', nextRefs.length > 0 ? nextRefs : 'NO NEXT');
+              logger.info('   📎 Refs:', refs.length > 0 ? refs : 'NO REFS');
               
               // Show full entry structure (collapsed)
-              console.log('   🏗️ Full Entry Structure:', {
+              logger.info('   🏗️ Full Entry Structure:', {
                 version: entry.v,
                 id: entry.id,
                 key: entry.key,
@@ -1056,61 +1057,61 @@
               
               // Limit output to prevent console overflow
               if (entryCount >= 10) {
-                console.log('   ⚠️ Limiting output to first 10 entries to prevent console overflow...');
+                logger.info('   ⚠️ Limiting output to first 10 entries to prevent console overflow...');
                 break;
               }
             }
           } catch (iteratorError) {
-            console.error('❌ Error using log.iterator():', iteratorError.message);
+            logger.error('❌ Error using log.iterator():', iteratorError.message);
             entryCount = 0; // Reset to try alternative methods
           }
         } else {
-          console.log('⚠️ log.iterator() not available, trying alternative methods...');
+          logger.info('⚠️ log.iterator() not available, trying alternative methods...');
         }
         
         // Method 2: Try using database.iterator() as fallback (for database entries)
         if (entryCount === 0) {
-          console.log('\n📖 Trying database.iterator() as fallback:');
+          logger.info('\n📖 Trying database.iterator() as fallback:');
           try {
             for await (const record of aliceDatabase.iterator()) {
               entryCount++;
-              console.log(`\n📄 Database Record #${entryCount}:`);
-              console.log('   🔑 Key:', record.key);
-              console.log('   💾 Value:', JSON.stringify(record.value)?.slice(0, 100) + '...');
-              console.log('   🔗 Hash:', record.hash?.toString() || 'NO HASH');
+              logger.info(`\n📄 Database Record #${entryCount}:`);
+              logger.info('   🔑 Key:', record.key);
+              logger.info('   💾 Value:', JSON.stringify(record.value)?.slice(0, 100) + '...');
+              logger.info('   🔗 Hash:', record.hash?.toString() || 'NO HASH');
               
               // Try to get the actual oplog entry for this record
               if (record.hash) {
                 try {
                   const oplogEntry = await aliceDatabase.log.get(record.hash);
                   if (oplogEntry) {
-                    console.log('   🔐 Signature:', oplogEntry.sig ? `${oplogEntry.sig.slice(0, 32)}... (${oplogEntry.sig.length} chars)` : 'NO SIGNATURE');
-                    console.log('   🆔 Entry Identity:', oplogEntry.identity);
+                    logger.info('   🔐 Signature:', oplogEntry.sig ? `${oplogEntry.sig.slice(0, 32)}... (${oplogEntry.sig.length} chars)` : 'NO SIGNATURE');
+                    logger.info('   🆔 Entry Identity:', oplogEntry.identity);
                   }
                 } catch (getError) {
-                  console.log('   ⚠️ Could not get oplog entry for record:', getError.message);
+                  logger.info('   ⚠️ Could not get oplog entry for record:', getError.message);
                 }
               }
               
               // Limit output
               if (entryCount >= 10) {
-                console.log('   ⚠️ Limiting output to first 10 records...');
+                logger.info('   ⚠️ Limiting output to first 10 records...');
                 break;
               }
             }
           } catch (dbIteratorError) {
-            console.error('❌ Error using database.iterator():', dbIteratorError.message);
+            logger.error('❌ Error using database.iterator():', dbIteratorError.message);
           }
         }
         
         // Summary
-        console.log(`\n📊 OPLOG SUMMARY:`);
-        console.log(`   📝 Total Entries Found: ${entryCount}`);
-        console.log(`   🗄️ Database Todos: ${aliceTodos.length}`);
-        console.log(`   🔍 Match: ${entryCount >= aliceTodos.length ? '✅ YES' : '❌ NO - Missing entries'}`);
+        logger.info(`\n📊 OPLOG SUMMARY:`);
+        logger.info(`   📝 Total Entries Found: ${entryCount}`);
+        logger.info(`   🗄️ Database Todos: ${aliceTodos.length}`);
+        logger.info(`   🔍 Match: ${entryCount >= aliceTodos.length ? '✅ YES' : '❌ NO - Missing entries'}`);
         
         // 🔐 WEBAUTHN SIGNATURE VERIFICATION SUMMARY
-        console.log(`\n🔐 =============== WEBAUTHN SIGNATURE SUMMARY ===============`);
+        logger.info(`\n🔐 =============== WEBAUTHN SIGNATURE SUMMARY ===============`);
         
         // Analyze all entries for WebAuthn signatures
         let signedEntries = 0;
@@ -1147,15 +1148,15 @@
             }
           }
         } catch (iterError) {
-          console.log('   ⚠️ Could not iterate for signature analysis:', iterError.message);
+          logger.info('   ⚠️ Could not iterate for signature analysis:', iterError.message);
         }
         
-        console.log('📊 Signature Analysis Results:');
-        console.log(`   📝 Total Entries: ${entryCount}`);
-        console.log(`   ✍️ Signed Entries: ${signedEntries}/${entryCount} (${entryCount > 0 ? Math.round(signedEntries/entryCount*100) : 0}%)`);
-        console.log(`   🔐 WebAuthn Proofs: ${webauthnProofs}/${signedEntries} (${signedEntries > 0 ? Math.round(webauthnProofs/signedEntries*100) : 0}%)`);
-        console.log(`   🆔 Identity Matches: ${identityMatches}/${entryCount} (${entryCount > 0 ? Math.round(identityMatches/entryCount*100) : 0}%)`);
-        console.log(`   🔗 Credential Matches: ${credentialMatches}/${webauthnProofs} (${webauthnProofs > 0 ? Math.round(credentialMatches/webauthnProofs*100) : 0}%)`);
+        logger.info('📊 Signature Analysis Results:');
+        logger.info(`   📝 Total Entries: ${entryCount}`);
+        logger.info(`   ✍️ Signed Entries: ${signedEntries}/${entryCount} (${entryCount > 0 ? Math.round(signedEntries/entryCount*100) : 0}%)`);
+        logger.info(`   🔐 WebAuthn Proofs: ${webauthnProofs}/${signedEntries} (${signedEntries > 0 ? Math.round(webauthnProofs/signedEntries*100) : 0}%)`);
+        logger.info(`   🆔 Identity Matches: ${identityMatches}/${entryCount} (${entryCount > 0 ? Math.round(identityMatches/entryCount*100) : 0}%)`);
+        logger.info(`   🔗 Credential Matches: ${credentialMatches}/${webauthnProofs} (${webauthnProofs > 0 ? Math.round(credentialMatches/webauthnProofs*100) : 0}%)`);
         
         // Overall assessment
         const allSigned = signedEntries === entryCount && entryCount > 0;
@@ -1163,60 +1164,60 @@
         const allMatchingIdentity = identityMatches === entryCount && entryCount > 0;
         const allMatchingCredential = credentialMatches === webauthnProofs && webauthnProofs > 0;
         
-        console.log('\n🏆 Overall Assessment:');
-        console.log(`   📝 All entries signed: ${allSigned ? '✅ YES' : '❌ NO'}`);
-        console.log(`   🔐 All signatures are WebAuthn: ${allWebAuthn ? '✅ YES' : '❌ NO'}`);
-        console.log(`   🆔 All identities match: ${allMatchingIdentity ? '✅ YES' : '❌ NO'}`);
-        console.log(`   🔗 All credentials match: ${allMatchingCredential ? '✅ YES' : '❌ NO'}`);
+        logger.info('\n🏆 Overall Assessment:');
+        logger.info(`   📝 All entries signed: ${allSigned ? '✅ YES' : '❌ NO'}`);
+        logger.info(`   🔐 All signatures are WebAuthn: ${allWebAuthn ? '✅ YES' : '❌ NO'}`);
+        logger.info(`   🆔 All identities match: ${allMatchingIdentity ? '✅ YES' : '❌ NO'}`);
+        logger.info(`   🔗 All credentials match: ${allMatchingCredential ? '✅ YES' : '❌ NO'}`);
         
         const perfect = allSigned && allWebAuthn && allMatchingIdentity && allMatchingCredential;
-        console.log(`   🎯 WebAuthn Integration: ${perfect ? '🎉 PERFECT!' : '⚠️ NEEDS ATTENTION'}`);
+        logger.info(`   🎯 WebAuthn Integration: ${perfect ? '🎉 PERFECT!' : '⚠️ NEEDS ATTENTION'}`);
         
-        console.log(`🔐 =============== END WEBAUTHN SUMMARY ===============`);
+        logger.info(`🔐 =============== END WEBAUTHN SUMMARY ===============`);
         
         // Additional oplog info
-        console.log(`\n🔧 Oplog Technical Details:`);
-        console.log(`   📊 Oplog Length:`, oplog.length || 'unknown');
-        console.log(`   🆔 Oplog Type:`, typeof oplog);
-        console.log(`   📋 Available Methods:`, Object.getOwnPropertyNames(oplog).filter(prop => typeof oplog[prop] === 'function'));
+        logger.info(`\n🔧 Oplog Technical Details:`);
+        logger.info(`   📊 Oplog Length:`, oplog.length || 'unknown');
+        logger.info(`   🆔 Oplog Type:`, typeof oplog);
+        logger.info(`   📋 Available Methods:`, Object.getOwnPropertyNames(oplog).filter(prop => typeof oplog[prop] === 'function'));
         
       } catch (error) {
-        console.error('❌ Error iterating oplog:', error);
-        console.error('   Error details:', error.message);
-        console.error('   Error stack:', error.stack?.slice(0, 500) + '...');
+        logger.error('❌ Error iterating oplog:', error);
+        logger.error('   Error details:', error.message);
+        logger.error('   Error stack:', error.stack?.slice(0, 500) + '...');
       }
       
-      console.log('🗂️ =============== END OPLOG HISTORY ===============\n');
+      logger.info('🗂️ =============== END OPLOG HISTORY ===============\n');
 
       // 🔒 ACCESS CONTROLLER INSPECTION
-      console.log('\n🔒 =============== ACCESS CONTROLLER ANALYSIS ===============');
+      logger.info('\n🔒 =============== ACCESS CONTROLLER ANALYSIS ===============');
       try {
         const database = aliceDatabase;
-        console.log('🎯 Database Access Controller Details:');
-        console.log('   📊 Database Name:', database.name);
-        console.log('   🆔 Database Identity:', database.identity?.id);
-        console.log('   📍 Database Address:', database.address);
+        logger.info('🎯 Database Access Controller Details:');
+        logger.info('   📊 Database Name:', database.name);
+        logger.info('   🆔 Database Identity:', database.identity?.id);
+        logger.info('   📍 Database Address:', database.address);
         
         // Check if access controller exists
         if (database.access) {
-          console.log('\n🔐 Access Controller Found:');
-          console.log('   🏷️ Type:', database.access.type || typeof database.access);
-          console.log('   📋 Available Methods:', Object.getOwnPropertyNames(database.access).filter(prop => typeof database.access[prop] === 'function'));
+          logger.info('\n🔐 Access Controller Found:');
+          logger.info('   🏷️ Type:', database.access.type || typeof database.access);
+          logger.info('   📋 Available Methods:', Object.getOwnPropertyNames(database.access).filter(prop => typeof database.access[prop] === 'function'));
           
           // Check for write permissions
           if (database.access.write) {
-            console.log('\n✍️ Write Permissions:');
+            logger.info('\n✍️ Write Permissions:');
             if (Array.isArray(database.access.write)) {
-              console.log('   📝 Write Array:', database.access.write);
-              console.log('   📊 Total Writers:', database.access.write.length);
+              logger.info('   📝 Write Array:', database.access.write);
+              logger.info('   📊 Total Writers:', database.access.write.length);
               
               // Check if wildcard is present
               if (database.access.write.includes('*')) {
-                console.log('   🌟 WILDCARD ACCESS: * found - ALL identities can write');
-                console.log('   ⚠️ WARNING: Using wildcard access - this was the old configuration!');
+                logger.info('   🌟 WILDCARD ACCESS: * found - ALL identities can write');
+                logger.info('   ⚠️ WARNING: Using wildcard access - this was the old configuration!');
               } else {
-                console.log('   🔒 RESTRICTED ACCESS: Only specific identities can write');
-                console.log('   ✅ GOOD: Using identity-based access control as intended');
+                logger.info('   🔒 RESTRICTED ACCESS: Only specific identities can write');
+                logger.info('   ✅ GOOD: Using identity-based access control as intended');
               }
               
               // Additional security analysis
@@ -1224,42 +1225,42 @@
               const hasSpecificIdentities = database.access.write.some(id => id !== '*');
               
               if (hasWildcard && hasSpecificIdentities) {
-                console.log('   ⚠️ MIXED ACCESS: Both wildcard (*) AND specific identities present');
-                console.log('   📝 This means the wildcard makes specific identities redundant');
+                logger.info('   ⚠️ MIXED ACCESS: Both wildcard (*) AND specific identities present');
+                logger.info('   📝 This means the wildcard makes specific identities redundant');
               } else if (hasWildcard) {
-                console.log('   🌍 OPEN ACCESS: Only wildcard present - any identity can write');
+                logger.info('   🌍 OPEN ACCESS: Only wildcard present - any identity can write');
               } else {
-                console.log('   🔐 SECURE ACCESS: Only specific identities can write (recommended)');
+                logger.info('   🔐 SECURE ACCESS: Only specific identities can write (recommended)');
               }
               
               // Check if our WebAuthn identity is in the list
               const ourIdentityId = database.identity?.id;
               if (ourIdentityId && database.access.write.includes(ourIdentityId)) {
-                console.log('   ✅ OUR IDENTITY ALLOWED:', ourIdentityId.slice(0, 32) + '...');
+                logger.info('   ✅ OUR IDENTITY ALLOWED:', ourIdentityId.slice(0, 32) + '...');
               } else if (ourIdentityId) {
-                console.log('   ❌ OUR IDENTITY NOT IN LIST:', ourIdentityId.slice(0, 32) + '...');
-                console.log('   ⚠️ This might cause write failures!');
+                logger.info('   ❌ OUR IDENTITY NOT IN LIST:', ourIdentityId.slice(0, 32) + '...');
+                logger.info('   ⚠️ This might cause write failures!');
               }
               
               // Show each allowed identity
               database.access.write.forEach((identity, index) => {
                 if (identity === '*') {
-                  console.log(`   ${index + 1}. 🌟 WILDCARD: * (allows all identities)`);
+                  logger.info(`   ${index + 1}. 🌟 WILDCARD: * (allows all identities)`);
                 } else {
                   const isOurs = identity === ourIdentityId;
-                  console.log(`   ${index + 1}. ${isOurs ? '👤 OUR IDENTITY' : '👥 OTHER IDENTITY'}: ${identity.slice(0, 32)}...`);
+                  logger.info(`   ${index + 1}. ${isOurs ? '👤 OUR IDENTITY' : '👥 OTHER IDENTITY'}: ${identity.slice(0, 32)}...`);
                 }
               });
             } else {
-              console.log('   📝 Write Property (not array):', database.access.write);
+              logger.info('   📝 Write Property (not array):', database.access.write);
             }
           } else {
-            console.log('   ⚠️ No write property found on access controller');
+            logger.info('   ⚠️ No write property found on access controller');
           }
           
           // Test access controller methods
           if (typeof database.access.canAppend === 'function') {
-            console.log('\n🧪 Testing Access Controller canAppend method:');
+            logger.info('\n🧪 Testing Access Controller canAppend method:');
             
             // Create a mock entry to test access
             const mockEntry = {
@@ -1271,43 +1272,43 @@
             
             try {
               const canAppend = await database.access.canAppend(mockEntry);
-              console.log('   🧪 Mock Entry Test Result:', canAppend ? '✅ ALLOWED' : '❌ DENIED');
+              logger.info('   🧪 Mock Entry Test Result:', canAppend ? '✅ ALLOWED' : '❌ DENIED');
               
               if (!canAppend) {
-                console.log('   ⚠️ WARNING: Mock entry would be denied - this explains write failures!');
+                logger.info('   ⚠️ WARNING: Mock entry would be denied - this explains write failures!');
               }
             } catch (canAppendError) {
-              console.log('   ❌ Error testing canAppend:', canAppendError.message);
+              logger.info('   ❌ Error testing canAppend:', canAppendError.message);
             }
           } else {
-            console.log('   ⚠️ No canAppend method found on access controller');
+            logger.info('   ⚠️ No canAppend method found on access controller');
           }
           
         } else {
-          console.log('\n❌ No access controller found on database');
-          console.log('   ⚠️ This might indicate a configuration issue');
+          logger.info('\n❌ No access controller found on database');
+          logger.info('   ⚠️ This might indicate a configuration issue');
         }
         
         // Check the original database configuration
-        console.log('\n📋 Database Configuration Analysis:');
-        console.log('   🏗️ Database Type:', database.type || 'unknown');
-        console.log('   📊 Database Options Keys:', Object.keys(database.options || {}));
+        logger.info('\n📋 Database Configuration Analysis:');
+        logger.info('   🏗️ Database Type:', database.type || 'unknown');
+        logger.info('   📊 Database Options Keys:', Object.keys(database.options || {}));
         
         if (database.options?.AccessController) {
-          console.log('   🔐 AccessController in options:', typeof database.options.AccessController);
+          logger.info('   🔐 AccessController in options:', typeof database.options.AccessController);
         }
         
         // Show the actual access controller constructor/function
         if (database.access && database.access.constructor) {
-          console.log('   🏗️ Access Controller Constructor:', database.access.constructor.name);
+          logger.info('   🏗️ Access Controller Constructor:', database.access.constructor.name);
         }
         
       } catch (accessError) {
-        console.error('❌ Error inspecting access controller:', accessError);
-        console.error('   Error details:', accessError.message);
+        logger.error('❌ Error inspecting access controller:', accessError);
+        logger.error('   Error details:', accessError.message);
       }
       
-      console.log('🔒 =============== END ACCESS CONTROLLER ANALYSIS ===============\n');
+      logger.info('🔒 =============== END ACCESS CONTROLLER ANALYSIS ===============\n');
 
       updateLastResult(
         "alice",
@@ -1324,7 +1325,7 @@
 
       aliceStep = "Alice ready to backup";
     } catch (error) {
-      console.error("❌ Adding todos failed:", error);
+      logger.error("❌ Adding todos failed:", error);
       aliceError = error.message;
       aliceStep = `Adding todos failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -1394,7 +1395,7 @@
 
       aliceStep = "Alice backup complete - Bob can now restore";
     } catch (error) {
-      console.error("❌ Backup failed:", error);
+      logger.error("❌ Backup failed:", error);
       aliceError = error.message;
       aliceStep = `Backup failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -1509,7 +1510,7 @@
 
       bobStep = "Bob ready to restore";
     } catch (error) {
-      console.error("❌ Bob initialization failed:", error);
+      logger.error("❌ Bob initialization failed:", error);
       bobError = error.message;
       bobStep = `Bob initialization failed: ${error.message}`;
       updateLastResult("bob", "error", error.message);
@@ -1612,7 +1613,7 @@
 
       bobStep = "Bob restore complete";
     } catch (error) {
-      console.error("❌ Restore failed:", error);
+      logger.error("❌ Restore failed:", error);
       bobError = error.message;
       bobStep = `Restore failed: ${error.message}`;
       updateLastResult("bob", "error", error.message);
@@ -1623,7 +1624,7 @@
 
   // Cleanup functions
   async function cleanup() {
-    console.log("🧹 Cleaning up all instances...");
+    logger.info("🧹 Cleaning up all instances...");
 
     // Cleanup Alice
     try {
@@ -1632,7 +1633,7 @@
       if (aliceHelia) await aliceHelia.stop();
       if (aliceLibp2p) await aliceLibp2p.stop();
     } catch (error) {
-      console.warn("⚠️ Alice cleanup error:", error.message);
+      logger.warn("⚠️ Alice cleanup error:", error.message);
     }
 
     // Cleanup Bob
@@ -1642,7 +1643,7 @@
       if (bobHelia) await bobHelia.stop();
       if (bobLibp2p) await bobLibp2p.stop();
     } catch (error) {
-      console.warn("⚠️ Bob cleanup error:", error.message);
+      logger.warn("⚠️ Bob cleanup error:", error.message);
     }
 
     await clearIndexedDB();

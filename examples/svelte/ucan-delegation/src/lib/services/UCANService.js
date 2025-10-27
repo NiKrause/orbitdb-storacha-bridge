@@ -4,6 +4,7 @@
  */
 
 import { sanitizeAgent } from "../AgentSanitizer.js";
+import { logger } from "../../../../lib/logger.js";
 
 export class UCANService {
   constructor() {
@@ -21,11 +22,11 @@ export class UCANService {
    * @returns {Object} - Bridge delegation info with P-256 signed token for Bob
    */
   async createBridgeStorachaDelegation(bobDID, storachaClient, sharedIdentity) {
-    console.log(`🌉 Creating bridge UCAN delegation: EdDSA → P-256 → P-256`);
-    console.log(
+    logger.info(`🌉 Creating bridge UCAN delegation: EdDSA → P-256 → P-256`);
+    logger.info(
       `   - Alice Storacha EdDSA → Alice OrbitDB P-256 → Bob OrbitDB P-256`,
     );
-    console.log(
+    logger.info(
       `   - Final delegation will be P-256 signed by Alice's OrbitDB identity`,
     );
 
@@ -48,14 +49,14 @@ export class UCANService {
       const aliceStorachaAgent = storachaClient.agent; // EdDSA signer
       const aliceOrbitDBIdentity = sharedIdentity; // P-256 WebAuthn signer
 
-      console.log(
+      logger.info(
         `   🔍 Alice Storacha EdDSA DID: ${aliceStorachaAgent.did()}`,
       );
-      console.log(`   🔍 Alice OrbitDB P-256 DID: ${aliceOrbitDBIdentity.id}`);
-      console.log(`   🔍 Bob OrbitDB P-256 DID: ${bobDID}`);
+      logger.info(`   🔍 Alice OrbitDB P-256 DID: ${aliceOrbitDBIdentity.id}`);
+      logger.info(`   🔍 Bob OrbitDB P-256 DID: ${bobDID}`);
 
       // Step 1: Create EdDSA → P-256 delegation (Storacha → Alice OrbitDB)
-      console.log(`   🔗 Step 1: Creating EdDSA → P-256 delegation...`);
+      logger.info(`   🔗 Step 1: Creating EdDSA → P-256 delegation...`);
 
       const aliceP256Verifier = Verifier.parse(aliceOrbitDBIdentity.id);
       const spaceDID = storachaClient.currentSpace().did();
@@ -81,10 +82,10 @@ export class UCANService {
         expiration: expiration,
       });
 
-      console.log(`   ✅ Step 1 complete: EdDSA → P-256 delegation created`);
+      logger.info(`   ✅ Step 1 complete: EdDSA → P-256 delegation created`);
 
       // Step 2: Create P-256 → P-256 delegation (Alice OrbitDB → Bob OrbitDB)
-      console.log(`   🔗 Step 2: Creating P-256 → P-256 delegation...`);
+      logger.info(`   🔗 Step 2: Creating P-256 → P-256 delegation...`);
 
       const bobP256Verifier = Verifier.parse(bobDID);
 
@@ -107,8 +108,8 @@ export class UCANService {
         expiration: expiration,
       });
 
-      console.log(`   ✅ Step 2 complete: P-256 → P-256 delegation created`);
-      console.log(`   🌉 Bridge delegation complete!`);
+      logger.info(`   ✅ Step 2 complete: P-256 → P-256 delegation created`);
+      logger.info(`   🌉 Bridge delegation complete!`);
 
       // Archive the final P-256 → P-256 delegation (this is what Bob will use)
       const archive = await p256ToP256Delegation.archive();
@@ -118,12 +119,12 @@ export class UCANService {
 
       const delegationToken = Buffer.from(archive.ok).toString("base64");
 
-      console.log(`   ✅ Bridge UCAN delegation created!`);
-      console.log(
+      logger.info(`   ✅ Bridge UCAN delegation created!`);
+      logger.info(
         `   📝 Final delegation signed by Alice's P-256 OrbitDB identity`,
       );
-      console.log(`   🎯 Bob receives P-256 signed delegation (not EdDSA)`);
-      console.log(`   📏 Token length: ${delegationToken.length} characters`);
+      logger.info(`   🎯 Bob receives P-256 signed delegation (not EdDSA)`);
+      logger.info(`   📏 Token length: ${delegationToken.length} characters`);
 
       const delegation = {
         delegationToken, // P-256 signed delegation for Bob
@@ -145,8 +146,8 @@ export class UCANService {
 
       return delegation;
     } catch (error) {
-      console.error(`❌ Bridge delegation failed: ${error.message}`);
-      console.error("   Falling back to direct EdDSA delegation...");
+      logger.error(`❌ Bridge delegation failed: ${error.message}`);
+      logger.error("   Falling back to direct EdDSA delegation...");
 
       // Fallback to the original EdDSA delegation method
       return await this.createStorachaDelegation(bobDID, storachaClient);
@@ -162,7 +163,7 @@ export class UCANService {
    * @returns {Object} - Delegation info with UCAN token for Bob's DID
    */
   async createStorachaDelegation(bobDID, storachaClient) {
-    console.log(`🎯 Creating Storacha UCAN delegation to Bob's DID: ${bobDID}`);
+    logger.info(`🎯 Creating Storacha UCAN delegation to Bob's DID: ${bobDID}`);
 
     if (!storachaClient) {
       throw new Error("Storacha client not available for delegation");
@@ -186,7 +187,7 @@ export class UCANService {
           `Storacha client agent did() returned invalid value: ${issuerDID}`,
         );
       }
-      console.log(`   ✅ Issuer validated: ${issuerDID}`);
+      logger.info(`   ✅ Issuer validated: ${issuerDID}`);
 
       // 🔍 DEFENSIVE VALIDATION: Parse Bob's DID
       let bobPrincipal;
@@ -211,10 +212,10 @@ export class UCANService {
         );
       }
 
-      console.log(
+      logger.info(
         `   🔑 Created principal reference for Bob's DID: ${audienceDID}`,
       );
-      console.log(
+      logger.info(
         `   🔐 Detected algorithm: ${bobPrincipal.signatureAlgorithm} (P-256 WebAuthn supported!)`,
       );
 
@@ -232,12 +233,13 @@ export class UCANService {
           }
         }
       } catch (spaceError) {
-        console.warn(
-          `   ⚠️ Could not get current space DID, using fallback: ${spaceError.message}`,
+        logger.warn(
+          { error: spaceError.message },
+          `   ⚠️ Could not get current space DID, using fallback:`
         );
       }
 
-      console.log(`   🏠 Using space DID: ${spaceDID}`);
+      logger.info(`   🏠 Using space DID: ${spaceDID}`);
 
       // 🔍 DEFENSIVE VALIDATION: Build capabilities with no undefined values
       const capabilityNames = [
@@ -260,7 +262,7 @@ export class UCANService {
         return cap;
       });
 
-      console.log(
+      logger.info(
         `   📋 Built ${capabilities.length} capabilities (no undefined values)`,
       );
 
@@ -270,18 +272,18 @@ export class UCANService {
         throw new Error(`Invalid expiration value: ${expiration}`);
       }
 
-      console.log(`   📋 Delegating capabilities to Bob's existing DID`);
-      console.log(
+      logger.info(`   📋 Delegating capabilities to Bob's existing DID`);
+      logger.info(
         `   ⏰ Valid until: ${new Date(expiration * 1000).toISOString()}`,
       );
 
       // 🔍 FINAL VALIDATION: Log all parameters before delegation
-      console.log(`   🔍 Final validation before delegate():`);
-      console.log(`     - Issuer DID: ${issuerDID}`);
-      console.log(`     - Audience DID: ${audienceDID}`);
-      console.log(`     - Capabilities count: ${capabilities.length}`);
-      console.log(`     - Space DID: ${spaceDID}`);
-      console.log(`     - Expiration: ${expiration}`);
+      logger.info(`   🔍 Final validation before delegate():`);
+      logger.info(`     - Issuer DID: ${issuerDID}`);
+      logger.info(`     - Audience DID: ${audienceDID}`);
+      logger.info(`     - Capabilities count: ${capabilities.length}`);
+      logger.info(`     - Space DID: ${spaceDID}`);
+      logger.info(`     - Expiration: ${expiration}`);
 
       // Validate capabilities array one more time
       const capString = JSON.stringify(capabilities);
@@ -302,27 +304,27 @@ export class UCANService {
       };
 
       // Check for any undefined values in the delegate parameters
-      console.log("🔍 Final parameter validation for delegate():");
-      console.log("   - issuer type:", typeof delegateParams.issuer);
-      console.log("   - issuer.did():", delegateParams.issuer.did?.());
-      console.log("   - audience type:", typeof delegateParams.audience);
-      console.log("   - audience.did():", delegateParams.audience.did?.());
-      console.log(
+      logger.info("🔍 Final parameter validation for delegate():");
+      logger.info("   - issuer type:", typeof delegateParams.issuer);
+      logger.info("   - issuer.did():", delegateParams.issuer.did?.());
+      logger.info("   - audience type:", typeof delegateParams.audience);
+      logger.info("   - audience.did():", delegateParams.audience.did?.());
+      logger.info(
         "   - capabilities:",
         delegateParams.capabilities.length,
         "items",
       );
-      console.log("   - expiration type:", typeof delegateParams.expiration);
-      console.log("   - expiration value:", delegateParams.expiration);
-      console.log("   - proofs:", delegateParams.proofs);
-      console.log("   - facts:", delegateParams.facts);
+      logger.info("   - expiration type:", typeof delegateParams.expiration);
+      logger.info("   - expiration value:", delegateParams.expiration);
+      logger.info("   - proofs:", delegateParams.proofs);
+      logger.info("   - facts:", delegateParams.facts);
 
       // 🧹 SANITIZE AGENT: Remove any undefined properties that could cause IPLD encoding errors
-      console.log(
+      logger.info(
         "   🧹 Sanitizing Storacha agent to remove undefined properties...",
       );
       const sanitizedIssuer = sanitizeAgent(storachaClient.agent);
-      console.log("   ✅ Agent sanitized successfully");
+      logger.info("   ✅ Agent sanitized successfully");
 
       // 🎯 ESSENTIAL ONLY: Pass only the required parameters to delegate()
       const essentialDelegateParams = {
@@ -332,36 +334,36 @@ export class UCANService {
         expiration, // Use original reference
       };
 
-      console.log(
+      logger.info(
         "   🎯 Using essential parameters only - no undefined properties",
       );
 
       // 🚀 SKIP JSON VALIDATION: We know the core parameters are valid
       // The maxDigestLength undefined is deep in crypto objects and won't affect UCAN creation
-      console.log(
+      logger.info(
         "   🚀 Skipping JSON validation - core parameters validated individually",
       );
-      console.log("   ✅ Ready to call delegate() with essential parameters");
+      logger.info("   ✅ Ready to call delegate() with essential parameters");
 
       // Log what we're actually passing
-      console.log("   🔍 Final delegate() parameters:");
-      console.log("     - issuer.did():", essentialDelegateParams.issuer.did());
-      console.log(
+      logger.info("   🔍 Final delegate() parameters:");
+      logger.info("     - issuer.did():", essentialDelegateParams.issuer.did());
+      logger.info(
         "     - issuer.signatureAlgorithm:",
         essentialDelegateParams.issuer.signatureAlgorithm,
       );
-      console.log(
+      logger.info(
         "     - audience.did():",
         essentialDelegateParams.audience.did(),
       );
-      console.log(
+      logger.info(
         "     - capabilities count:",
         essentialDelegateParams.capabilities.length,
       );
-      console.log("     - expiration:", essentialDelegateParams.expiration);
+      logger.info("     - expiration:", essentialDelegateParams.expiration);
 
       // Create delegation using lower-level UCAN API to Bob's existing DID (with essential parameters)
-      console.log("   🏁 Calling delegate() with essential parameters only...");
+      logger.info("   🏁 Calling delegate() with essential parameters only...");
       const delegation = await delegate(essentialDelegateParams);
 
       // Archive the delegation
@@ -373,8 +375,8 @@ export class UCANService {
       // Create base64 token that Bob can use with his existing DID/keys
       const delegationToken = Buffer.from(archive.ok).toString("base64");
 
-      console.log(`   ✅ UCAN delegation created to Bob's existing DID`);
-      console.log(`   📝 Token length: ${delegationToken.length} characters`);
+      logger.info(`   ✅ UCAN delegation created to Bob's existing DID`);
+      logger.info(`   📝 Token length: ${delegationToken.length} characters`);
 
       const delegationInfo = {
         delegationToken,
@@ -392,10 +394,10 @@ export class UCANService {
 
       return delegationInfo;
     } catch (error) {
-      console.error(
+      logger.error(
         `❌ Failed to create Storacha delegation: ${error.message}`,
       );
-      console.error("   Falling back to Storacha client delegation...");
+      logger.error("   Falling back to Storacha client delegation...");
 
       // Fallback: Use Storacha's high-level API (this will create a new principal)
       // But store the mapping to Bob's OrbitDB DID in the access controller
@@ -419,7 +421,7 @@ export class UCANService {
         const archive = await delegation.archive();
         const delegationToken = Buffer.from(archive.ok).toString("base64");
 
-        console.log(
+        logger.info(
           `   ✅ Fallback delegation created (mapped to Bob's DID: ${bobDID})`,
         );
 
@@ -446,7 +448,7 @@ export class UCANService {
 
         return fallbackDelegation;
       } catch (fallbackError) {
-        console.error(
+        logger.error(
           `❌ Fallback delegation also failed: ${fallbackError.message}`,
         );
         throw fallbackError;
@@ -500,7 +502,7 @@ export class UCANService {
     this.delegations.delete(bobDID);
 
     if (existed) {
-      console.log(`🚫 Revoked delegation for ${bobDID}`);
+      logger.info(`🚫 Revoked delegation for ${bobDID}`);
     }
 
     return existed;
@@ -512,7 +514,7 @@ export class UCANService {
   clearAllDelegations() {
     const count = this.delegations.size;
     this.delegations.clear();
-    console.log(`🗑️ Cleared ${count} delegations`);
+    logger.info(`🗑️ Cleared ${count} delegations`);
   }
 
   /**

@@ -26,6 +26,7 @@ import { createHelia } from 'helia'
 import { createOrbitDB } from '@orbitdb/core'
 import { LevelBlockstore } from 'blockstore-level'
 import { LevelDatastore } from 'datastore-level'
+import { logger } from '../lib/logger.js'
 
 /**
  * Check if Storacha service is available
@@ -40,7 +41,7 @@ async function isStorachaAvailable() {
     })
     return response.status < 500 // Accept any status except 5xx server errors
   } catch (error) {
-    console.warn(`🔌 Storacha connectivity check failed: ${error.message}`)
+    logger.warn({ error: error.message }, `🔌 Storacha connectivity check failed: ${error.message}`)
     return false
   }
 }
@@ -85,7 +86,7 @@ describe('OrbitDB Storacha Bridge - Access Control Integration', () => {
     // Check if Storacha is available before running tests
     storachaAvailable = await isStorachaAvailable()
     if (!storachaAvailable) {
-      console.warn('⚠️ Storacha service appears to be unavailable. Tests will be skipped or modified.')
+      logger.warn('⚠️ Storacha service appears to be unavailable. Tests will be skipped or modified.')
     }
   })
 
@@ -102,7 +103,7 @@ describe('OrbitDB Storacha Bridge - Access Control Integration', () => {
           storachaProof: process.env.STORACHA_PROOF
         })
       } catch (error) {
-        console.warn('Space clearing failed:', error.message)
+        logger.warn({ error: error.message }, 'Space clearing failed')
       }
     }
   })
@@ -117,7 +118,7 @@ describe('OrbitDB Storacha Bridge - Access Control Integration', () => {
         await node.blockstore.close()
         await node.datastore.close()
       } catch (error) {
-        console.warn('Cleanup warning:', error.message)
+        logger.warn({ error: error.message }, 'Cleanup warning')
       }
     }
     aliceNode = null
@@ -136,12 +137,12 @@ describe('OrbitDB Storacha Bridge - Access Control Integration', () => {
    */
   test('Different identities with access control enforcement', async () => {
     if (!process.env.STORACHA_KEY || !process.env.STORACHA_PROOF) {
-      console.log('⏭️ Skipping test: Missing Storacha credentials')
+      logger.info('⏭️ Skipping test: Missing Storacha credentials')
       return
     }
     
     if (!storachaAvailable) {
-      console.log('⏭️ Skipping test: Storacha service appears to be unavailable')
+      logger.info('⏭️ Skipping test: Storacha service appears to be unavailable')
       return
     }
 
@@ -179,7 +180,7 @@ describe('OrbitDB Storacha Bridge - Access Control Integration', () => {
       // Handle network failures gracefully
       if (!backupResult.success) {
         if (backupResult.error && backupResult.error.includes('fetch failed')) {
-          console.warn('⚠️ Network connectivity issue detected, skipping test')
+          logger.warn('⚠️ Network connectivity issue detected, skipping test')
           return
         }
         // Re-throw if it's not a network issue
@@ -248,13 +249,13 @@ describe('OrbitDB Storacha Bridge - Access Control Integration', () => {
       const entriesAfterWriteAttempt = await restoreResult.database.all()
       expect(entriesAfterWriteAttempt).toHaveLength(aliceEntries.length)
       
-      console.log('✅ Access control test results:')
-      console.log(`   👩 Alice's identity: ${aliceIdentityId}`)
-      console.log(`   👨 Bob's identity: ${bobIdentityId}`)
-      console.log(`   📊 Identities different: ${aliceIdentityId !== bobIdentityId}`)
-      console.log(`   📖 Bob can read: ${restoreResult.entries.length} entries`)
-      console.log(`   🔒 Bob write blocked: ${writeAttemptFailed}`)
-      console.log(`   📝 Error message: ${writeErrorMessage}`)
+      logger.info('✅ Access control test results:')
+      logger.info({ aliceIdentityId }, `   👩 Alice's identity: ${aliceIdentityId}`)
+      logger.info({ bobIdentityId }, `   👨 Bob's identity: ${bobIdentityId}`)
+      logger.info({ different: aliceIdentityId !== bobIdentityId }, `   📊 Identities different: ${aliceIdentityId !== bobIdentityId}`)
+      logger.info({ entriesCount: restoreResult.entries.length }, `   📖 Bob can read: ${restoreResult.entries.length} entries`)
+      logger.info({ writeAttemptFailed }, `   🔒 Bob write blocked: ${writeAttemptFailed}`)
+      logger.info({ writeErrorMessage }, `   📝 Error message: ${writeErrorMessage}`)
       
       // Close Bob's database
       await restoreResult.database.close()
@@ -279,12 +280,12 @@ describe('OrbitDB Storacha Bridge - Access Control Integration', () => {
    */
   test('Identity block preservation in backup and restore', async () => {
     if (!process.env.STORACHA_KEY || !process.env.STORACHA_PROOF) {
-      console.log('⏭️ Skipping test: Missing Storacha credentials')
+      logger.info('⏭️ Skipping test: Missing Storacha credentials')
       return
     }
     
     if (!storachaAvailable) {
-      console.log('⏭️ Skipping test: Storacha service appears to be unavailable')
+      logger.info('⏭️ Skipping test: Storacha service appears to be unavailable')
       return
     }
 
@@ -308,7 +309,7 @@ describe('OrbitDB Storacha Bridge - Access Control Integration', () => {
       // Handle network failures gracefully
       if (!backupResult.success) {
         if (backupResult.error && backupResult.error.includes('fetch failed')) {
-          console.warn('⚠️ Network connectivity issue detected, skipping test')
+          logger.warn('⚠️ Network connectivity issue detected, skipping test')
           return
         }
         // Re-throw if it's not a network issue
@@ -320,7 +321,7 @@ describe('OrbitDB Storacha Bridge - Access Control Integration', () => {
       // Verify that identity blocks are included in backup
       if (backupResult.blockSummary) {
         // Should have identity blocks if they were properly extracted
-        console.log('Block summary:', backupResult.blockSummary)
+        logger.info({ blockSummary: backupResult.blockSummary }, 'Block summary')
       }
       
       // Clean up source
@@ -345,7 +346,7 @@ describe('OrbitDB Storacha Bridge - Access Control Integration', () => {
       // Verify identity information is preserved
       if (restoreResult.analysis && restoreResult.analysis.identityBlocks) {
         expect(restoreResult.analysis.identityBlocks.length).toBeGreaterThan(0)
-        console.log(`✅ Identity blocks preserved: ${restoreResult.analysis.identityBlocks.length} blocks`)
+        logger.info({ count: restoreResult.analysis.identityBlocks.length }, `✅ Identity blocks preserved: ${restoreResult.analysis.identityBlocks.length} blocks`)
       }
       
       // Verify log entries contain original identity information
@@ -354,7 +355,7 @@ describe('OrbitDB Storacha Bridge - Access Control Integration', () => {
         const firstEntry = logEntries[0] 
         expect(firstEntry.identity).toBeTruthy()
         expect(typeof firstEntry.identity).toBe('string')
-        console.log(`✅ Log entry identity preserved: ${firstEntry.identity}`)
+        logger.info({ identity: firstEntry.identity }, `✅ Log entry identity preserved: ${firstEntry.identity}`)
       }
       
       await restoreResult.database.close()

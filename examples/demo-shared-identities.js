@@ -31,6 +31,7 @@ import { createHelia } from 'helia'
 import { createOrbitDB, Identities, IPFSAccessController } from '@orbitdb/core'
 import { LevelBlockstore } from 'blockstore-level'
 import { LevelDatastore } from 'datastore-level'
+import { logger } from '../lib/logger.js'
 
 /**
  * Create shared identities directory and identities
@@ -41,11 +42,11 @@ async function createSharedIdentities() {
   
   // Create Alice's identity
   const aliceIdentity = await identities.createIdentity({ id: 'alice' })
-  console.log(`   👩 Created Alice's identity: ${aliceIdentity.id}`)
+  logger.info({ aliceIdentity: aliceIdentity.id }, `   👩 Created Alice's identity: ${aliceIdentity.id}`)
   
   // Create Bob's identity
   const bobIdentity = await identities.createIdentity({ id: 'bob' })
-  console.log(`   👨 Created Bob's identity: ${bobIdentity.id}`)
+  logger.info({ bobIdentity: bobIdentity.id }, `   👨 Created Bob's identity: ${bobIdentity.id}`)
   
   return { identities, aliceIdentity, bobIdentity, sharedIdentitiesPath }
 }
@@ -88,30 +89,30 @@ async function createHeliaOrbitDBWithIdentity(suffix = '', identity, identities)
  * Test OrbitDB with shared identities
  */
 async function testSharedIdentities() {
-  console.log('🚀 Testing OrbitDB Storacha Bridge - Shared Identities Edition')
-  console.log('=' .repeat(60))
+  logger.info('🚀 Testing OrbitDB Storacha Bridge - Shared Identities Edition')
+  logger.info('=' .repeat(60))
   
   let aliceNode, bobNode, sharedIdentities
   
   try {
     // Step 1: Create both identities upfront
-    console.log('\n🔑 Step 1: Creating shared identities...')
+    logger.info('\n🔑 Step 1: Creating shared identities...')
     sharedIdentities = await createSharedIdentities()
     const { identities, aliceIdentity, bobIdentity, sharedIdentitiesPath } = sharedIdentities
     
-    console.log(`\n   ✅ Both identities created in shared store: ${sharedIdentitiesPath}`)
-    console.log(`   👩 Alice: ${aliceIdentity.id}`)
-    console.log(`   👨 Bob: ${bobIdentity.id}`)
+    logger.info({ sharedIdentitiesPath }, `\n   ✅ Both identities created in shared store: ${sharedIdentitiesPath}`)
+    logger.info({ aliceIdentity: aliceIdentity.id }, `   👩 Alice: ${aliceIdentity.id}`)
+    logger.info({ bobIdentity: bobIdentity.id }, `   👨 Bob: ${bobIdentity.id}`)
     
     // Step 2: Create Alice's node with her identity
-    console.log('\n👩 Step 2: Creating Alice\'s node with her identity...')
+    logger.info('\n👩 Step 2: Creating Alice\'s node with her identity...')
     aliceNode = await createHeliaOrbitDBWithIdentity('-alice', aliceIdentity, identities)
-    console.log(`   ✅ Alice's OrbitDB created`)
-    console.log(`   📋 Alice's OrbitDB identity: ${aliceNode.orbitdb.identity.id}`)
+    logger.info('   ✅ Alice\'s OrbitDB created')
+    logger.info({ aliceOrbitdbIdentity: aliceNode.orbitdb.identity.id }, `   📋 Alice's OrbitDB identity: ${aliceNode.orbitdb.identity.id}`)
     
     // Step 3: Create database with BOTH Alice and Bob in write access
-    console.log('\n📊 Step 3: Creating database with write access for BOTH...')
-    console.log('   🔒 Access control: Both Alice AND Bob can write')
+    logger.info('\n📊 Step 3: Creating database with write access for BOTH...')
+    logger.info('   🔒 Access control: Both Alice AND Bob can write')
     
     const sourceDB = await aliceNode.orbitdb.open('bridge-demo', { 
       type: 'events',
@@ -123,12 +124,12 @@ async function testSharedIdentities() {
       })
     })
     
-    console.log(`   ✅ Database created: ${sourceDB.address}`)
-    console.log(`   🔐 Access controller: ${sourceDB.access.address}`)
-    console.log(`   📝 Write access list: [Alice, Bob]`)
+    logger.info({ databaseAddress: sourceDB.address }, `   ✅ Database created: ${sourceDB.address}`)
+    logger.info({ accessController: sourceDB.access.address }, `   🔐 Access controller: ${sourceDB.access.address}`)
+    logger.info('   📝 Write access list: [Alice, Bob]')
     
     // Step 4: Alice adds sample data
-    console.log('\n📝 Step 4: Alice adding data...')
+    logger.info('\n📝 Step 4: Alice adding data...')
     const sampleData = [
       'Hello from Alice!',
       'Alice\'s data - Bob should be able to read this',
@@ -138,17 +139,17 @@ async function testSharedIdentities() {
     
     for (const content of sampleData) {
       const hash = await sourceDB.add(content)
-      console.log(`   ✍️  Alice added: ${hash.substring(0, 16)}... - "${content}"`)
+      logger.info({ hash: hash.substring(0, 16), content }, `   ✍️  Alice added: ${hash.substring(0, 16)}... - "${content}"`)
     }
     
-    console.log(`\n📊 Alice's database summary:`)
-    console.log(`   Name: ${sourceDB.name}`)
-    console.log(`   Address: ${sourceDB.address}`)
-    console.log(`   Entries: ${(await sourceDB.all()).length}`)
-    console.log(`   Owner: ${aliceNode.orbitdb.identity.id}`)
+    logger.info('\n📊 Alice\'s database summary:')
+    logger.info({ name: sourceDB.name }, `   Name: ${sourceDB.name}`)
+    logger.info({ address: sourceDB.address }, `   Address: ${sourceDB.address}`)
+    logger.info({ entryCount: (await sourceDB.all()).length }, `   Entries: ${(await sourceDB.all()).length}`)
+    logger.info({ owner: aliceNode.orbitdb.identity.id }, `   Owner: ${aliceNode.orbitdb.identity.id}`)
     
     // Step 5: Backup database to Storacha
-    console.log('\n📤 Step 5: Backing up Alice\'s database to Storacha...')
+    logger.info('\n📤 Step 5: Backing up Alice\'s database to Storacha...')
     
     const backupResult = await backupDatabase(aliceNode.orbitdb, sourceDB.address, {
       storachaKey: process.env.STORACHA_KEY,
@@ -159,9 +160,9 @@ async function testSharedIdentities() {
       throw new Error(`Backup failed: ${backupResult.error}`)
     }
     
-    console.log(`✅ Backup completed successfully!`)
-    console.log(`   📋 Manifest CID: ${backupResult.manifestCID}`)
-    console.log(`   📊 Blocks uploaded: ${backupResult.blocksUploaded}/${backupResult.blocksTotal}`)
+    logger.info('✅ Backup completed successfully!')
+    logger.info({ manifestCID: backupResult.manifestCID }, `   📋 Manifest CID: ${backupResult.manifestCID}`)
+    logger.info({ uploaded: backupResult.blocksUploaded, total: backupResult.blocksTotal }, `   📊 Blocks uploaded: ${backupResult.blocksUploaded}/${backupResult.blocksTotal}`)
     
     // Close Alice's database and node
     await sourceDB.close()
@@ -170,24 +171,24 @@ async function testSharedIdentities() {
     await aliceNode.blockstore.close()
     await aliceNode.datastore.close()
     
-    console.log('\n🧹 Alice\'s node closed')
+    logger.info('\n🧹 Alice\'s node closed')
     
     // Step 6: Create Bob's node with his identity (using same identities store)
-    console.log('\n👨 Step 6: Creating Bob\'s node with his identity...')
+    logger.info('\n👨 Step 6: Creating Bob\'s node with his identity...')
     bobNode = await createHeliaOrbitDBWithIdentity('-bob', bobIdentity, identities)
-    console.log(`   ✅ Bob's OrbitDB created`)
-    console.log(`   📋 Bob's OrbitDB identity: ${bobNode.orbitdb.identity.id}`)
+    logger.info('   ✅ Bob\'s OrbitDB created')
+    logger.info({ bobOrbitdbIdentity: bobNode.orbitdb.identity.id }, `   📋 Bob's OrbitDB identity: ${bobNode.orbitdb.identity.id}`)
     
     // Verify identities are different
-    console.log('\n🔍 Step 7: Verifying identities...')
-    console.log(`   👩 Alice's identity: ${aliceIdentity.id}`)
-    console.log(`   👨 Bob's identity: ${bobIdentity.id}`)
-    console.log(`   📊 Identities are different: ${aliceIdentity.id !== bobIdentity.id ? '✅ Yes' : '❌ No'}`)
-    console.log(`   🔑 Both identities in shared store: ✅ Yes`)
-    console.log(`   🔐 Bob's identity in write list: ✅ Yes`)
+    logger.info('\n🔍 Step 7: Verifying identities...')
+    logger.info({ aliceIdentity: aliceIdentity.id }, `   👩 Alice's identity: ${aliceIdentity.id}`)
+    logger.info({ bobIdentity: bobIdentity.id }, `   👨 Bob's identity: ${bobIdentity.id}`)
+    logger.info({ different: aliceIdentity.id !== bobIdentity.id }, `   📊 Identities are different: ${aliceIdentity.id !== bobIdentity.id ? '✅ Yes' : '❌ No'}`)
+    logger.info('   🔑 Both identities in shared store: ✅ Yes')
+    logger.info('   🔐 Bob\'s identity in write list: ✅ Yes')
     
     // Step 8: Restore database from Storacha
-    console.log('\n📥 Step 8: Bob restoring database from Storacha...')
+    logger.info('\n📥 Step 8: Bob restoring database from Storacha...')
     
     const restoreResult = await restoreDatabaseFromSpace(bobNode.orbitdb, {
       storachaKey: process.env.STORACHA_KEY,
@@ -198,78 +199,78 @@ async function testSharedIdentities() {
       throw new Error(`Restore failed: ${restoreResult.error}`)
     }
     
-    console.log(`✅ Restore completed successfully!`)
-    console.log(`   📋 Restored database: ${restoreResult.name}`)
-    console.log(`   📍 Address: ${restoreResult.address}`)
-    console.log(`   📊 Entries recovered: ${restoreResult.entriesRecovered}`)
-    console.log(`   🔄 Blocks restored: ${restoreResult.blocksRestored}`)
+    logger.info('✅ Restore completed successfully!')
+    logger.info({ name: restoreResult.name }, `   📋 Restored database: ${restoreResult.name}`)
+    logger.info({ address: restoreResult.address }, `   📍 Address: ${restoreResult.address}`)
+    logger.info({ entriesRecovered: restoreResult.entriesRecovered }, `   📊 Entries recovered: ${restoreResult.entriesRecovered}`)
+    logger.info({ blocksRestored: restoreResult.blocksRestored }, `   🔄 Blocks restored: ${restoreResult.blocksRestored}`)
     
     // Step 9: Verify identity block restoration
-    console.log('\n🔐 Step 9: Verifying identity block restoration...')
+    logger.info('\n🔐 Step 9: Verifying identity block restoration...')
     
     if (restoreResult.analysis && restoreResult.analysis.identityBlocks) {
-      console.log(`   ✅ Identity blocks restored: ${restoreResult.analysis.identityBlocks.length}`)
+      logger.info({ count: restoreResult.analysis.identityBlocks.length }, `   ✅ Identity blocks restored: ${restoreResult.analysis.identityBlocks.length}`)
       
       if (restoreResult.analysis.identityBlocks.length > 0) {
-        console.log('   📋 Identity preservation verified!')
+        logger.info('   📋 Identity preservation verified!')
         restoreResult.analysis.identityBlocks.forEach((block, i) => {
-          console.log(`      ${i + 1}. ${block.cid} (Identity block)`)
+          logger.info({ index: i + 1, cid: block.cid }, `      ${i + 1}. ${block.cid} (Identity block)`)
         })
-        console.log('   🎯 This ensures Alice\'s identity is preserved across nodes')
+        logger.info('   🎯 This ensures Alice\'s identity is preserved across nodes')
       } else {
-        console.log('   ⚠️  No identity blocks found - this could affect cross-node access')
-        console.log('   📚 Without identity blocks, Bob may not be able to verify Alice\'s identity')
+        logger.warn('   ⚠️  No identity blocks found - this could affect cross-node access')
+        logger.info('   📚 Without identity blocks, Bob may not be able to verify Alice\'s identity')
       }
     } else {
-      console.log('   ❌ No analysis data available for identity verification')
-      console.log('   📊 This suggests the restore process may not have captured identity metadata')
+      logger.warn('   ❌ No analysis data available for identity verification')
+      logger.info('   📊 This suggests the restore process may not have captured identity metadata')
     }
     
     // Also check access controller blocks
     if (restoreResult.analysis && restoreResult.analysis.accessControllerBlocks) {
-      console.log(`   🔒 Access controller blocks: ${restoreResult.analysis.accessControllerBlocks.length}`)
+      logger.info({ count: restoreResult.analysis.accessControllerBlocks.length }, `   🔒 Access controller blocks: ${restoreResult.analysis.accessControllerBlocks.length}`)
       if (restoreResult.analysis.accessControllerBlocks.length > 0) {
-        console.log('   ✅ Access control configuration preserved!')
+        logger.info('   ✅ Access control configuration preserved!')
       }
     }
     
     // Step 10: Check if Bob can see the entries
-    console.log('\n📄 Step 10: Bob viewing restored entries...')
+    logger.info('\n📄 Step 10: Bob viewing restored entries...')
     
     if (restoreResult.entries.length === 0) {
-      console.log('   ⚠️ Bob sees 0 entries')
-      console.log('   🤔 Even though Bob is in the write list!')
-      console.log('   📊 This reveals the actual reason for the issue...')
+      logger.info('   ⚠️ Bob sees 0 entries')
+      logger.info('   🤔 Even though Bob is in the write list!')
+      logger.info('   📊 This reveals the actual reason for the issue...')
       
       // Check the raw log
       const logEntries = await restoreResult.database.log.values()
-      console.log(`   📝 Raw log entries: ${logEntries.length}`)
+      logger.info({ logEntriesCount: logEntries.length }, `   📝 Raw log entries: ${logEntries.length}`)
       
       if (logEntries.length > 0) {
-        console.log('   ✅ Entries exist in log!')
-        console.log('   🔍 First entry author:', logEntries[0].identity)
-        console.log('   📚 Issue is likely in database.all() layer, not access control')
+        logger.info('   ✅ Entries exist in log!')
+        logger.info({ firstEntryAuthor: logEntries[0].identity }, '   🔍 First entry author')
+        logger.info('   📚 Issue is likely in database.all() layer, not access control')
       }
     } else {
-      console.log(`   ✅ Bob sees ${restoreResult.entries.length} entries!`)
+      logger.info({ entriesCount: restoreResult.entries.length }, `   ✅ Bob sees ${restoreResult.entries.length} entries!`)
       for (let i = 0; i < restoreResult.entries.length; i++) {
         const entry = restoreResult.entries[i]
-        console.log(`   ${i + 1}. 👁️  Bob reads: "${entry.value}"`)
+        logger.info({ index: i + 1, value: entry.value }, `   ${i + 1}. 👁️  Bob reads: "${entry.value}"`)
       }
     }
     
     // Step 11: Test if Bob can write
-    console.log('\n✍️  Step 11: Testing if Bob can write...')
+    logger.info('\n✍️  Step 11: Testing if Bob can write...')
     
     try {
       const bobEntry = await restoreResult.database.add('Message from Bob')
-      console.log(`   ✅ Bob successfully wrote an entry!`)
-      console.log(`   📝 Bob's entry hash: ${bobEntry.substring(0, 16)}...`)
+      logger.info('   ✅ Bob successfully wrote an entry!')
+      logger.info({ entryHash: bobEntry.substring(0, 16 }, `   📝 Bob's entry hash: ${bobEntry.substring(0, 16)}...`)
       
       const allEntriesNow = await restoreResult.database.all()
-      console.log(`   📊 Total entries now: ${allEntriesNow.length}`)
+      logger.info({ totalEntries: allEntriesNow.length }, `   📊 Total entries now: ${allEntriesNow.length}`)
     } catch (error) {
-      console.log(`   ❌ Bob could not write: ${error.message}`)
+      logger.warn({ error: error.message }, `   ❌ Bob could not write: ${error.message}`)
     }
     
     // Close Bob's database
@@ -279,21 +280,21 @@ async function testSharedIdentities() {
     const originalCount = sampleData.length
     const restoredCount = restoreResult.entriesRecovered
     
-    console.log('\n🎉 Test Completed!')
-    console.log('=' .repeat(60))
-    console.log(`   👩 Alice's identity: ${aliceIdentity.id}`)
-    console.log(`   👨 Bob's identity: ${bobIdentity.id}`)
-    console.log(`   📊 Identities different: ✅ Yes`)
-    console.log(`   🔑 Identities shared: ✅ Yes`)
-    console.log(`   📊 Alice's entries: ${originalCount}`)
-    console.log(`   📊 Bob can see: ${restoredCount}`)
-    console.log(`   📍 Address preserved: ${restoreResult.addressMatch}`)
-    console.log(`   🔒 Both in write list: ✅ Yes`)
-    console.log('\n   ✨ Key findings:')
-    console.log('      • Alice and Bob have different identities')
-    console.log('      • Both identities stored in shared keystore')
-    console.log('      • Both identities in write access list')
-    console.log('      • This tests if shared identities solve the issue')
+    logger.info('\n🎉 Test Completed!')
+    logger.info('=' .repeat(60))
+    logger.info({ aliceIdentity: aliceIdentity.id }, `   👩 Alice's identity: ${aliceIdentity.id}`)
+    logger.info({ bobIdentity: bobIdentity.id }, `   👨 Bob's identity: ${bobIdentity.id}`)
+    logger.info('   📊 Identities different: ✅ Yes')
+    logger.info('   🔑 Identities shared: ✅ Yes')
+    logger.info({ originalCount }, `   📊 Alice's entries: ${originalCount}`)
+    logger.info({ restoredCount }, `   📊 Bob can see: ${restoredCount}`)
+    logger.info({ addressMatch: restoreResult.addressMatch }, `   📍 Address preserved: ${restoreResult.addressMatch}`)
+    logger.info('   🔒 Both in write list: ✅ Yes')
+    logger.info('\n   ✨ Key findings:')
+    logger.info('      • Alice and Bob have different identities')
+    logger.info('      • Both identities stored in shared keystore')
+    logger.info('      • Both identities in write access list')
+    logger.info('      • This tests if shared identities solve the issue')
     
     // Close identities keystore
     await identities.keystore.close()
@@ -310,15 +311,14 @@ async function testSharedIdentities() {
     }
     
   } catch (error) {
-    console.error('\n💥 Test failed:', error.message)
-    console.error(error.stack)
+    logger.error({ error: error.message, stack: error.stack }, '\n💥 Test failed')
     return {
       success: false,
       error: error.message
     }
   } finally {
     // Cleanup
-    console.log('\n🧹 Cleaning up...')
+    logger.info('\n🧹 Cleaning up...')
     
     if (bobNode) {
       try {
@@ -326,9 +326,9 @@ async function testSharedIdentities() {
         await bobNode.helia.stop()
         await bobNode.blockstore.close()
         await bobNode.datastore.close()
-        console.log('   ✅ Bob\'s node cleaned up')
+        logger.info('   ✅ Bob\'s node cleaned up')
       } catch (error) {
-        console.warn(`   ⚠️ Bob cleanup warning: ${error.message}`)
+        logger.warn({ error: error.message }, `   ⚠️ Bob cleanup warning: ${error.message}`)
       }
     }
     
@@ -341,14 +341,14 @@ async function testSharedIdentities() {
           await aliceNode.blockstore.close()
           await aliceNode.datastore.close()
         }
-        console.log('   ✅ Alice\'s node cleaned up')
+        logger.info('   ✅ Alice\'s node cleaned up')
       } catch (error) {
-        console.warn(`   ⚠️ Alice cleanup warning: ${error.message}`)
+        logger.warn({ error: error.message }, `   ⚠️ Alice cleanup warning: ${error.message}`)
       }
     }
     
     // Clean up OrbitDB directories
-    console.log('\n🧹 Final cleanup - removing OrbitDB directories...')
+    logger.info('\n🧹 Final cleanup - removing OrbitDB directories...')
     await cleanupOrbitDBDirectories()
   }
 }
@@ -358,16 +358,15 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   testSharedIdentities()
     .then((result) => {
       if (result?.success) {
-        console.log('\n🎉 Demo completed successfully!')
+        logger.info('\n🎉 Demo completed successfully!')
         process.exit(0)
       } else {
-        console.error('\n❌ Demo failed!')
+        logger.error('\n❌ Demo failed!')
         process.exit(1)
       }
     })
     .catch((error) => {
-      console.error('\n💥 Demo crashed:', error.message)
-      console.error(error.stack)
+      logger.error({ error: error.message, stack: error.stack }, '\n💥 Demo crashed')
       process.exit(1)
     })
 }
