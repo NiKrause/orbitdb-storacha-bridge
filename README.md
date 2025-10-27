@@ -208,8 +208,6 @@ setLogLevel('debug');
 disableLogging(); // Silence all logs
 ```
 
-📖 **See [docs/LOGGING_QUICKSTART.md](docs/LOGGING_QUICKSTART.md)** for quick reference or **[docs/LOGGING.md](docs/LOGGING.md)** for complete documentation.
-
 ## Testing
 
 Ensure you have Storacha credentials in your `.env` file.
@@ -217,7 +215,7 @@ Use npm test commands to run various test suites including integration tests and
 
 ### CAR Storage Tests
 
-The `car-storage.test.js` suite provides comprehensive validation of the CAR (Content Addressable Archive) storage layer that enables persistent file-based storage for OrbitDB databases. The **Full OrbitDB Integration with Persistence** test demonstrates complete database lifecycle management: creating an OrbitDB instance with CAR storage, adding todo entries, persisting to CAR files, closing the database, reopening with a new OrbitDB instance, and verifying all data is perfectly recovered. This test validates that CAR storage can serve as a reliable persistence layer for OrbitDB's entry, heads, and index storage, ensuring data survives across application restarts.
+The `car-storage.test.js` suite provides validation of the CAR (Content Addressable Archive) storage layer that enables persistent file-based storage for OrbitDB databases. The **Full OrbitDB Integration with Persistence** test demonstrates database lifecycle management: creating an OrbitDB instance with CAR storage, adding todo entries, persisting to CAR files, closing the database, reopening with a new OrbitDB instance, and verifying all data is perfectly recovered. This test validates that CAR storage can serve as a reliable persistence layer for OrbitDB's entry, heads, and index storage, ensuring data survives across application restarts.
 
 ## Contributing
 
