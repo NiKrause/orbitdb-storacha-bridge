@@ -37,7 +37,7 @@
     restoreLogEntriesOnly,
     clearStorachaSpace,
     OrbitDBStorachaBridge,
-  } from "./orbitdb-storacha-bridge";
+  } from "orbitdb-storacha-bridge";
   import { Identities, useIdentityProvider } from "@orbitdb/core";
   import OrbitDBIdentityProviderDID from "@orbitdb/identity-provider-did";
   import { Ed25519Provider } from "key-did-provider-ed25519";

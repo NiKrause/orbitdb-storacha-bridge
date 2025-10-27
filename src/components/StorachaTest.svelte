@@ -1212,10 +1212,19 @@ let showProgress = false;
               {#if uploadProgress.error}
                 <InlineNotification 
                   kind="error" 
-                  title="Upload Error" 
+                  title={uploadProgress.error.type === 'ucan' ? 'UCAN Authorization Error' : 'Upload Error'} 
                   subtitle={uploadProgress.error.message} 
                   style="margin-top:0.5rem;"
-                />
+                >
+                  {#if uploadProgress.error.type === 'ucan' && uploadProgress.error.details}
+                    <div style="margin-top:0.5rem;font-size:0.75rem;color:var(--cds-text-secondary);">
+                      <details>
+                        <summary>Technical Details</summary>
+                        <pre style="white-space:pre-wrap;margin-top:0.5rem;">{uploadProgress.error.details}</pre>
+                      </details>
+                    </div>
+                  {/if}
+                </InlineNotification>
               {/if}
             </div>
           {/if}

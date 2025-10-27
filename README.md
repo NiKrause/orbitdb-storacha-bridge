@@ -87,6 +87,32 @@ Install the package via npm.
 
 Get Storacha credentials from [storacha.network quickstart](https://docs.storacha.network/quickstart/), install w3 for the console, get storacha key and proof then set up your environment variables (.env) for STORACHA_KEY and STORACHA_PROOF.
 
+### Logging Configuration
+
+The library uses [pino](https://github.com/pinojs/pino) for structured logging. Configure logging before running or importing:
+
+```bash
+# Set log level (default: 'info')
+export LOG_LEVEL=debug  # Options: trace, debug, info, warn, error, fatal, silent
+
+# Enable pretty-printed logs (human-readable)
+export LOG_PRETTY=true
+```
+
+Or in your `.env` file:
+```env
+LOG_LEVEL=info
+LOG_PRETTY=true
+```
+
+**Programmatic control:**
+```js
+import { setLogLevel, disableLogging } from 'orbitdb-storacha-bridge/lib/logger.js'
+
+setLogLevel('debug')     // Set level
+disableLogging()         // Silence all logs
+```
+
 ## Demo
 
 ### NodeJS Demo Scripts (full backup with Manifest, Identity and AccessController and entries blocks)

@@ -29,7 +29,7 @@
     restoreLogEntriesOnly,
     clearStorachaSpace,
     OrbitDBStorachaBridge,
-  } from "./orbitdb-storacha-bridge";
+  } from "orbitdb-storacha-bridge";
   // Import the Identity Service, UCAN Service, OrbitDB Service, and required OrbitDB components
   import { identityService } from "./services/IdentityService.js";
   import { ucanService } from "./services/UCANService.js";
