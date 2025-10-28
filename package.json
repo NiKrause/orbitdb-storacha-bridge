@@ -10,6 +10,8 @@
       "types": "./lib/orbitdb-storacha-bridge.d.ts",
       "default": "./lib/orbitdb-storacha-bridge.js"
     },
+    "./car-storage": "./lib/car-storage.js",
+    "./storacha-storage": "./lib/storacha-storage.js",
     "./StorachaIntegration.svelte": "./dist/components/StorachaIntegration.svelte",
     "./StorachaTest.svelte": "./dist/components/StorachaTest.svelte",
     "./StorachaAuth.svelte": "./dist/components/StorachaAuth.svelte",
