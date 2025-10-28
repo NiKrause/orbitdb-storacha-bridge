@@ -1,5 +1,4 @@
 <script>
-  import StorachaTest from "$lib/StorachaTest.svelte";
   import StorachaTestWithWebAuthn from "$lib/StorachaTestWithWebAuthn.svelte"
   import { theme } from "$lib/theme.js";
   import {

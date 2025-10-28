@@ -1,6 +1,6 @@
 /**
  * Test Utilities for OrbitDB Storacha Bridge
- * 
+ *
  * Utility functions for testing, including cleanup and test data management
  */
 
@@ -180,7 +180,3 @@ export function generateReplicationTestTodos(createdBy = "alice") {
     },
   ];
 }
-
-
-
-

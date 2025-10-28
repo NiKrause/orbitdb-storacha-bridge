@@ -10,6 +10,7 @@
     Column,
   } from "carbon-components-svelte";
   import { identityService } from "../../lib/services/IdentityService.js";
+  import { logger } from "../../../../lib/logger.js";
 
   let testing = false;
   let testResults = [];
@@ -130,8 +131,8 @@
   }
 
   onMount(() => {
-    console.log("🧪 Identity Service Test Component mounted");
-    console.log('💡 Click "Run Tests" to test the extracted Identity Service');
+    logger.info("🧪 Identity Service Test Component mounted");
+    logger.info('💡 Click "Run Tests" to test the extracted Identity Service');
   });
 </script>
 

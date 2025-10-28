@@ -6,6 +6,7 @@
  */
 
 import { Identities, useIdentityProvider } from '@orbitdb/core';
+import { logger } from '../../lib/logger.js'
 
 /**
  * WebAuthn DID Provider Core Implementation
@@ -35,7 +36,7 @@ export class WebAuthnDIDProvider {
     try {
       return await window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
     } catch (error) {
-      console.warn('Failed to check platform authenticator availability:', error);
+      logger.warn('Failed to check platform authenticator availability:', error);
       return false;
     }
   }
@@ -92,7 +93,7 @@ export class WebAuthnDIDProvider {
         throw new Error('Failed to create WebAuthn credential');
       }
 
-      console.log('✅ WebAuthn credential created successfully, extracting public key...');
+      logger.info('✅ WebAuthn credential created successfully, extracting public key...');
       
       // Extract public key from credential with timeout
       const publicKey = await Promise.race([
@@ -110,7 +111,7 @@ export class WebAuthnDIDProvider {
       };
 
     } catch (error) {
-      console.error('WebAuthn credential creation failed:', error);
+      logger.error('WebAuthn credential creation failed:', error);
       
       // Provide user-friendly error messages
       if (error.name === 'NotAllowedError') {
@@ -131,12 +132,12 @@ export class WebAuthnDIDProvider {
    */
   static async extractPublicKey(credential) {
     try {
-      console.log('🔍 Starting public key extraction from WebAuthn credential...');
+      logger.info('🔍 Starting public key extraction from WebAuthn credential...');
       
       // Import CBOR decoder for parsing attestation object
-      console.log('📦 Importing cbor-web module...');
+      logger.info('📦 Importing cbor-web module...');
       const { decode } = await import('cbor-web');
-      console.log('✅ CBOR module imported successfully');
+      logger.info('✅ CBOR module imported successfully');
       
       const attestationObject = decode(new Uint8Array(credential.response.attestationObject));
       const authData = attestationObject.authData;
@@ -161,7 +162,7 @@ export class WebAuthnDIDProvider {
       };
       
     } catch (error) {
-      console.warn('Failed to extract real public key from WebAuthn credential, using fallback:', error);
+      logger.warn('Failed to extract real public key from WebAuthn credential, using fallback:', error);
       
       // Fallback: Create deterministic public key from credential ID
       // This ensures the SAME public key is generated every time for the same credential
@@ -213,7 +214,7 @@ export class WebAuthnDIDProvider {
     }
 
     try {
-      console.log('🔐 WebAuthn signing started:', {
+      logger.info('🔐 WebAuthn signing started:', {
         timestamp: new Date().toISOString(),
         dataType: typeof data,
         dataLength: data?.length || 0,
@@ -232,7 +233,7 @@ export class WebAuthnDIDProvider {
       combined.set(dataBytes, this.rawCredentialId.length);
       const challenge = await crypto.subtle.digest('SHA-256', combined);
       
-      console.log('🚀 Requesting WebAuthn authentication - this should trigger biometric prompt!');
+      logger.info('🚀 Requesting WebAuthn authentication - this should trigger biometric prompt!');
       const authStartTime = Date.now();
       
       // Use WebAuthn to authenticate (this proves the user is present and verified)
@@ -255,7 +256,7 @@ export class WebAuthnDIDProvider {
         throw new Error('WebAuthn authentication failed');
       }
 
-      console.log('✅ WebAuthn authentication completed:', {
+      logger.info('✅ WebAuthn authentication completed:', {
         authDuration: `${authDuration}ms`,
         userPresent: assertion.response.authenticatorData ? true : false,
         timestamp: new Date().toISOString()
@@ -271,7 +272,7 @@ export class WebAuthnDIDProvider {
         timestamp: Date.now()
       };
       
-      console.log('📝 WebAuthn proof created:', {
+      logger.info('📝 WebAuthn proof created:', {
         proofSize: JSON.stringify(webauthnProof).length,
         hasAuthenticatorData: !!webauthnProof.authenticatorData,
         hasClientData: !!webauthnProof.clientDataJSON
@@ -281,7 +282,7 @@ export class WebAuthnDIDProvider {
       return WebAuthnDIDProvider.arrayBufferToBase64url(new TextEncoder().encode(JSON.stringify(webauthnProof)));
 
     } catch (error) {
-      console.error('WebAuthn signing failed:', error);
+      logger.error('WebAuthn signing failed:', error);
       
       if (error.name === 'NotAllowedError') {
         throw new Error('Biometric authentication was cancelled');
@@ -303,7 +304,7 @@ export class WebAuthnDIDProvider {
       
       // Verify this proof was created by the same credential
       if (webauthnProof.credentialId !== this.credentialId) {
-        console.warn('Credential ID mismatch in WebAuthn proof verification');
+        logger.warn('Credential ID mismatch in WebAuthn proof verification');
         return false;
       }
       
@@ -315,32 +316,32 @@ export class WebAuthnDIDProvider {
       try {
         const clientData = JSON.parse(webauthnProof.clientDataJSON);
         if (clientData.type !== 'webauthn.get') {
-          console.warn('Invalid WebAuthn proof type');
+          logger.warn('Invalid WebAuthn proof type');
           return false;
         }
       } catch (e) {
-        console.warn('Invalid client data in WebAuthn proof');
+        logger.warn('Invalid client data in WebAuthn proof');
         return false;
       }
       
       // Verify the proof is recent (within 5 minutes)
       const proofAge = Date.now() - webauthnProof.timestamp;
       if (proofAge > 5 * 60 * 1000) {
-        console.warn('WebAuthn proof is too old');
+        logger.warn('WebAuthn proof is too old');
         return false;
       }
       
       // Verify the authenticator data is present
       if (!webauthnProof.authenticatorData) {
-        console.warn('Missing authenticator data in WebAuthn proof');
+        logger.warn('Missing authenticator data in WebAuthn proof');
         return false;
       }
       
-      console.log('✅ WebAuthn proof verification passed');
+      logger.info('✅ WebAuthn proof verification passed');
       return true;
       
     } catch (error) {
-      console.error('WebAuthn proof verification failed:', error);
+      logger.error('WebAuthn proof verification failed:', error);
       return false;
     }
   }
@@ -395,7 +396,7 @@ export class OrbitDBWebAuthnIdentityProvider {
   }
 
   signIdentity(data, options = {}) {
-    console.log('🆔 OrbitDB signIdentity called:', {
+    logger.info('🆔 OrbitDB signIdentity called:', {
       timestamp: new Date().toISOString(),
       dataType: typeof data,
       dataLength: data?.length || 0,
@@ -404,7 +405,7 @@ export class OrbitDBWebAuthnIdentityProvider {
     
     // Return Promise directly to avoid async function issues
     return this.webauthnProvider.sign(data).then(result => {
-      console.log('🆔 OrbitDB signIdentity completed:', {
+      logger.info('🆔 OrbitDB signIdentity completed:', {
         resultType: typeof result,
         resultLength: result?.length || 0
       });
@@ -431,14 +432,14 @@ export class OrbitDBWebAuthnIdentityProvider {
       type: 'webauthn',
       // Make sure sign method is NOT async to avoid Promise serialization
       sign: (identity, data) => {
-        console.log('📋 OrbitDB identity.sign method called:', { 
+        logger.info('📋 OrbitDB identity.sign method called:', { 
           timestamp: new Date().toISOString(),
           identity: identity?.id || identity, 
           dataType: typeof data, 
           dataLength: data?.length || 0,
           dataPreview: typeof data === 'string' ? data.slice(0, 100) : 'Binary data'
         });
-        console.trace('📋 Call stack for OrbitDB sign method');
+        logger.trace('📋 Call stack for OrbitDB sign method');
         // Return the Promise directly, don't await here
         return provider.signIdentity(data);
       },
@@ -471,11 +472,11 @@ OrbitDBWebAuthnIdentityProviderFunction.verifyIdentity = async function(identity
     // Since WebAuthn verification requires the original credential, not just the public key,
     // we'll create a simplified verification that checks the proof structure
     
-    console.log('🔍 Static WebAuthn identity verification called');
-    console.log('   Identity ID:', identity.id);
-    console.log('   Identity type:', identity.type);
-    console.log('   Has publicKey:', !!identity.publicKey);
-    console.log('   Has signatures:', !!identity.signatures);
+    logger.info('🔍 Static WebAuthn identity verification called');
+    logger.info('   Identity ID:', identity.id);
+    logger.info('   Identity type:', identity.type);
+    logger.info('   Has publicKey:', !!identity.publicKey);
+    logger.info('   Has signatures:', !!identity.signatures);
     
     // For WebAuthn, the identity should have been created with our provider,
     // so we can trust it if it has the right structure
@@ -484,18 +485,18 @@ OrbitDBWebAuthnIdentityProviderFunction.verifyIdentity = async function(identity
     const isValidHash = identity.id && /^[a-f0-9]{64}$/.test(identity.id); // 64-char hex string
     
     if (identity.type === 'webauthn' && (isValidDID || isValidHash)) {
-      console.log('✅ WebAuthn identity structure is valid');
-      console.log('   Identity format:', isValidDID ? 'DID' : 'Hash');
+      logger.info('✅ WebAuthn identity structure is valid');
+      logger.info('   Identity format:', isValidDID ? 'DID' : 'Hash');
       return true;
     }
     
-    console.warn('❌ Invalid WebAuthn identity structure');
-    console.warn('   Expected: webauthn type with DID or hash format');
-    console.warn('   Got: type=' + identity.type + ', id=' + identity.id);
+    logger.warn('❌ Invalid WebAuthn identity structure');
+    logger.warn('   Expected: webauthn type with DID or hash format');
+    logger.warn('   Got: type=' + identity.type + ', id=' + identity.id);
     return false;
     
   } catch (error) {
-    console.error('WebAuthn static identity verification failed:', error);
+    logger.error('WebAuthn static identity verification failed:', error);
     return false;
   }
 };
@@ -506,10 +507,10 @@ OrbitDBWebAuthnIdentityProviderFunction.verifyIdentity = async function(identity
 export function registerWebAuthnProvider() {
   try {
     useIdentityProvider(OrbitDBWebAuthnIdentityProviderFunction);
-    console.log('✅ WebAuthn identity provider registered with OrbitDB');
+    logger.info('✅ WebAuthn identity provider registered with OrbitDB');
     return true;
   } catch (error) {
-    console.error('Failed to register WebAuthn provider:', error);
+    logger.error('Failed to register WebAuthn provider:', error);
     return false;
   }
 }

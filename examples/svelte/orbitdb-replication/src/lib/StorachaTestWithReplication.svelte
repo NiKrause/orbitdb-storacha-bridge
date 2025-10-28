@@ -37,7 +37,7 @@
     restoreLogEntriesOnly,
     clearStorachaSpace,
     OrbitDBStorachaBridge,
-  } from "./orbitdb-storacha-bridge";
+  } from "orbitdb-storacha-bridge";
   import { Identities, useIdentityProvider } from "@orbitdb/core";
   import OrbitDBIdentityProviderDID from "@orbitdb/identity-provider-did";
   import { Ed25519Provider } from "key-did-provider-ed25519";
@@ -76,6 +76,7 @@
     Warning,
     Connect,
   } from "carbon-icons-svelte";
+  import { logger } from "../../../../../lib/logger.js";
 
   // Storacha authentication state
   let storachaAuthenticated = false;
@@ -185,8 +186,8 @@
     // Configure peer discovery based on enablePeerConnections
     const peerDiscoveryServices = [];
     if (enablePeerConnections && enableNetworkConnection) {
-      console.log('🔍 Enabling enhanced peer discovery...');
-      console.log(`   📬 Pubsub topics: ${PUBSUB_TOPICS.join(', ')}`);
+      logger.info('🔍 Enabling enhanced peer discovery...');
+      logger.info(`   📬 Pubsub topics: ${PUBSUB_TOPICS.join(', ')}`);
       
       // Enhanced pubsub peer discovery
       peerDiscoveryServices.push(
@@ -198,8 +199,8 @@
         })
       );
       
-      console.log('✅ Pubsub peer discovery configured');
-      console.log(`   🔄 Broadcasting every 3 seconds on topics: ${PUBSUB_TOPICS}`);
+      logger.info('✅ Pubsub peer discovery configured');
+      logger.info(`   🔄 Broadcasting every 3 seconds on topics: ${PUBSUB_TOPICS}`);
     }
 
     // Configure services based on network connection preference
@@ -213,10 +214,10 @@
 
     // Only add bootstrap service if network connections are enabled
     if (enableNetworkConnection) {
-      console.log('🔍 Enabling enhanced libp2p services...');
-      console.log(`   🔗 Bootstrap peers: ${RELAY_BOOTSTRAP_ADDR.length} configured`);
+      logger.info('🔍 Enabling enhanced libp2p services...');
+      logger.info(`   🔗 Bootstrap peers: ${RELAY_BOOTSTRAP_ADDR.length} configured`);
       RELAY_BOOTSTRAP_ADDR.forEach((addr, i) => {
-        console.log(`     ${i + 1}. ${addr}`);
+        logger.info(`     ${i + 1}. ${addr}`);
       });
       
       services.bootstrap = bootstrap({ 
@@ -229,10 +230,10 @@
       services.autonat = autoNAT();
       services.dcutr = dcutr();
       
-      console.log('✅ Services configured:');
-      console.log('   🔄 bootstrap: with timeout and tagging');
-      console.log('   🔍 autonat: NAT detection');
-      console.log('   🔗 dcutr: Direct connection upgrades');
+      logger.info('✅ Services configured:');
+      logger.info('   🔄 bootstrap: with timeout and tagging');
+      logger.info('   🔍 autonat: NAT detection');
+      logger.info('   🔗 dcutr: Direct connection upgrades');
     }
 
     return {
@@ -322,7 +323,7 @@
           bridgeOptions.spaceDID = currentSpace.did();
         }
       } catch (error) {
-        console.warn('Could not get current space DID:', error.message);
+        logger.warn('Could not get current space DID:', error.message);
       }
     } else {
       throw new Error(
@@ -334,7 +335,7 @@
     
     // Set up progress event listeners
     bridge.on('uploadProgress', (progress) => {
-      console.log('📤 Upload Progress:', progress);
+      logger.info('📤 Upload Progress:', progress);
       if (progress && typeof progress === 'object') {
         uploadProgress = progress;
         showProgress = true;
@@ -349,12 +350,12 @@
           showProgress = false;
         }
       } else {
-        console.warn('Invalid upload progress data:', progress);
+        logger.warn('Invalid upload progress data:', progress);
       }
     });
     
     bridge.on('downloadProgress', (progress) => {
-      console.log('📥 Download Progress:', progress);
+      logger.info('📥 Download Progress:', progress);
       if (progress && typeof progress === 'object') {
         downloadProgress = progress;
         showProgress = true;
@@ -369,7 +370,7 @@
           showProgress = false;
         }
       } else {
-        console.warn('Invalid download progress data:', progress);
+        logger.warn('Invalid download progress data:', progress);
       }
     });
     
@@ -378,7 +379,7 @@
 
   // Handle Storacha authentication events
   function handleStorachaAuthenticated(event) {
-    console.log("🔐 Storacha authenticated:", event.detail);
+    logger.info("🔐 Storacha authenticated:", event.detail);
     storachaAuthenticated = true;
     storachaClient = event.detail.client;
     storachaCredentials = {
@@ -390,28 +391,28 @@
     // Store credentials for backup/restore operations
     if (event.detail.method === "credentials") {
       // For key/proof authentication, we need to extract the credentials
-      console.log(
+      logger.info(
         "📝 Credentials-based authentication - storing for backup operations",
       );
     } else if (
       event.detail.method === "ucan" ||
       event.detail.method === "seed"
     ) {
-      console.log(
+      logger.info(
         `📝 ${event.detail.method}-based authentication - ready for operations`,
       );
     }
   }
 
   function handleStorachaLogout() {
-    console.log("🚪 Storacha logged out");
+    logger.info("🚪 Storacha logged out");
     storachaAuthenticated = false;
     storachaClient = null;
     storachaCredentials = null;
   }
 
   function handleSpaceChanged(event) {
-    console.log("🔄 Storacha space changed:", event.detail.space);
+    logger.info("🔄 Storacha space changed:", event.detail.space);
     // Update any space-dependent operations
   }
 
@@ -442,7 +443,7 @@
    * Create a reusable OrbitDB identity from seed
    */
   async function createReusableIdentity(persona = "shared") {
-    console.log(`🆔 Creating ${persona} identity...`);
+    logger.info(`🆔 Creating ${persona} identity...`);
 
     // Generate a test seed phrase for consistent identity
     const seedPhrase = generateMnemonic(english);
@@ -467,7 +468,7 @@
       }),
     });
 
-    console.log(`✅ ${persona} identity created: ${identity.id}`);
+    logger.info(`✅ ${persona} identity created: ${identity.id}`);
     return { identity, identities, seedPhrase, masterSeed };
   }
 
@@ -476,7 +477,7 @@
    * UPDATED: Creates a shared identities system that knows about both identities
    */
   async function generateBothIdentities() {
-    console.log(`🆔 Generating peer identities for replication demo...`);
+    logger.info(`🆔 Generating peer identities for replication demo...`);
 
     try {
       // Set up DID resolver and register the official DID provider
@@ -516,9 +517,9 @@
       bobIdentities = sharedIdentitiesSystem;
       bothIdentitiesGenerated = true;
 
-      console.log(`✅ Peer identities created:`);
-      console.log(`   Alice: ...${aliceIdentity.id.slice(-12)}`);
-      console.log(`   Bob: ...${bobIdentity.id.slice(-12)}`);
+      logger.info(`✅ Peer identities created:`);
+      logger.info(`   Alice: ...${aliceIdentity.id.slice(-12)}`);
+      logger.info(`   Bob: ...${bobIdentity.id.slice(-12)}`);
 
       return {
         aliceIdentity,
@@ -528,7 +529,7 @@
         sharedIdentitiesSystem
       };
     } catch (error) {
-      console.error(`❌ Failed to generate identities:`, error);
+      logger.error(`❌ Failed to generate identities:`, error);
       throw error;
     }
   }
@@ -547,7 +548,7 @@
     } else {
       bobResults = [...bobResults, result];
     }
-    console.log(`🧪 ${persona}: ${step} - ${status} - ${message}`, data || "");
+    logger.info(`🧪 ${persona}: ${step} - ${status} - ${message}`, data || "");
   }
 
   function updateLastResult(persona, status, message, data = null) {
@@ -574,27 +575,27 @@
       data: event.data,
     };
     replicationEvents = [...replicationEvents, replicationEvent].slice(-20); // Keep last 20 events
-    console.log("🔄 Replication Event:", replicationEvent);
+    logger.info("🔄 Replication Event:", replicationEvent);
   }
 
   // Function to check replication status
   async function checkReplicationStatus() {
-    console.log("🔍 Checking replication status...");
+    logger.info("🔍 Checking replication status...");
     
     if (aliceDatabase && bobDatabase) {
-      console.log("📊 Database status check:");
+      logger.info("📊 Database status check:");
       
       try {
         // OrbitDB doesn't have a sync() method - replication happens automatically via events
         // Instead, we just check the current state of both databases
-        console.log("🔄 Checking current database states...");
+        logger.info("🔄 Checking current database states...");
         
         // Get current data counts
         const aliceData = await aliceDatabase.all();
         const bobData = await bobDatabase.all();
         
-        console.log(`📊 Alice has ${aliceData.length} todos:`, aliceData.map(t => t.key));
-        console.log(`📊 Bob has ${bobData.length} todos:`, bobData.map(t => t.key));
+        logger.info(`📊 Alice has ${aliceData.length} todos:`, aliceData.map(t => t.key));
+        logger.info(`📊 Bob has ${bobData.length} todos:`, bobData.map(t => t.key));
         
         // Update UI
         aliceTodos = aliceData;
@@ -602,22 +603,22 @@
         
         // Check if data matches
         if (aliceData.length === bobData.length) {
-          console.log("✅ Data counts match - replication appears to be working!");
+          logger.info("✅ Data counts match - replication appears to be working!");
         } else {
-          console.warn(`⚠️  Data mismatch - Alice: ${aliceData.length}, Bob: ${bobData.length}`);
+          logger.warn(`⚠️  Data mismatch - Alice: ${aliceData.length}, Bob: ${bobData.length}`);
         }
         
         // Check for peer connections to verify replication potential
-        console.log(`🔗 Alice connected to ${aliceConnectedPeers.length} peers:`, aliceConnectedPeers.map(p => p.slice(-8)));
-        console.log(`🔗 Bob connected to ${bobConnectedPeers.length} peers:`, bobConnectedPeers.map(p => p.slice(-8)));
+        logger.info(`🔗 Alice connected to ${aliceConnectedPeers.length} peers:`, aliceConnectedPeers.map(p => p.slice(-8)));
+        logger.info(`🔗 Bob connected to ${bobConnectedPeers.length} peers:`, bobConnectedPeers.map(p => p.slice(-8)));
         
         return { alice: aliceData.length, bob: bobData.length };
       } catch (error) {
-        console.error("❌ Error checking replication status:", error);
+        logger.error("❌ Error checking replication status:", error);
         return null;
       }
     } else {
-      console.warn("⚠️  Cannot check replication - one or both databases not initialized");
+      logger.warn("⚠️  Cannot check replication - one or both databases not initialized");
       return null;
     }
   }
@@ -629,7 +630,7 @@
     databaseConfig,
     openDatabase = true, // New parameter to control database opening
   ) {
-    console.log(`🔧 Creating OrbitDB instance for ${persona}... (openDatabase: ${openDatabase})`);
+    logger.info(`🔧 Creating OrbitDB instance for ${persona}... (openDatabase: ${openDatabase})`);
 
     // Create libp2p configuration with replication enabled
     const libp2pConfig = await createLibp2pConfig({
@@ -639,12 +640,12 @@
 
     // Create libp2p instance
     const libp2p = await createLibp2p(libp2pConfig);
-    console.log(`${persona} libp2p created with peer discovery enabled:`, replicationEnabled);
-    console.log(`🆔 ${persona} Peer ID:`, libp2p.peerId.toString());
+    logger.info(`${persona} libp2p created with peer discovery enabled:`, replicationEnabled);
+    logger.info(`🆔 ${persona} Peer ID:`, libp2p.peerId.toString());
     
     // Store multiaddrs for potential direct dialing
     const multiaddrs = libp2p.getMultiaddrs().map(addr => addr.toString());
-    console.log(`🎧 ${persona} Listening on:`, multiaddrs);
+    logger.info(`🎧 ${persona} Listening on:`, multiaddrs);
     
     if (persona === "alice") {
       aliceMultiaddrs = multiaddrs;
@@ -672,7 +673,7 @@
         aliceAddressReady = hasDialableAddresses;
         
         if (hasDialableAddresses && !wasReady) {
-          console.log(`✅ Alice ready for connections (${currentMultiaddrs.length} addresses)`);
+          logger.info(`✅ Alice ready for connections (${currentMultiaddrs.length} addresses)`);
           addReplicationEvent({
             type: 'addresses_ready',
             peer: 'alice',
@@ -685,7 +686,7 @@
         bobAddressReady = hasDialableAddresses;
         
         if (hasDialableAddresses && !wasReady) {
-          console.log(`✅ Bob ready for connections (${currentMultiaddrs.length} addresses)`);
+          logger.info(`✅ Bob ready for connections (${currentMultiaddrs.length} addresses)`);
           addReplicationEvent({
             type: 'addresses_ready', 
             peer: 'bob',
@@ -701,9 +702,9 @@
     // Try to listen for any address updates
     try {
       libp2p.addEventListener('self:peer:update', (event) => {
-        console.log(`🔄 [${persona.toUpperCase()}] PEER UPDATE EVENT:`, event.detail);
+        logger.info(`🔄 [${persona.toUpperCase()}] PEER UPDATE EVENT:`, event.detail);
         const updatedMultiaddrs = libp2p.getMultiaddrs().map(addr => addr.toString());
-        console.log(`🔄 [${persona.toUpperCase()}] Updated multiaddrs:`, updatedMultiaddrs);
+        logger.info(`🔄 [${persona.toUpperCase()}] Updated multiaddrs:`, updatedMultiaddrs);
         
         if (persona === "alice") {
           aliceMultiaddrs = updatedMultiaddrs;
@@ -715,13 +716,13 @@
         updateAddressReadiness();
       });
     } catch (error) {
-      console.log(`💫 Peer update events not available for ${persona}`);
+      logger.info(`💫 Peer update events not available for ${persona}`);
     }
     
     // Peer Discovery Events
     libp2p.addEventListener('peer:discovery', (event) => {
       const peerId = event.detail.id.toString();
-      console.log(`🔍 ${persona.toUpperCase()} discovered peer: ...${peerId.slice(-8)}`);
+      logger.info(`🔍 ${persona.toUpperCase()} discovered peer: ...${peerId.slice(-8)}`);
       
       addReplicationEvent({
         type: 'peer_discovered',
@@ -733,7 +734,7 @@
     // Connection Events
     libp2p.addEventListener('peer:connect', (event) => {
       const peerId = event.detail.toString();
-      console.log(`🔗 ${persona.toUpperCase()} connected to peer: ...${peerId.slice(-8)}`);
+      logger.info(`🔗 ${persona.toUpperCase()} connected to peer: ...${peerId.slice(-8)}`);
       
       if (persona === "alice") {
         aliceConnectedPeers = [...aliceConnectedPeers, peerId];
@@ -756,7 +757,7 @@
     // Disconnection Events
     libp2p.addEventListener('peer:disconnect', (event) => {
       const peerId = event.detail.toString();
-      console.log(`🔌 ${persona.toUpperCase()} disconnected from: ...${peerId.slice(-8)}`);
+      logger.info(`🔌 ${persona.toUpperCase()} disconnected from: ...${peerId.slice(-8)}`);
       
       if (persona === "alice") {
         aliceConnectedPeers = aliceConnectedPeers.filter(p => p !== peerId);
@@ -787,23 +788,23 @@
       
       // Only log if there are active connections
       if (connections.length > 0) {
-        console.log(`📊 ${persona.toUpperCase()}: ${connections.length} active connections`);
+        logger.info(`📊 ${persona.toUpperCase()}: ${connections.length} active connections`);
       }
     }, 15000); // Every 15 seconds
 
     // Create Helia instance
-    console.log(`🗄️ Initializing ${persona}'s Helia with memory storage for testing...`);
+    logger.info(`🗄️ Initializing ${persona}'s Helia with memory storage for testing...`);
     const helia = await createHelia({ libp2p });
-    console.log(`${persona} Helia created with memory storage`);
+    logger.info(`${persona} Helia created with memory storage`);
 
     // Create OrbitDB instance with unique ID and persona-specific identity
     const personaIdentity = persona === "alice" ? aliceIdentity : bobIdentity;
     const personaIdentities = persona === "alice" ? aliceIdentities : bobIdentities;
     
-    console.log(`🔍 ${persona} identity verification:`);
-    console.log(`   Identity ID: ${personaIdentity.id}`);
-    console.log(`   Alice ID: ${aliceIdentity.id}`);
-    console.log(`   Bob ID: ${bobIdentity.id}`);
+    logger.info(`🔍 ${persona} identity verification:`);
+    logger.info(`   Identity ID: ${personaIdentity.id}`);
+    logger.info(`   Alice ID: ${aliceIdentity.id}`);
+    logger.info(`   Bob ID: ${bobIdentity.id}`);
     
     const orbitdbConfig = {
       ipfs: helia,
@@ -814,7 +815,7 @@
     };
 
     const orbitdb = await createOrbitDB(orbitdbConfig);
-    console.log(`${persona} orbitdb:`, orbitdb);
+    logger.info(`${persona} orbitdb:`, orbitdb);
 
     // Create database with proper access control for both personas (conditionally)
     let database = null;
@@ -822,10 +823,10 @@
     if (openDatabase) {
       if (persona === "alice") {
         // Alice creates the database with both Alice and Bob access
-        console.log(`🆕 Alice creating new database with both Alice & Bob access:`, databaseName);
+        logger.info(`🆕 Alice creating new database with both Alice & Bob access:`, databaseName);
         
         // Create shared database with access control for both peers
-        console.log('🔐 Setting up database with write access for both peers');
+        logger.info('🔐 Setting up database with write access for both peers');
         const multiAccessConfig = {
           ...databaseConfig,
           accessController: IPFSAccessController({ 
@@ -835,47 +836,47 @@
         
         database = await orbitdb.open(databaseName, multiAccessConfig);
         sharedDatabaseAddress = database.address;
-        console.log(`📍 Alice created shared database with address:`, sharedDatabaseAddress);
-        console.log(`🔐 Access granted to both Alice (${aliceIdentity.id}) and Bob (${bobIdentity.id})`);
-        console.log(`📚 Following official OrbitDB documentation pattern`);
+        logger.info(`📍 Alice created shared database with address:`, sharedDatabaseAddress);
+        logger.info(`🔐 Access granted to both Alice (${aliceIdentity.id}) and Bob (${bobIdentity.id})`);
+        logger.info(`📚 Following official OrbitDB documentation pattern`);
       } else {
         // Bob opens the existing database by Alice's address
         if (!sharedDatabaseAddress) {
           throw new Error("Cannot initialize Bob: Alice must create the shared database first!");
         }
         
-        console.log(`🔗 Bob opening existing database by Alice's address (minimal approach):`, sharedDatabaseAddress);
-        console.log(`💡 Bob will inherit all configuration from Alice's database`);
+        logger.info(`🔗 Bob opening existing database by Alice's address (minimal approach):`, sharedDatabaseAddress);
+        logger.info(`💡 Bob will inherit all configuration from Alice's database`);
         
         // Bob opens by address only - minimal approach, inherits all Alice's configuration
         database = await orbitdb.open(sharedDatabaseAddress);
         
         // Verify that the address matches
         if (database.address !== sharedDatabaseAddress) {
-          console.warn(`⚠️  Address mismatch! Expected: ${sharedDatabaseAddress}, Got: ${database.address}`);
+          logger.warn(`⚠️  Address mismatch! Expected: ${sharedDatabaseAddress}, Got: ${database.address}`);
         } else {
-          console.log(`✅ Bob successfully opened shared database by address`);
-          console.log(`🔐 Bob using Alice's access control - write permissions for Alice (${aliceIdentity.id}) and Bob (${bobIdentity.id})`);
+          logger.info(`✅ Bob successfully opened shared database by address`);
+          logger.info(`🔐 Bob using Alice's access control - write permissions for Alice (${aliceIdentity.id}) and Bob (${bobIdentity.id})`);
         }
       }
       
-      console.log(`${persona} database:`, database);
+      logger.info(`${persona} database:`, database);
       
       // Verify database setup
-      console.log(`✅ ${persona.toUpperCase()} database ready:`);
-      console.log(`   Address: ...${database.address.split('/').pop().slice(-12)}`);
-      console.log(`   Type: ${database.type}`);
-      console.log(`   Identity: ...${database.identity.id.slice(-12)}`);
+      logger.info(`✅ ${persona.toUpperCase()} database ready:`);
+      logger.info(`   Address: ...${database.address.split('/').pop().slice(-12)}`);
+      logger.info(`   Type: ${database.type}`);
+      logger.info(`   Identity: ...${database.identity.id.slice(-12)}`);
       
       if (database.access && database.access.write) {
         const writeList = database.access.write.map(id => `...${id.slice(-12)}`);
-        console.log(`   Write permissions: [${writeList.join(', ')}]`);
+        logger.info(`   Write permissions: [${writeList.join(', ')}]`);
       }
 
       // Set up event listeners for this database
       setupDatabaseEventListeners(database, persona);
     } else {
-      console.log(`⏳ ${persona} OrbitDB instance created but database not opened yet (waiting for connection)`);
+      logger.info(`⏳ ${persona} OrbitDB instance created but database not opened yet (waiting for connection)`);
     }
 
     return { libp2p, helia, orbitdb, database };
@@ -898,81 +899,81 @@
    * Compares Alice's and Bob's database properties side-by-side
    */
   function debugDatabasePropertiesComparison(aliceDb, bobDb) {
-    console.log(`🔍🔎 [DATABASE COMPARISON] Comprehensive Properties Debug:`);
-    console.log(`=================================================================`);
+    logger.info(`🔍🔎 [DATABASE COMPARISON] Comprehensive Properties Debug:`);
+    logger.info(`=================================================================`);
     
     // Basic Properties Comparison
-    console.log(`🏠 BASIC PROPERTIES:`);
-    console.log(`   Address:`);
-    console.log(`     Alice: ${aliceDb?.address || 'NULL'}`);
-    console.log(`     Bob:   ${bobDb?.address || 'NULL'}`);
-    console.log(`     Match: ${aliceDb?.address === bobDb?.address ? '✅' : '❌'}`);
+    logger.info(`🏠 BASIC PROPERTIES:`);
+    logger.info(`   Address:`);
+    logger.info(`     Alice: ${aliceDb?.address || 'NULL'}`);
+    logger.info(`     Bob:   ${bobDb?.address || 'NULL'}`);
+    logger.info(`     Match: ${aliceDb?.address === bobDb?.address ? '✅' : '❌'}`);
     
-    console.log(`   Type:`);
-    console.log(`     Alice: ${aliceDb?.type || 'NULL'}`);
-    console.log(`     Bob:   ${bobDb?.type || 'NULL'}`);
-    console.log(`     Match: ${aliceDb?.type === bobDb?.type ? '✅' : '❌'}`);
+    logger.info(`   Type:`);
+    logger.info(`     Alice: ${aliceDb?.type || 'NULL'}`);
+    logger.info(`     Bob:   ${bobDb?.type || 'NULL'}`);
+    logger.info(`     Match: ${aliceDb?.type === bobDb?.type ? '✅' : '❌'}`);
     
-    console.log(`   Name:`);
-    console.log(`     Alice: ${aliceDb?.name || 'NULL'}`);
-    console.log(`     Bob:   ${bobDb?.name || 'NULL'}`);
-    console.log(`     Match: ${aliceDb?.name === bobDb?.name ? '✅' : '❌'}`);
+    logger.info(`   Name:`);
+    logger.info(`     Alice: ${aliceDb?.name || 'NULL'}`);
+    logger.info(`     Bob:   ${bobDb?.name || 'NULL'}`);
+    logger.info(`     Match: ${aliceDb?.name === bobDb?.name ? '✅' : '❌'}`);
     
     // Identity Comparison
-    console.log(`\n🆔 IDENTITY COMPARISON:`);
-    console.log(`   Database Identity:`);
-    console.log(`     Alice DB Identity: ${aliceDb?.identity?.id || 'NULL'}`);
-    console.log(`     Bob DB Identity:   ${bobDb?.identity?.id || 'NULL'}`);
-    console.log(`     Match: ${aliceDb?.identity?.id === bobDb?.identity?.id ? '✅' : '❌'}`);
+    logger.info(`\n🆔 IDENTITY COMPARISON:`);
+    logger.info(`   Database Identity:`);
+    logger.info(`     Alice DB Identity: ${aliceDb?.identity?.id || 'NULL'}`);
+    logger.info(`     Bob DB Identity:   ${bobDb?.identity?.id || 'NULL'}`);
+    logger.info(`     Match: ${aliceDb?.identity?.id === bobDb?.identity?.id ? '✅' : '❌'}`);
     
-    console.log(`   Expected Identities:`);
-    console.log(`     Alice Identity: ${aliceIdentity?.id || 'NULL'}`);
-    console.log(`     Bob Identity:   ${bobIdentity?.id || 'NULL'}`);
+    logger.info(`   Expected Identities:`);
+    logger.info(`     Alice Identity: ${aliceIdentity?.id || 'NULL'}`);
+    logger.info(`     Bob Identity:   ${bobIdentity?.id || 'NULL'}`);
     
-    console.log(`   Database Uses Correct Identity:`);
-    console.log(`     Alice DB uses Bob Identity: ${aliceDb?.identity?.id === bobIdentity?.id ? '✅' : '❌'}`);
-    console.log(`     Bob DB uses Bob Identity:   ${bobDb?.identity?.id === bobIdentity?.id ? '✅' : '❌'}`);
+    logger.info(`   Database Uses Correct Identity:`);
+    logger.info(`     Alice DB uses Bob Identity: ${aliceDb?.identity?.id === bobIdentity?.id ? '✅' : '❌'}`);
+    logger.info(`     Bob DB uses Bob Identity:   ${bobDb?.identity?.id === bobIdentity?.id ? '✅' : '❌'}`);
     
     // Access Controller Deep Dive
-    console.log(`\n🔐 ACCESS CONTROLLER COMPARISON:`);
-    console.log(`   Access Controller Exists:`);
-    console.log(`     Alice: ${aliceDb?.access ? '✅ YES' : '❌ NO'}`);
-    console.log(`     Bob:   ${bobDb?.access ? '✅ YES' : '❌ NO'}`);
+    logger.info(`\n🔐 ACCESS CONTROLLER COMPARISON:`);
+    logger.info(`   Access Controller Exists:`);
+    logger.info(`     Alice: ${aliceDb?.access ? '✅ YES' : '❌ NO'}`);
+    logger.info(`     Bob:   ${bobDb?.access ? '✅ YES' : '❌ NO'}`);
     
     if (aliceDb?.access && bobDb?.access) {
-      console.log(`   Write Permissions:`);
-      console.log(`     Alice Write List:`, aliceDb.access.write || 'NULL');
-      console.log(`     Bob Write List:  `, bobDb.access.write || 'NULL');
+      logger.info(`   Write Permissions:`);
+      logger.info(`     Alice Write List:`, aliceDb.access.write || 'NULL');
+      logger.info(`     Bob Write List:  `, bobDb.access.write || 'NULL');
       
       // Check if write lists match
       const aliceWrites = aliceDb.access.write || [];
       const bobWrites = bobDb.access.write || [];
       const writeListsMatch = JSON.stringify(aliceWrites.sort()) === JSON.stringify(bobWrites.sort());
-      console.log(`     Write Lists Match: ${writeListsMatch ? '✅' : '❌'}`);
+      logger.info(`     Write Lists Match: ${writeListsMatch ? '✅' : '❌'}`);
       
       // Check specific identity permissions
-      console.log(`   Identity Permissions:`);
-      console.log(`     Alice can write to Alice DB: ${aliceWrites.includes(aliceIdentity?.id) ? '✅' : '❌'}`);
-      console.log(`     Alice can write to Bob DB:   ${bobWrites.includes(aliceIdentity?.id) ? '✅' : '❌'}`);
-      console.log(`     Bob can write to Alice DB:   ${aliceWrites.includes(bobIdentity?.id) ? '✅' : '❌'}`);
-      console.log(`     Bob can write to Bob DB:     ${bobWrites.includes(bobIdentity?.id) ? '✅' : '❌'}`);
+      logger.info(`   Identity Permissions:`);
+      logger.info(`     Alice can write to Alice DB: ${aliceWrites.includes(aliceIdentity?.id) ? '✅' : '❌'}`);
+      logger.info(`     Alice can write to Bob DB:   ${bobWrites.includes(aliceIdentity?.id) ? '✅' : '❌'}`);
+      logger.info(`     Bob can write to Alice DB:   ${aliceWrites.includes(bobIdentity?.id) ? '✅' : '❌'}`);
+      logger.info(`     Bob can write to Bob DB:     ${bobWrites.includes(bobIdentity?.id) ? '✅' : '❌'}`);
       
       // Access controller type comparison
-      console.log(`   Controller Type:`);
-      console.log(`     Alice: ${aliceDb.access.type || 'NULL'}`);
-      console.log(`     Bob:   ${bobDb.access.type || 'NULL'}`);
-      console.log(`     Match: ${aliceDb.access.type === bobDb.access.type ? '✅' : '❌'}`);
+      logger.info(`   Controller Type:`);
+      logger.info(`     Alice: ${aliceDb.access.type || 'NULL'}`);
+      logger.info(`     Bob:   ${bobDb.access.type || 'NULL'}`);
+      logger.info(`     Match: ${aliceDb.access.type === bobDb.access.type ? '✅' : '❌'}`);
       
       // Detailed access controller analysis
-      console.log(`   Access Controller Analysis:`);
+      logger.info(`   Access Controller Analysis:`);
       if (aliceDb.access.type === 'ipfs') {
-        console.log(`     ✅ Using IPFSAccessController (Static/Immutable) - CORRECT for your use case`);
-        console.log(`     📝 Static permissions set at creation - no runtime changes needed`);
+        logger.info(`     ✅ Using IPFSAccessController (Static/Immutable) - CORRECT for your use case`);
+        logger.info(`     📝 Static permissions set at creation - no runtime changes needed`);
       } else if (aliceDb.access.type === 'orbitdb') {
-        console.log(`     🔄 Using OrbitDBAccessController (Dynamic/Mutable)`);
-        console.log(`     🔧 Supports runtime grant/revoke operations`);
+        logger.info(`     🔄 Using OrbitDBAccessController (Dynamic/Mutable)`);
+        logger.info(`     🔧 Supports runtime grant/revoke operations`);
       } else {
-        console.log(`     🤔 Unknown access controller type: ${aliceDb.access.type}`);
+        logger.info(`     🤔 Unknown access controller type: ${aliceDb.access.type}`);
       }
       
       // Verify multi-identity setup using HASH format (correct for OrbitDB)
@@ -982,61 +983,61 @@
       const hasAllExpectedHashes = expectedIdentityHashes.every(hash => aliceDbWrites.includes(hash));
       const hasAllExpectedDIDs = expectedIdentityDIDs.every(did => aliceDbWrites.includes(did));
       
-      console.log(`   Multi-Identity Setup Verification:`);
-      console.log(`     Expected identity hashes: ${expectedIdentityHashes.length} [${expectedIdentityHashes.map(h => h?.slice(-12)).join(', ')}]`);
-      console.log(`     Expected identity DIDs: ${expectedIdentityDIDs.length}`);
-      console.log(`     Found in write list: ${aliceDbWrites.length} [${aliceDbWrites.map(w => w?.slice(-12)).join(', ')}]`);
-      console.log(`     All expected hashes present: ${hasAllExpectedHashes ? '✅' : '❌'}`);
-      console.log(`     All expected DIDs present: ${hasAllExpectedDIDs ? '✅' : '❌'} (should be false - DIDs not used)`);
-      console.log(`     Implementation status: ${hasAllExpectedHashes ? '✅ PERFECT - Using correct HASH format' : '❌ ISSUE - Using wrong format or missing identities'}`);
+      logger.info(`   Multi-Identity Setup Verification:`);
+      logger.info(`     Expected identity hashes: ${expectedIdentityHashes.length} [${expectedIdentityHashes.map(h => h?.slice(-12)).join(', ')}]`);
+      logger.info(`     Expected identity DIDs: ${expectedIdentityDIDs.length}`);
+      logger.info(`     Found in write list: ${aliceDbWrites.length} [${aliceDbWrites.map(w => w?.slice(-12)).join(', ')}]`);
+      logger.info(`     All expected hashes present: ${hasAllExpectedHashes ? '✅' : '❌'}`);
+      logger.info(`     All expected DIDs present: ${hasAllExpectedDIDs ? '✅' : '❌'} (should be false - DIDs not used)`);
+      logger.info(`     Implementation status: ${hasAllExpectedHashes ? '✅ PERFECT - Using correct HASH format' : '❌ ISSUE - Using wrong format or missing identities'}`);
     } else {
-      console.log(`   ⚠️  Cannot compare access controllers - one or both missing`);
+      logger.info(`   ⚠️  Cannot compare access controllers - one or both missing`);
     }
     
     // OrbitDB Instance Properties
-    console.log(`\n🌌 ORBITDB INSTANCE COMPARISON:`);
-    console.log(`   OrbitDB Identity:`);
-    console.log(`     Alice OrbitDB: ${aliceOrbitDB?.identity?.id || 'NULL'}`);
-    console.log(`     Bob OrbitDB:   ${bobOrbitDB?.identity?.id || 'NULL'}`);
-    console.log(`     Both Use Bob:  ${(aliceOrbitDB?.identity?.id === bobIdentity?.id && bobOrbitDB?.identity?.id === bobIdentity?.id) ? '✅' : '❌'}`);
+    logger.info(`\n🌌 ORBITDB INSTANCE COMPARISON:`);
+    logger.info(`   OrbitDB Identity:`);
+    logger.info(`     Alice OrbitDB: ${aliceOrbitDB?.identity?.id || 'NULL'}`);
+    logger.info(`     Bob OrbitDB:   ${bobOrbitDB?.identity?.id || 'NULL'}`);
+    logger.info(`     Both Use Bob:  ${(aliceOrbitDB?.identity?.id === bobIdentity?.id && bobOrbitDB?.identity?.id === bobIdentity?.id) ? '✅' : '❌'}`);
     
-    console.log(`   OrbitDB ID:`);
-    console.log(`     Alice: ${aliceOrbitDB?.id || 'NULL'}`);
-    console.log(`     Bob:   ${bobOrbitDB?.id || 'NULL'}`);
+    logger.info(`   OrbitDB ID:`);
+    logger.info(`     Alice: ${aliceOrbitDB?.id || 'NULL'}`);
+    logger.info(`     Bob:   ${bobOrbitDB?.id || 'NULL'}`);
     
     // Log Properties (deeper inspection)
-    console.log(`\n📜 LOG PROPERTIES:`);
-    console.log(`   Log ID:`);
-    console.log(`     Alice: ${aliceDb?.log?.id || 'NULL'}`);
-    console.log(`     Bob:   ${bobDb?.log?.id || 'NULL'}`);
-    console.log(`     Match: ${aliceDb?.log?.id === bobDb?.log?.id ? '✅' : '❌'}`);
+    logger.info(`\n📜 LOG PROPERTIES:`);
+    logger.info(`   Log ID:`);
+    logger.info(`     Alice: ${aliceDb?.log?.id || 'NULL'}`);
+    logger.info(`     Bob:   ${bobDb?.log?.id || 'NULL'}`);
+    logger.info(`     Match: ${aliceDb?.log?.id === bobDb?.log?.id ? '✅' : '❌'}`);
     
-    console.log(`   Log Length:`);
-    console.log(`     Alice: ${aliceDb?.log?.length || 0}`);
-    console.log(`     Bob:   ${bobDb?.log?.length || 0}`);
+    logger.info(`   Log Length:`);
+    logger.info(`     Alice: ${aliceDb?.log?.length || 0}`);
+    logger.info(`     Bob:   ${bobDb?.log?.length || 0}`);
     
     // Events and Capabilities
-    console.log(`\n🎆 EVENTS & CAPABILITIES:`);
-    console.log(`   Event Emitter:`);
-    console.log(`     Alice: ${aliceDb?.events ? '✅ YES' : '❌ NO'}`);
-    console.log(`     Bob:   ${bobDb?.events ? '✅ YES' : '❌ NO'}`);
+    logger.info(`\n🎆 EVENTS & CAPABILITIES:`);
+    logger.info(`   Event Emitter:`);
+    logger.info(`     Alice: ${aliceDb?.events ? '✅ YES' : '❌ NO'}`);
+    logger.info(`     Bob:   ${bobDb?.events ? '✅ YES' : '❌ NO'}`);
     
-    console.log(`   Sync Enabled:`);
-    console.log(`     Alice: ${aliceDb?.sync !== false ? '✅ YES' : '❌ NO'}`);
-    console.log(`     Bob:   ${bobDb?.sync !== false ? '✅ YES' : '❌ NO'}`);
+    logger.info(`   Sync Enabled:`);
+    logger.info(`     Alice: ${aliceDb?.sync !== false ? '✅ YES' : '❌ NO'}`);
+    logger.info(`     Bob:   ${bobDb?.sync !== false ? '✅ YES' : '❌ NO'}`);
     
     // Storage and Network
-    console.log(`\n💾 STORAGE & NETWORK:`);
-    console.log(`   IPFS/Helia Instance:`);
-    console.log(`     Alice: ${aliceHelia ? '✅ YES' : '❌ NO'}`);
-    console.log(`     Bob:   ${bobHelia ? '✅ YES' : '❌ NO'}`);
+    logger.info(`\n💾 STORAGE & NETWORK:`);
+    logger.info(`   IPFS/Helia Instance:`);
+    logger.info(`     Alice: ${aliceHelia ? '✅ YES' : '❌ NO'}`);
+    logger.info(`     Bob:   ${bobHelia ? '✅ YES' : '❌ NO'}`);
     
-    console.log(`   LibP2P Instance:`);
-    console.log(`     Alice: ${aliceLibp2p ? '✅ YES' : '❌ NO'}`);
-    console.log(`     Bob:   ${bobLibp2p ? '✅ YES' : '❌ NO'}`);
+    logger.info(`   LibP2P Instance:`);
+    logger.info(`     Alice: ${aliceLibp2p ? '✅ YES' : '❌ NO'}`);
+    logger.info(`     Bob:   ${bobLibp2p ? '✅ YES' : '❌ NO'}`);
     
-    console.log(`=================================================================`);
-    console.log(`🆗 REPLICATION READINESS SUMMARY:`);
+    logger.info(`=================================================================`);
+    logger.info(`🆗 REPLICATION READINESS SUMMARY:`);
     
     const criticalChecks = {
       addressesMatch: aliceDb?.address === bobDb?.address,
@@ -1048,19 +1049,19 @@
     };
     
     Object.entries(criticalChecks).forEach(([check, passed]) => {
-      console.log(`   ${check}: ${passed ? '✅ PASS' : '❌ FAIL'}`);
+      logger.info(`   ${check}: ${passed ? '✅ PASS' : '❌ FAIL'}`);
     });
     
     const allPassed = Object.values(criticalChecks).every(check => check);
-    console.log(`\n🏆 OVERALL REPLICATION READINESS: ${allPassed ? '✅ EXCELLENT' : '⚠️  NEEDS ATTENTION'}`);
+    logger.info(`\n🏆 OVERALL REPLICATION READINESS: ${allPassed ? '✅ EXCELLENT' : '⚠️  NEEDS ATTENTION'}`);
     
     return criticalChecks;
   }
   
   // Function for Bob to open Alice's shared database after connection is established
   async function openSharedDatabase(orbitdb, databaseAddress, persona = "bob") {
-    console.log(`🔗 ${persona} opening shared database by address:`, databaseAddress);
-    console.log(`💡 ${persona} will inherit all configuration from Alice's database`);
+    logger.info(`🔗 ${persona} opening shared database by address:`, databaseAddress);
+    logger.info(`💡 ${persona} will inherit all configuration from Alice's database`);
     
     try {
       // Bob opens by address only - minimal approach, inherits all Alice's configuration
@@ -1068,37 +1069,37 @@
       
       // Verify that the address matches
       if (database.address !== databaseAddress) {
-        console.warn(`⚠️  Address mismatch! Expected: ${databaseAddress}, Got: ${database.address}`);
+        logger.warn(`⚠️  Address mismatch! Expected: ${databaseAddress}, Got: ${database.address}`);
       } else {
-        console.log(`✅ ${persona} successfully opened shared database by address`);
-        console.log(`🔐 ${persona} using Alice's access control - write permissions for Alice (${aliceIdentity.id}) and Bob (${bobIdentity.id})`);
+        logger.info(`✅ ${persona} successfully opened shared database by address`);
+        logger.info(`🔐 ${persona} using Alice's access control - write permissions for Alice (${aliceIdentity.id}) and Bob (${bobIdentity.id})`);
       }
       
-      console.log(`${persona} database:`, database);
+      logger.info(`${persona} database:`, database);
       
       // COMPREHENSIVE DATABASE COMPARISON (if both databases exist)
       if (aliceDatabase && database && persona === 'bob') {
-        console.log(`\n🔍 [DATABASE DEBUG] Running comprehensive comparison...`);
+        logger.info(`\n🔍 [DATABASE DEBUG] Running comprehensive comparison...`);
         debugDatabasePropertiesComparison(aliceDatabase, database);
       }
       
       // REPLICATION VERIFICATION: Check all requirements
-      console.log(`\n🔍 [${persona.toUpperCase()}] REPLICATION VERIFICATION:`);
-      console.log(`   🕑 1. Database Address: ${database.address}`);
-      console.log(`   🕒 2. Shared Address: ${databaseAddress}`);
-      console.log(`   🕓 3. Addresses Match: ${database.address === databaseAddress}`);
-      console.log(`   🕔 4. Database Identity: ${database.identity.id}`);
-      console.log(`   🕕 5. Alice Identity: ${aliceIdentity.id}`);
-      console.log(`   🕖 6. Bob Identity: ${bobIdentity.id}`);
-      console.log(`   🕗 7. Database Type: ${database.type}`);
-      console.log(`   🕘 8. OrbitDB Used Identity: ${orbitdb.identity.id}`);
-      console.log(`   🕙 9. OrbitDB Used Identities: ${orbitdb.identities ? 'YES' : 'NO'}`);
+      logger.info(`\n🔍 [${persona.toUpperCase()}] REPLICATION VERIFICATION:`);
+      logger.info(`   🕑 1. Database Address: ${database.address}`);
+      logger.info(`   🕒 2. Shared Address: ${databaseAddress}`);
+      logger.info(`   🕓 3. Addresses Match: ${database.address === databaseAddress}`);
+      logger.info(`   🕔 4. Database Identity: ${database.identity.id}`);
+      logger.info(`   🕕 5. Alice Identity: ${aliceIdentity.id}`);
+      logger.info(`   🕖 6. Bob Identity: ${bobIdentity.id}`);
+      logger.info(`   🕗 7. Database Type: ${database.type}`);
+      logger.info(`   🕘 8. OrbitDB Used Identity: ${orbitdb.identity.id}`);
+      logger.info(`   🕙 9. OrbitDB Used Identities: ${orbitdb.identities ? 'YES' : 'NO'}`);
       
       // Check access controller
       if (database.access && database.access.write) {
-        console.log(`   🔐 10. Access Controller Write List:`, database.access.write);
+        logger.info(`   🔐 10. Access Controller Write List:`, database.access.write);
       } else {
-        console.log(`   ⚠️  10. Access Controller: NOT FOUND`);
+        logger.info(`   ⚠️  10. Access Controller: NOT FOUND`);
       }
 
       // Set up event listeners for this database
@@ -1106,39 +1107,39 @@
       
       return database;
     } catch (error) {
-      console.error(`❌ Failed to open shared database for ${persona}:`, error);
+      logger.error(`❌ Failed to open shared database for ${persona}:`, error);
       throw error;
     }
   }
   
   // Enhanced function to force connection between Alice and Bob with multiple strategies
   async function forceDirectConnection() {
-    console.log("🔗 [FORCE_CONNECTION] Starting enhanced connection attempt...");
+    logger.info("🔗 [FORCE_CONNECTION] Starting enhanced connection attempt...");
     
     // Detailed prerequisite checking
-    console.log("🔗 [FORCE_CONNECTION] Checking prerequisites:");
-    console.log(`   aliceLibp2p: ${!!aliceLibp2p}`);
-    console.log(`   bobLibp2p: ${!!bobLibp2p}`);
-    console.log(`   alicePeerId: ${alicePeerId}`);
-    console.log(`   bobPeerId: ${bobPeerId}`);
-    console.log(`   aliceAddressReady: ${aliceAddressReady}`);
-    console.log(`   bobAddressReady: ${bobAddressReady}`);
+    logger.info("🔗 [FORCE_CONNECTION] Checking prerequisites:");
+    logger.info(`   aliceLibp2p: ${!!aliceLibp2p}`);
+    logger.info(`   bobLibp2p: ${!!bobLibp2p}`);
+    logger.info(`   alicePeerId: ${alicePeerId}`);
+    logger.info(`   bobPeerId: ${bobPeerId}`);
+    logger.info(`   aliceAddressReady: ${aliceAddressReady}`);
+    logger.info(`   bobAddressReady: ${bobAddressReady}`);
     
     if (!aliceLibp2p || !bobLibp2p || !alicePeerId || !bobPeerId) {
-      console.warn("⚠️  [FORCE_CONNECTION] Cannot force connection - missing libp2p instances or peer IDs");
+      logger.warn("⚠️  [FORCE_CONNECTION] Cannot force connection - missing libp2p instances or peer IDs");
       return false;
     }
     
     if (!aliceAddressReady || !bobAddressReady) {
-      console.warn("⚠️  [FORCE_CONNECTION] Cannot force connection - addresses not ready yet");
-      console.log(`   Alice ready: ${aliceAddressReady}, Bob ready: ${bobAddressReady}`);
+      logger.warn("⚠️  [FORCE_CONNECTION] Cannot force connection - addresses not ready yet");
+      logger.info(`   Alice ready: ${aliceAddressReady}, Bob ready: ${bobAddressReady}`);
       return false;
     }
     
-    console.log("✅ [FORCE_CONNECTION] Prerequisites met, proceeding with connection strategies...");
+    logger.info("✅ [FORCE_CONNECTION] Prerequisites met, proceeding with connection strategies...");
     
     // Strategy 0: Try dialing with PeerId objects directly (libp2p's preferred method)
-    console.log("🎯 [FORCE_CONNECTION] Strategy 0: Direct PeerId dialing (no multiaddr)...");
+    logger.info("🎯 [FORCE_CONNECTION] Strategy 0: Direct PeerId dialing (no multiaddr)...");
     
     let connectionEstablished = false;
     
@@ -1146,20 +1147,20 @@
     const alicePeerIdObj = aliceLibp2p.peerId;
     const bobPeerIdObj = bobLibp2p.peerId;
     
-    console.log(`🆔 [FORCE_CONNECTION] Using PeerId objects:`);
-    console.log(`   Alice PeerId type: ${typeof alicePeerIdObj}, toString: ${alicePeerIdObj.toString().slice(-12)}`);
-    console.log(`   Bob PeerId type: ${typeof bobPeerIdObj}, toString: ${bobPeerIdObj.toString().slice(-12)}`);
+    logger.info(`🆔 [FORCE_CONNECTION] Using PeerId objects:`);
+    logger.info(`   Alice PeerId type: ${typeof alicePeerIdObj}, toString: ${alicePeerIdObj.toString().slice(-12)}`);
+    logger.info(`   Bob PeerId type: ${typeof bobPeerIdObj}, toString: ${bobPeerIdObj.toString().slice(-12)}`);
     
     // Try Bob dialing Alice using PeerId object
     try {
-      console.log(`📞 [FORCE_CONNECTION] Bob dialing Alice using PeerId object...`);
+      logger.info(`📞 [FORCE_CONNECTION] Bob dialing Alice using PeerId object...`);
       
       const connection = await Promise.race([
         bobLibp2p.dial(alicePeerIdObj),
         new Promise((_, reject) => setTimeout(() => reject(new Error('PeerId dial timeout')), 8000))
       ]);
       
-      console.log(`✅ [FORCE_CONNECTION] PeerId dial SUCCESS!`, {
+      logger.info(`✅ [FORCE_CONNECTION] PeerId dial SUCCESS!`, {
         remotePeer: connection.remotePeer.toString().slice(-12),
         direction: connection.direction,
         transient: connection.transient,
@@ -1170,18 +1171,18 @@
       
       connectionEstablished = true;
     } catch (error) {
-      console.log(`❌ [FORCE_CONNECTION] Bob->Alice PeerId dial failed: ${error.message}`);
+      logger.info(`❌ [FORCE_CONNECTION] Bob->Alice PeerId dial failed: ${error.message}`);
       
       // Try Alice dialing Bob using PeerId object
       try {
-        console.log(`📞 [FORCE_CONNECTION] Alice dialing Bob using PeerId object...`);
+        logger.info(`📞 [FORCE_CONNECTION] Alice dialing Bob using PeerId object...`);
         
         const connection = await Promise.race([
           aliceLibp2p.dial(bobPeerIdObj),
           new Promise((_, reject) => setTimeout(() => reject(new Error('PeerId dial timeout')), 8000))
         ]);
         
-        console.log(`✅ [FORCE_CONNECTION] PeerId dial SUCCESS!`, {
+        logger.info(`✅ [FORCE_CONNECTION] PeerId dial SUCCESS!`, {
           remotePeer: connection.remotePeer.toString().slice(-12),
           direction: connection.direction,
           transient: connection.transient,
@@ -1192,17 +1193,17 @@
         
         connectionEstablished = true;
       } catch (error2) {
-        console.log(`❌ [FORCE_CONNECTION] Alice->Bob PeerId dial failed: ${error2.message}`);
+        logger.info(`❌ [FORCE_CONNECTION] Alice->Bob PeerId dial failed: ${error2.message}`);
       }
     }
     
     if (connectionEstablished) {
-      console.log("🎉 [FORCE_CONNECTION] Strategy 0 SUCCESS: PeerId direct connection established!");
+      logger.info("🎉 [FORCE_CONNECTION] Strategy 0 SUCCESS: PeerId direct connection established!");
       return true;
     }
     
     // Strategy 1: Try direct dialing with multiaddrs (fallback)
-    console.log("🚀 [FORCE_CONNECTION] Strategy 1: Direct multiaddr dialing (fallback)...");
+    logger.info("🚀 [FORCE_CONNECTION] Strategy 1: Direct multiaddr dialing (fallback)...");
     
     // Get Alice's multiaddrs for Bob to dial
     const aliceDialableAddrs = aliceMultiaddrs.filter(addr => 
@@ -1212,16 +1213,16 @@
       addr.includes('/wss/')
     );
     
-    console.log(`📍 [FORCE_CONNECTION] Alice's dialable addresses (${aliceDialableAddrs.length}):`);
+    logger.info(`📍 [FORCE_CONNECTION] Alice's dialable addresses (${aliceDialableAddrs.length}):`);
     aliceDialableAddrs.forEach((addr, i) => {
-      console.log(`   ${i + 1}. ${addr}`);
+      logger.info(`   ${i + 1}. ${addr}`);
     });
     
     // Try Bob dialing Alice's addresses (connectionEstablished already declared above)
     for (let i = 0; i < Math.min(aliceDialableAddrs.length, 3); i++) { // Try up to 3 addresses
       const addr = aliceDialableAddrs[i];
       try {
-        console.log(`📞 [FORCE_CONNECTION] Bob dialing Alice: ${addr}`);
+        logger.info(`📞 [FORCE_CONNECTION] Bob dialing Alice: ${addr}`);
         
         // Use timeout to prevent hanging
         const connection = await Promise.race([
@@ -1229,7 +1230,7 @@
           new Promise((_, reject) => setTimeout(() => reject(new Error('Dial timeout')), 5000))
         ]);
         
-        console.log(`✅ [FORCE_CONNECTION] Direct dial successful!`, {
+        logger.info(`✅ [FORCE_CONNECTION] Direct dial successful!`, {
           remotePeer: connection.remotePeer.toString(),
           direction: connection.direction,
           transient: connection.transient,
@@ -1239,17 +1240,17 @@
         connectionEstablished = true;
         break;
       } catch (error) {
-        console.log(`❌ [FORCE_CONNECTION] Direct dial ${i + 1} failed: ${error.message}`);
+        logger.info(`❌ [FORCE_CONNECTION] Direct dial ${i + 1} failed: ${error.message}`);
       }
     }
     
     if (connectionEstablished) {
-      console.log("🎉 [FORCE_CONNECTION] Strategy 1 SUCCESS: Direct connection established!");
+      logger.info("🎉 [FORCE_CONNECTION] Strategy 1 SUCCESS: Direct connection established!");
       return true;
     }
     
     // Strategy 2: Cross-dialing (Alice dials Bob too)
-    console.log("🔄 [FORCE_CONNECTION] Strategy 2: Cross-dialing approach...");
+    logger.info("🔄 [FORCE_CONNECTION] Strategy 2: Cross-dialing approach...");
     
     const bobDialableAddrs = bobMultiaddrs.filter(addr => 
       addr.includes('/p2p-circuit/') || 
@@ -1258,9 +1259,9 @@
       addr.includes('/wss/')
     );
     
-    console.log(`📍 [FORCE_CONNECTION] Bob's dialable addresses (${bobDialableAddrs.length}):`);
+    logger.info(`📍 [FORCE_CONNECTION] Bob's dialable addresses (${bobDialableAddrs.length}):`);
     bobDialableAddrs.forEach((addr, i) => {
-      console.log(`   ${i + 1}. ${addr}`);
+      logger.info(`   ${i + 1}. ${addr}`);
     });
     
     // Try both directions simultaneously
@@ -1281,32 +1282,32 @@
     }
     
     if (dialPromises.length > 0) {
-      console.log(`🔀 [FORCE_CONNECTION] Attempting ${dialPromises.length} simultaneous dials...`);
+      logger.info(`🔀 [FORCE_CONNECTION] Attempting ${dialPromises.length} simultaneous dials...`);
       
       try {
         const results = await Promise.allSettled(dialPromises);
         
         for (const result of results) {
           if (result.status === 'fulfilled' && result.value.connection) {
-            console.log(`✅ [FORCE_CONNECTION] Cross-dial success: ${result.value.dialer} connected to ${result.value.target}`);
+            logger.info(`✅ [FORCE_CONNECTION] Cross-dial success: ${result.value.dialer} connected to ${result.value.target}`);
             connectionEstablished = true;
             break;
           } else {
-            console.log(`❌ [FORCE_CONNECTION] Cross-dial failed:`, result.value || result.reason);
+            logger.info(`❌ [FORCE_CONNECTION] Cross-dial failed:`, result.value || result.reason);
           }
         }
       } catch (error) {
-        console.log(`❌ [FORCE_CONNECTION] Cross-dial error:`, error.message);
+        logger.info(`❌ [FORCE_CONNECTION] Cross-dial error:`, error.message);
       }
     }
     
     if (connectionEstablished) {
-      console.log("🎉 [FORCE_CONNECTION] Strategy 2 SUCCESS: Cross-dial connection established!");
+      logger.info("🎉 [FORCE_CONNECTION] Strategy 2 SUCCESS: Cross-dial connection established!");
       return true;
     }
     
     // Strategy 3: Enhanced peer discovery with pubsub
-    console.log("📡 [FORCE_CONNECTION] Strategy 3: Enhanced peer discovery...");
+    logger.info("📡 [FORCE_CONNECTION] Strategy 3: Enhanced peer discovery...");
     
     // Use pubsub to help peers find each other
     try {
@@ -1325,7 +1326,7 @@
       
       // Try to publish peer info on discovery topics
       if (aliceLibp2p.services.pubsub && bobLibp2p.services.pubsub) {
-        console.log(`📻 [FORCE_CONNECTION] Publishing peer discovery messages...`);
+        logger.info(`📻 [FORCE_CONNECTION] Publishing peer discovery messages...`);
         
         const discoveryTopic = 'alice-bob-discovery';
         
@@ -1341,14 +1342,14 @@
           peer: bobPeerInfo
         })));
         
-        console.log(`📡 [FORCE_CONNECTION] Peer announcements sent via pubsub`);
+        logger.info(`📡 [FORCE_CONNECTION] Peer announcements sent via pubsub`);
       }
     } catch (error) {
-      console.log(`❌ [FORCE_CONNECTION] Pubsub discovery failed:`, error.message);
+      logger.info(`❌ [FORCE_CONNECTION] Pubsub discovery failed:`, error.message);
     }
     
     // Strategy 4: Wait and check for natural discovery
-    console.log("⏳ [FORCE_CONNECTION] Strategy 4: Natural discovery monitoring...");
+    logger.info("⏳ [FORCE_CONNECTION] Strategy 4: Natural discovery monitoring...");
     
     const discoveryTimeout = 15000; // 15 seconds for natural discovery
     const discoveryStartTime = Date.now();
@@ -1366,7 +1367,7 @@
       
       // Enhanced logging every 3 seconds
       if ((Date.now() - discoveryStartTime) % 3000 < 1000) {
-        console.log(`🔍 [FORCE_CONNECTION] Discovery progress:`, {
+        logger.info(`🔍 [FORCE_CONNECTION] Discovery progress:`, {
           elapsed: Math.round((Date.now() - discoveryStartTime) / 1000) + 's',
           aliceConnections: aliceConnections.length,
           bobConnections: bobConnections.length,
@@ -1377,10 +1378,10 @@
         
         // Log connection details
         if (aliceConnections.length > 0) {
-          console.log(`   Alice connected to: ${aliceConnections.map(c => c.remotePeer.toString().slice(-8)).join(', ')}`);
+          logger.info(`   Alice connected to: ${aliceConnections.map(c => c.remotePeer.toString().slice(-8)).join(', ')}`);
         }
         if (bobConnections.length > 0) {
-          console.log(`   Bob connected to: ${bobConnections.map(c => c.remotePeer.toString().slice(-8)).join(', ')}`);
+          logger.info(`   Bob connected to: ${bobConnections.map(c => c.remotePeer.toString().slice(-8)).join(', ')}`);
         }
       }
       
@@ -1390,7 +1391,7 @@
     }
     
     if (peersDiscovered) {
-      console.log("🎉 [FORCE_CONNECTION] Strategy 4 SUCCESS: Natural discovery worked!");
+      logger.info("🎉 [FORCE_CONNECTION] Strategy 4 SUCCESS: Natural discovery worked!");
       return true;
     }
     
@@ -1398,16 +1399,16 @@
     const finalAliceConnections = aliceLibp2p.getConnections().length;
     const finalBobConnections = bobLibp2p.getConnections().length;
     
-    console.log(`📊 [FORCE_CONNECTION] Final assessment:`);
-    console.log(`   Alice connections: ${finalAliceConnections}`);
-    console.log(`   Bob connections: ${finalBobConnections}`);
-    console.log(`   Both have relay connections: ${finalAliceConnections > 0 && finalBobConnections > 0}`);
+    logger.info(`📊 [FORCE_CONNECTION] Final assessment:`);
+    logger.info(`   Alice connections: ${finalAliceConnections}`);
+    logger.info(`   Bob connections: ${finalBobConnections}`);
+    logger.info(`   Both have relay connections: ${finalAliceConnections > 0 && finalBobConnections > 0}`);
     
     if (finalAliceConnections > 0 && finalBobConnections > 0) {
-      console.log("✨ [FORCE_CONNECTION] PARTIAL SUCCESS: Both peers connected to relay - OrbitDB replication may still work!");
+      logger.info("✨ [FORCE_CONNECTION] PARTIAL SUCCESS: Both peers connected to relay - OrbitDB replication may still work!");
       return true;
     } else {
-      console.warn("⚠️  [FORCE_CONNECTION] All strategies failed - but proceeding anyway");
+      logger.warn("⚠️  [FORCE_CONNECTION] All strategies failed - but proceeding anyway");
       return false;
     }
   }
@@ -1417,8 +1418,8 @@
   function setupDatabaseEventListeners(database, persona) {
     if (!database) return;
 
-    console.log(`🎧 Setting up replication event listeners for ${persona}'s database...`);
-    console.log(`🎯 [ReplicationTest] Database address: ${database.address}`);
+    logger.info(`🎧 Setting up replication event listeners for ${persona}'s database...`);
+    logger.info(`🎯 [ReplicationTest] Database address: ${database.address}`);
 
     // Add this database address to our tracking set
     replicationTestDatabaseAddresses.add(
@@ -1433,19 +1434,19 @@
       if (replicationTestDatabaseAddresses.has(eventAddress)) {
         const replicationSource = entry?.identity !== database.identity.id ? 'REPLICATED' : 'LOCAL';
         
-        console.log(`🔥 🔗 [${persona.toUpperCase()}] JOIN EVENT (${replicationSource}):`);
-        console.log(`   Entry Key: ${entry?.key}`);
-        console.log(`   Entry Value:`, entry?.value);
-        console.log(`   Entry Identity: ${entry?.identity}`);
-        console.log(`   Local Identity: ${database.identity.id}`);
-        console.log(`   Address: ${eventAddress}`);
-        console.log(`   Timestamp: ${new Date().toISOString()}`);
+        logger.info(`🔥 🔗 [${persona.toUpperCase()}] JOIN EVENT (${replicationSource}):`);
+        logger.info(`   Entry Key: ${entry?.key}`);
+        logger.info(`   Entry Value:`, entry?.value);
+        logger.info(`   Entry Identity: ${entry?.identity}`);
+        logger.info(`   Local Identity: ${database.identity.id}`);
+        logger.info(`   Address: ${eventAddress}`);
+        logger.info(`   Timestamp: ${new Date().toISOString()}`);
         
         if (replicationSource === 'REPLICATED') {
-          console.log(`✨ 🎆 REPLICATION DETECTED! ${persona} received data from remote peer!`);
+          logger.info(`✨ 🎆 REPLICATION DETECTED! ${persona} received data from remote peer!`);
         }
         
-        console.log(`📊 Full event data:`, {
+        logger.info(`📊 Full event data:`, {
           address: eventAddress,
           entry: {
             hash: entry?.hash?.toString() || entry?.hash,
@@ -1483,7 +1484,7 @@
             bobTodos = await bobDatabase.all();
           }
         } catch (error) {
-          console.warn(`Failed to update ${persona}'s todos:`, error);
+          logger.warn(`Failed to update ${persona}'s todos:`, error);
         }
 
         // Add replication event
@@ -1507,14 +1508,14 @@
       if (replicationTestDatabaseAddresses.has(eventAddress)) {
         const replicationSource = entry?.identity !== database.identity.id ? 'REPLICATED' : 'LOCAL';
         
-        console.log(`🔥 🔄 [${persona.toUpperCase()}] UPDATE EVENT (${replicationSource}):`);
-        console.log(`   Entry Key: ${entry?.key}`);
-        console.log(`   Entry Value:`, entry?.value);
-        console.log(`   Entry Identity: ${entry?.identity}`);
-        console.log(`   Local Identity: ${database.identity.id}`);
+        logger.info(`🔥 🔄 [${persona.toUpperCase()}] UPDATE EVENT (${replicationSource}):`);
+        logger.info(`   Entry Key: ${entry?.key}`);
+        logger.info(`   Entry Value:`, entry?.value);
+        logger.info(`   Entry Identity: ${entry?.identity}`);
+        logger.info(`   Local Identity: ${database.identity.id}`);
         
         if (replicationSource === 'REPLICATED') {
-          console.log(`✨ 🔄 UPDATE REPLICATION DETECTED! ${persona} received update from remote peer!`);
+          logger.info(`✨ 🔄 UPDATE REPLICATION DETECTED! ${persona} received update from remote peer!`);
         }
 
         // Add to test results if test is running
@@ -1534,26 +1535,26 @@
       }
     });
 
-    console.log(
+    logger.info(
       `✅ [ReplicationTest] Event listeners set up for database instance ${persona}`,
     );
     
     // Verify event listeners are actually working
-    console.log(`🎧 [${persona.toUpperCase()}] EVENT LISTENER VERIFICATION:`);
-    console.log(`   ✅ 'join' event listener: ACTIVE`);
-    console.log(`   ✅ 'update' event listener: ACTIVE`);
-    console.log(`   📊 Tracking database address: ${database.address}`);
-    console.log(`   🗑️ Total tracked addresses: ${replicationTestDatabaseAddresses.size}`);
-    console.log(`   🔍 All tracked:`, Array.from(replicationTestDatabaseAddresses));
+    logger.info(`🎧 [${persona.toUpperCase()}] EVENT LISTENER VERIFICATION:`);
+    logger.info(`   ✅ 'join' event listener: ACTIVE`);
+    logger.info(`   ✅ 'update' event listener: ACTIVE`);
+    logger.info(`   📊 Tracking database address: ${database.address}`);
+    logger.info(`   🗑️ Total tracked addresses: ${replicationTestDatabaseAddresses.size}`);
+    logger.info(`   🔍 All tracked:`, Array.from(replicationTestDatabaseAddresses));
   }
 
   async function clearIndexedDB() {
-    console.log("🗑️ Clearing IndexedDB...");
+    logger.info("🗑️ Clearing IndexedDB...");
 
     // Get all IndexedDB databases
     if ("databases" in indexedDB) {
       const databases = await indexedDB.databases();
-      console.log(
+      logger.info(
         "📋 Found databases:",
         databases.map((db) => db.name),
       );
@@ -1571,7 +1572,7 @@
 
       for (const db of dbsToDelete) {
         try {
-          console.log(`🗑️ Deleting database: ${db.name}`);
+          logger.info(`🗑️ Deleting database: ${db.name}`);
 
           // Add timeout to prevent hanging
           await Promise.race([
@@ -1580,7 +1581,7 @@
               deleteReq.onsuccess = () => resolve();
               deleteReq.onerror = () => reject(deleteReq.error);
               deleteReq.onblocked = () => {
-                console.warn(`⚠️ Database deletion blocked for: ${db.name}`);
+                logger.warn(`⚠️ Database deletion blocked for: ${db.name}`);
                 // Don't reject immediately, give it more time
               };
             }),
@@ -1589,18 +1590,18 @@
             ),
           ]);
 
-          console.log(`✅ Deleted database: ${db.name}`);
+          logger.info(`✅ Deleted database: ${db.name}`);
         } catch (error) {
           if (error.message === "Timeout") {
-            console.warn(`⏱️ Timeout deleting database ${db.name} - skipping`);
+            logger.warn(`⏱️ Timeout deleting database ${db.name} - skipping`);
           } else {
-            console.warn(`⚠️ Failed to delete database ${db.name}:`, error);
+            logger.warn(`⚠️ Failed to delete database ${db.name}:`, error);
           }
         }
       }
     }
 
-    console.log("🧹 IndexedDB cleanup completed");
+    logger.info("🧹 IndexedDB cleanup completed");
   }
 
   // Alice's functions
@@ -1676,7 +1677,7 @@
 
       aliceStep = "Alice ready to add todos and replicate with Bob";
     } catch (error) {
-      console.error("❌ Alice initialization failed:", error);
+      logger.error("❌ Alice initialization failed:", error);
       aliceError = error.message;
       aliceStep = `Alice initialization failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -1702,7 +1703,7 @@
       for (let i = 0; i < originalTodos.length; i++) {
         const todo = originalTodos[i];
         await aliceDatabase.put(todo.id, todo);
-        console.log(`✅ Alice added todo ${i + 1} (will replicate to Bob):`, todo);
+        logger.info(`✅ Alice added todo ${i + 1} (will replicate to Bob):`, todo);
       }
 
       // Get all todos to verify and display
@@ -1725,7 +1726,7 @@
 
       aliceStep = "Alice ready to backup (Bob should see replicated todos)";
     } catch (error) {
-      console.error("❌ Adding todos failed:", error);
+      logger.error("❌ Adding todos failed:", error);
       aliceError = error.message;
       aliceStep = `Adding todos failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -1796,7 +1797,7 @@
 
       aliceStep = "Alice backup complete - Bob can restore while maintaining replication";
     } catch (error) {
-      console.error("❌ Backup failed:", error);
+      logger.error("❌ Backup failed:", error);
       aliceError = error.message;
       aliceStep = `Backup failed: ${error.message}`;
       updateLastResult("alice", "error", error.message);
@@ -1807,19 +1808,19 @@
 
   // Bob's functions
   async function initializeBob() {
-    console.log("🚨 initializeBob() called!");
-    console.log(`   bobRunning: ${bobRunning}`);
-    console.log(`   bobDatabase: ${bobDatabase ? 'exists' : 'null'}`);
-    console.log(`   bobOrbitDB: ${bobOrbitDB ? 'exists' : 'null'}`);
+    logger.info("🚨 initializeBob() called!");
+    logger.info(`   bobRunning: ${bobRunning}`);
+    logger.info(`   bobDatabase: ${bobDatabase ? 'exists' : 'null'}`);
+    logger.info(`   bobOrbitDB: ${bobOrbitDB ? 'exists' : 'null'}`);
     
     if (bobRunning) {
-      console.log("🚫 initializeBob() exiting - bobRunning is true");
+      logger.info("🚫 initializeBob() exiting - bobRunning is true");
       return;
     }
 
     // Check requirements
     if (!storachaAuthenticated || !storachaClient) {
-      console.log("🚫 initializeBob() exiting - not authenticated");
+      logger.info("🚫 initializeBob() exiting - not authenticated");
       addResult(
         "bob",
         "Error",
@@ -1830,7 +1831,7 @@
     }
 
     if (!bothIdentitiesGenerated || !sharedDatabaseAddress) {
-      console.log("🚫 initializeBob() exiting - identities or address not ready");
+      logger.info("🚫 initializeBob() exiting - identities or address not ready");
       addResult(
         "bob",
         "Error",
@@ -1840,7 +1841,7 @@
       return;
     }
 
-    console.log("✅ initializeBob() proceeding with initialization");
+    logger.info("✅ initializeBob() proceeding with initialization");
     bobRunning = true;
     bobError = null;
     bobResults = [];
@@ -1875,7 +1876,7 @@
       // Note: bobDatabase is still null at this point
 
       // Wait for Bob to have dialable addresses before attempting connection
-      console.log("⏳ Waiting for Bob to have dialable multiaddresses...");
+      logger.info("⏳ Waiting for Bob to have dialable multiaddresses...");
       bobStep = "Waiting for Bob's P2P addresses to be ready...";
       
       addResult(
@@ -1893,7 +1894,7 @@
       await new Promise((resolve, reject) => {
         // Check if already ready
         if (bobAddressReady) {
-          console.log('✅ [BOB] Addresses already ready!');
+          logger.info('✅ [BOB] Addresses already ready!');
           resolve();
           return;
         }
@@ -1901,7 +1902,7 @@
         // Set up one-time listener for address readiness
         const checkAddressReadiness = () => {
           if (bobAddressReady) {
-            console.log('✅ [BOB] Addresses now ready!');
+            logger.info('✅ [BOB] Addresses now ready!');
             resolve();
           } else if (Date.now() - startTime >= maxWaitTime) {
             reject(new Error("Timeout waiting for Bob's dialable addresses to be ready"));
@@ -1915,7 +1916,7 @@
         checkAddressReadiness();
       });
       
-      console.log("✅ Bob has dialable addresses, now dialing Alice...");
+      logger.info("✅ Bob has dialable addresses, now dialing Alice...");
       bobStep = "Dialing Alice to establish P2P connection...";
       
       addResult(
@@ -1926,25 +1927,25 @@
       );
 
       // Now that Bob has addresses, try to connect to Alice
-      console.log("📞 Bob attempting to connect directly to Alice...");
-      console.log(`   Alice Peer ID: ${alicePeerId}`);
-      console.log(`   Bob Peer ID: ${bobPeerId}`);
-      console.log(`   Alice libp2p exists: ${!!aliceLibp2p}`);
-      console.log(`   Bob libp2p exists: ${!!bobLibp2p}`);
-      console.log(`   Alice address ready: ${aliceAddressReady}`);
-      console.log(`   Bob address ready: ${bobAddressReady}`);
+      logger.info("📞 Bob attempting to connect directly to Alice...");
+      logger.info(`   Alice Peer ID: ${alicePeerId}`);
+      logger.info(`   Bob Peer ID: ${bobPeerId}`);
+      logger.info(`   Alice libp2p exists: ${!!aliceLibp2p}`);
+      logger.info(`   Bob libp2p exists: ${!!bobLibp2p}`);
+      logger.info(`   Alice address ready: ${aliceAddressReady}`);
+      logger.info(`   Bob address ready: ${bobAddressReady}`);
       
       const connected = await forceDirectConnection();
-      console.log(`📋 forceDirectConnection() returned: ${connected}`);
+      logger.info(`📋 forceDirectConnection() returned: ${connected}`);
       
       if (!connected) {
-        console.warn("⚠️  Direct connection failed - proceeding anyway (may rely on discovery)");
+        logger.warn("⚠️  Direct connection failed - proceeding anyway (may rely on discovery)");
       } else {
-        console.log("✅ Direct connection to Alice established!");
+        logger.info("✅ Direct connection to Alice established!");
       }
       
       // Wait and verify that Bob is actually connected to Alice before opening database
-      console.log("⏳ Waiting to verify connection with Alice...");
+      logger.info("⏳ Waiting to verify connection with Alice...");
       bobStep = "Verifying connection with Alice...";
       
       addResult(
@@ -1965,7 +1966,7 @@
           const bobConnectedToAlice = bobConnectedPeers.includes(alicePeerId);
           const verified = aliceConnectedToBob || bobConnectedToAlice;
           
-          console.log(`🔗 Connection verification:`, {
+          logger.info(`🔗 Connection verification:`, {
             aliceConnectedToBob,
             bobConnectedToAlice,
             verified,
@@ -1988,13 +1989,13 @@
       });
       
       if (!connectionVerified) {
-        console.warn("⚠️  Could not verify direct connection, but proceeding with database opening (OrbitDB may work through discovery)");
+        logger.warn("⚠️  Could not verify direct connection, but proceeding with database opening (OrbitDB may work through discovery)");
       } else {
-        console.log("✅ Connection verified! Alice and Bob can see each other.");
+        logger.info("✅ Connection verified! Alice and Bob can see each other.");
       }
       
       // Now that connection is verified (or timed out), open Alice's shared database
-      console.log("📛 Bob now opening Alice's shared database...");
+      logger.info("📛 Bob now opening Alice's shared database...");
       bobStep = "Opening Alice's shared database...";
       
       addResult(
@@ -2032,7 +2033,7 @@
 
       bobStep = "Bob ready - dialed Alice, verified connection, then opened shared database for replication";
     } catch (error) {
-      console.error("❌ Bob initialization failed:", error);
+      logger.error("❌ Bob initialization failed:", error);
       bobError = error.message;
       bobStep = `Bob initialization failed: ${error.message}`;
       updateLastResult("bob", "error", error.message);
@@ -2130,7 +2131,7 @@
 
       bobStep = "Bob restore complete - replication with Alice maintained";
     } catch (error) {
-      console.error("❌ Restore failed:", error);
+      logger.error("❌ Restore failed:", error);
       bobError = error.message;
       bobStep = `Restore failed: ${error.message}`;
       updateLastResult("bob", "error", error.message);
@@ -2141,17 +2142,17 @@
 
   // Test replication by having Bob add a todo
   async function addBobTodo() {
-    console.log("🚨 addBobTodo() called!");
-    console.log(`   bobRunning: ${bobRunning}`);
-    console.log(`   bobDatabase: ${bobDatabase ? 'exists' : 'null'}`);
-    console.log(`   Guard condition (bobRunning || !bobDatabase): ${bobRunning || !bobDatabase}`);
+    logger.info("🚨 addBobTodo() called!");
+    logger.info(`   bobRunning: ${bobRunning}`);
+    logger.info(`   bobDatabase: ${bobDatabase ? 'exists' : 'null'}`);
+    logger.info(`   Guard condition (bobRunning || !bobDatabase): ${bobRunning || !bobDatabase}`);
     
     if (bobRunning || !bobDatabase) {
-      console.log("🚫 addBobTodo() exiting - guard condition met");
+      logger.info("🚫 addBobTodo() exiting - guard condition met");
       return;
     }
 
-    console.log("✅ addBobTodo() proceeding with todo addition");
+    logger.info("✅ addBobTodo() proceeding with todo addition");
     bobRunning = true;
     bobStep = "Bob adding todo to test replication...";
 
@@ -2164,19 +2165,19 @@
         createdBy: "bob",
       };
 
-      console.log("📊 Before adding - Bob todos:", bobTodos.length);
+      logger.info("📊 Before adding - Bob todos:", bobTodos.length);
       if (aliceDatabase) {
         const aliceDataBefore = await aliceDatabase.all();
-        console.log("📊 Before adding - Alice todos:", aliceDataBefore.length);
+        logger.info("📊 Before adding - Alice todos:", aliceDataBefore.length);
       }
       
       // Test write operation
-      console.log('📝 Bob attempting to write todo to shared database...');
+      logger.info('📝 Bob attempting to write todo to shared database...');
       await bobDatabase.put(bobTodo.id, bobTodo);
-      console.log("✅ Bob added todo (should replicate to Alice):", bobTodo);
+      logger.info("✅ Bob added todo (should replicate to Alice):", bobTodo);
 
       // Wait a bit for replication and check status
-      console.log("⏳ Waiting for replication events...");
+      logger.info("⏳ Waiting for replication events...");
       await new Promise((resolve) => setTimeout(resolve, 3000));
       
       // Force check replication status
@@ -2197,7 +2198,7 @@
 
       bobStep = "Bob added todo - check Alice's list for replication";
     } catch (error) {
-      console.error("❌ Bob todo add failed:", error);
+      logger.error("❌ Bob todo add failed:", error);
       bobError = error.message;
       bobStep = `Bob todo add failed: ${error.message}`;
       addResult("bob", "Replication Test", "error", error.message);
@@ -2211,36 +2212,36 @@
 
   // Cleanup functions
   async function cleanup() {
-    console.log("🧹 Cleaning up all instances...");
+    logger.info("🧹 Cleaning up all instances...");
     cleanupRunning = true;
 
     try {
       // Cleanup Alice
       try {
-        console.log("🧹 Cleaning up Alice...");
+        logger.info("🧹 Cleaning up Alice...");
         if (aliceDatabase) await aliceDatabase.close();
         if (aliceOrbitDB) await aliceOrbitDB.stop();
         if (aliceHelia) await aliceHelia.stop();
         if (aliceLibp2p) await aliceLibp2p.stop();
       } catch (error) {
-        console.warn("⚠️ Alice cleanup error:", error.message);
+        logger.warn("⚠️ Alice cleanup error:", error.message);
       }
 
       // Cleanup Bob
       try {
-        console.log("🧹 Cleaning up Bob...");
+        logger.info("🧹 Cleaning up Bob...");
         if (bobDatabase) await bobDatabase.close();
         if (bobOrbitDB) await bobOrbitDB.stop();
         if (bobHelia) await bobHelia.stop();
         if (bobLibp2p) await bobLibp2p.stop();
       } catch (error) {
-        console.warn("⚠️ Bob cleanup error:", error.message);
+        logger.warn("⚠️ Bob cleanup error:", error.message);
       }
 
-      console.log("🧹 Clearing IndexedDB...");
+      logger.info("🧹 Clearing IndexedDB...");
       await clearIndexedDB();
 
-      console.log("🧹 Resetting application state...");
+      logger.info("🧹 Resetting application state...");
       // Reset state
       aliceOrbitDB = null;
       aliceDatabase = null;
@@ -2287,9 +2288,9 @@
       downloadProgress = null;
       showProgress = false;
 
-      console.log("✅ Cleanup completed successfully!");
+      logger.info("✅ Cleanup completed successfully!");
     } catch (error) {
-      console.error("❌ Cleanup failed:", error);
+      logger.error("❌ Cleanup failed:", error);
     } finally {
       cleanupRunning = false;
     }
@@ -2875,7 +2876,7 @@
             kind="secondary"
             icon={bobRunning ? undefined : DataBase}
             on:click={() => {
-              console.log("🔘 Initialize Bob button clicked!");
+              logger.info("🔘 Initialize Bob button clicked!");
               initializeBob();
             }}
             disabled={bobRunning ||
@@ -2896,7 +2897,7 @@
             kind="secondary"
             icon={bobRunning ? undefined : Add}
             on:click={() => {
-              console.log("🔘 Add Bob Todo button clicked!");
+              logger.info("🔘 Add Bob Todo button clicked!");
               addBobTodo();
             }}
             disabled={bobRunning || !bobDatabase}

@@ -5,6 +5,7 @@
 
 import { delegate } from "@le-space/ucanto-client";
 import { Verifier } from "@le-space/ucanto-principal";
+import { logger } from "../../../lib/logger.js";
 
 /**
  * Create Storacha delegation using Alice's P-256 OrbitDB identity
@@ -18,10 +19,10 @@ export async function createP256StorachaDelegation(
   bobP256DID,
   storachaSpaceDID,
 ) {
-  console.log("🎯 Creating P-256 Storacha delegation...");
-  console.log(`   - Alice P-256 DID: ${aliceP256Signer.did()}`);
-  console.log(`   - Bob P-256 DID: ${bobP256DID}`);
-  console.log(`   - Storacha Space: ${storachaSpaceDID}`);
+  logger.info("🎯 Creating P-256 Storacha delegation...");
+  logger.info(`   - Alice P-256 DID: ${aliceP256Signer.did()}`);
+  logger.info(`   - Bob P-256 DID: ${bobP256DID}`);
+  logger.info(`   - Storacha Space: ${storachaSpaceDID}`);
 
   try {
     // Create P-256 verifier for Bob
@@ -45,14 +46,14 @@ export async function createP256StorachaDelegation(
       expiration: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
     });
 
-    console.log("✅ P-256 delegation created successfully!");
-    console.log(`   - Signed by: ${aliceP256Signer.did()} (P-256)`);
-    console.log(`   - Delegated to: ${bobP256DID} (P-256)`);
-    console.log(`   - Capabilities: ${capabilities.length} permissions`);
+    logger.info("✅ P-256 delegation created successfully!");
+    logger.info(`   - Signed by: ${aliceP256Signer.did()} (P-256)`);
+    logger.info(`   - Delegated to: ${bobP256DID} (P-256)`);
+    logger.info(`   - Capabilities: ${capabilities.length} permissions`);
 
     return delegation;
   } catch (error) {
-    console.error("❌ P-256 delegation creation failed:", error);
+    logger.error("❌ P-256 delegation creation failed:", error);
     throw error;
   }
 }
@@ -81,7 +82,7 @@ export async function createBridgeDelegation(
   aliceP256Signer,
   bobP256DID,
 ) {
-  console.log("🌉 Creating bridge delegation: EdDSA → P-256 → P-256");
+  logger.info("🌉 Creating bridge delegation: EdDSA → P-256 → P-256");
 
   try {
     // Step 1: Storacha EdDSA agent delegates to Alice's P-256 DID
@@ -103,7 +104,7 @@ export async function createBridgeDelegation(
       expiration: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
     });
 
-    console.log("✅ Step 1: EdDSA → P-256 delegation created");
+    logger.info("✅ Step 1: EdDSA → P-256 delegation created");
 
     // Step 2: Alice's P-256 DID delegates to Bob's P-256 DID
     const bobVerifier = Verifier.parse(bobP256DID);
@@ -121,8 +122,8 @@ export async function createBridgeDelegation(
       expiration: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
     });
 
-    console.log("✅ Step 2: P-256 → P-256 delegation created");
-    console.log("🌉 Bridge delegation complete: EdDSA → P-256 → P-256");
+    logger.info("✅ Step 2: P-256 → P-256 delegation created");
+    logger.info("🌉 Bridge delegation complete: EdDSA → P-256 → P-256");
 
     return {
       eddsaToP256: eddsaToP256Delegation,
@@ -130,7 +131,7 @@ export async function createBridgeDelegation(
       finalDelegation: p256ToP256Delegation, // Bob uses this
     };
   } catch (error) {
-    console.error("❌ Bridge delegation failed:", error);
+    logger.error("❌ Bridge delegation failed:", error);
     throw error;
   }
 }

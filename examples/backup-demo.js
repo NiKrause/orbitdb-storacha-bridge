@@ -1,90 +1,109 @@
 /**
  * OrbitDB Storacha Bridge - Backup Demo
- * 
+ *
  * Demonstrates how to backup an OrbitDB database to Storacha
  */
 
-import 'dotenv/config'
-import { backupDatabase } from '../lib/orbitdb-storacha-bridge.js'
+import "dotenv/config";
+import { backupDatabase } from "../lib/orbitdb-storacha-bridge.js";
 
 // Import utilities separately
-import { createHeliaOrbitDB } from '../lib/utils.js'
+import { createHeliaOrbitDB } from "../lib/utils.js";
+import { logger } from "../lib/logger.js";
 
 async function runBackupDemo() {
-  console.log('🚀 OrbitDB Storacha Bridge - Backup Demo')
-  console.log('=' .repeat(50))
-  
-  let sourceNode
-  
+  logger.info("🚀 OrbitDB Storacha Bridge - Backup Demo");
+  logger.info("=".repeat(50));
+
+  let sourceNode;
+
   try {
     // Step 1: Create OrbitDB instance
-    console.log('\n📡 Creating OrbitDB instance...')
-    sourceNode = await createHeliaOrbitDB('-backup-demo')
-    
+    logger.info("\n📡 Creating OrbitDB instance...");
+    sourceNode = await createHeliaOrbitDB("-backup-demo");
+
     // Step 2: Create and populate database
-    console.log('\n📊 Creating database...')
-    const database = await sourceNode.orbitdb.open('backup-demo-db', { type: 'events' })
-    
+    logger.info("\n📊 Creating database...");
+    const database = await sourceNode.orbitdb.open("backup-demo-db", {
+      type: "events",
+    });
+
     const sampleEntries = [
-      'First backup entry',
-      'Second backup entry',
-      'Third backup entry'
-    ]
-    
+      "First backup entry",
+      "Second backup entry",
+      "Third backup entry",
+    ];
+
     for (const entry of sampleEntries) {
-      const hash = await database.add(entry)
-      console.log(`   ✓ Added: ${hash} - "${entry}"`)
+      const hash = await database.add(entry);
+      logger.info({ hash, entry }, `   ✓ Added: ${hash} - "${entry}"`);
     }
-    
-    console.log(`\n📋 Database created:`)
-    console.log(`   Name: ${database.name}`)
-    console.log(`   Address: ${database.address}`)
-    console.log(`   Entries: ${(await database.all()).length}`)
-    
+
+    logger.info("\n📋 Database created:");
+    logger.info({ name: database.name }, "   Name");
+    logger.info({ address: database.address }, "   Address");
+    logger.info({ entryCount: (await database.all()).length }, "   Entries");
+
     // Step 3: Backup to Storacha
-    console.log('\n💾 Starting backup...')
-    const backupResult = await backupDatabase(sourceNode.orbitdb, database.address)
-    
+    logger.info("\n💾 Starting backup...");
+    const backupResult = await backupDatabase(
+      sourceNode.orbitdb,
+      database.address,
+    );
+
     if (backupResult.success) {
-      console.log('\n🎉 Backup completed successfully!')
-      console.log(`📋 Manifest CID: ${backupResult.manifestCID}`)
-      console.log(`📊 Blocks uploaded: ${backupResult.blocksUploaded}/${backupResult.blocksTotal}`)
-      console.log(`📈 Block breakdown:`)
+      logger.info("\n🎉 Backup completed successfully!");
+      logger.info({ manifestCID: backupResult.manifestCID }, "📋 Manifest CID");
+      logger.info(
+        {
+          uploaded: backupResult.blocksUploaded,
+          total: backupResult.blocksTotal,
+        },
+        "📊 Blocks uploaded",
+      );
+      logger.info("📈 Block breakdown:");
       for (const [type, count] of Object.entries(backupResult.blockSummary)) {
-        console.log(`   ${type}: ${count} blocks`)
+        logger.info({ type, count }, `   ${type}: ${count} blocks`);
       }
-      
+
       // Save backup info for restoration demo
-      console.log('\n💾 Backup information (save this for restore):')
-      console.log('Manifest CID:', backupResult.manifestCID)
-      console.log('Database Address:', backupResult.databaseAddress)
-      console.log('CID Mappings (sample):', Object.keys(backupResult.cidMappings).slice(0, 2))
-      
+      logger.info("\n💾 Backup information (save this for restore):");
+      logger.info({ manifestCID: backupResult.manifestCID }, "Manifest CID");
+      logger.info(
+        { databaseAddress: backupResult.databaseAddress },
+        "Database Address",
+      );
+      logger.info(
+        {
+          sampleCidMappings: Object.keys(backupResult.cidMappings).slice(0, 2),
+        },
+        "CID Mappings (sample)",
+      );
     } else {
-      console.error('\n❌ Backup failed:', backupResult.error)
-      process.exit(1)
+      logger.error({ error: backupResult.error }, "\n❌ Backup failed");
+      process.exit(1);
     }
-    
   } catch (error) {
-    console.error('\n💥 Demo failed:', error.message)
-    console.error(error.stack)
-    process.exit(1)
-    
+    logger.error(
+      { error: error.message, stack: error.stack },
+      "\n💥 Demo failed",
+    );
+    process.exit(1);
   } finally {
     // Cleanup
     if (sourceNode) {
       try {
-        await sourceNode.orbitdb.stop()
-        await sourceNode.helia.stop()
-        await sourceNode.blockstore.close()
-        await sourceNode.datastore.close()
-        console.log('\n🧹 Cleanup completed')
+        await sourceNode.orbitdb.stop();
+        await sourceNode.helia.stop();
+        await sourceNode.blockstore.close();
+        await sourceNode.datastore.close();
+        logger.info("\n🧹 Cleanup completed");
       } catch (error) {
-        console.warn('⚠️ Cleanup warning:', error.message)
+        logger.warn({ error: error.message }, "⚠️ Cleanup warning");
       }
     }
   }
 }
 
 // Run demo
-runBackupDemo()
+runBackupDemo();
