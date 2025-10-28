@@ -68,7 +68,7 @@ Read more on Medium: [Bridging OrbitDB with Storacha: Decentralized Database Bac
 
 ## Installation
 
-Install the package via npm.
+Install the package via npm. ```npm install orbitdb-storacha-bridge```
 
 ## Environment Setup
 
