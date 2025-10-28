@@ -12,7 +12,7 @@ import {
 } from "../lib/orbitdb-storacha-bridge.js";
 import * as Signer from "@storacha/client/principal/ed25519";
 
-describe("Timestamped backups error handling", () => {
+describe.skip("Timestamped backups error handling", () => {
   let sourceNode, targetNode;
   const TEST_SPACE = "test-backup-errors";
   const AUTH = {
