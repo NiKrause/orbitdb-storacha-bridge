@@ -8,7 +8,6 @@ import {
   restoreFromSpaceCAR,
   listAvailableBackups,
 } from "../lib/backup-car.js";
-import { listStorachaSpaceFiles } from "../lib/orbitdb-storacha-bridge.js";
 
 describe("Timestamped backups", () => {
   let sourceNode, targetNode;
