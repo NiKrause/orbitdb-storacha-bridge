@@ -35,7 +35,7 @@ OrbitDB-Storacha-Bridge is intended for archiving large OrbitDBs on additional d
 
 Initially, each user hosts their own data on their own device and decides with whom they need or want to replicate the data. This depends strongly on the use case. Each app user typically doesn't want or need to replicate with everyone.
 
-OrbitDB-Storacha-Bridge is also useful for emergency cases, for example, when both Alice and Bob lose their data or devices. In that case, Alice, Bob, or even a new user like Peter can restore the work from Storacha with the same identity or with a new identity. We support UCAN authentication and enable UCAN delegation between OrbitDBs, so Alice can delegate access to the same Storacha backup space to whomever she wants for a defined period.
+OrbitDB-Storacha-Bridge is also useful for emergency cases, for example, when both Alice and Bob lose their data or devices. In that case, Alice, Bob, or even a new user like Peter can restore the work from Storacha with the same identity or with a new identity. We support UCAN authentication and plan to enable UCAN delegation between OrbitDBs with OrbitDBAccessControllers. Alice could delegate access to the same Storacha backup space to whomever she wants for a defined period.
 
 It has happened in the past that countries, mobile networks, internet providers, corporate networks, or hotels block IP addresses, ports, and protocols — for example, WebRTC or WebSocket/WebTransport gateways. Although libp2p support many different transport options as backup or alternative and such cases are becoming rarer because in the last years, it would still be desirable to have an additional option - just to be safe. This would allow users to restore an OrbitDB directly from IPFS and to push or upload database states back to it via Storacha/Filecoin after every db change.
 This backup option becomes particularly valuable when peer-to-peer connectivity cannot be established due to network restrictions or when internet standards are broken.
@@ -101,8 +101,7 @@ Svelte components for OrbitDB-Storacha integration in browser environments:
 Authentication component supporting multiple Storacha authentication methods:
 
 - Storacha credentials (Storacha-Key and Storacha Proof)
-- UCAN delegation (delegated UCAN + corresponding private key) 
-- Email registration (create new Storacha account via email confirmation)
+- UCAN authentication (delegated UCAN + corresponding private key) 
 
 #### [`StorachaTest.svelte`](src/components/StorachaTest.svelte)
 
