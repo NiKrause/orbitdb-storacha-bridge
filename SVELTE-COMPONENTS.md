@@ -98,47 +98,23 @@ In the examples/svelte diretory you find three simple to advanced OrbitDB-Storac
 
 ## Live Demo
 
-<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 2rem; margin: 2rem 0;">
+- [See Storacha Integration Widget in Simple Todo Example](https://simple-todo.le-space.de/)
 
-<div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-<h3 style="color: white; margin-top: 0; margin-bottom: 1rem; font-size: 1.25rem;">Storacha Integration Widget in Simple TODO Example</h3>
-<div style="position: relative; padding-bottom: 75%; height: 0; overflow: hidden; border-radius: 8px; background: #000;">
-<iframe 
-  src="https://simple-todo.le-space.de/" 
-  style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;"
-  allow="clipboard-read; clipboard-write"
-  title="Storacha Integration Widget Demo"
-></iframe>
-</div>
-</div>
+---
 
-<div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); border-radius: 12px; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-<h3 style="color: white; margin-top: 0; margin-bottom: 1rem; font-size: 1.25rem;">Simple Backup & Restore Demo</h3>
-<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; background: #000;">
-<iframe 
-  src="https://www.youtube.com/embed/Bzeg5gHlQvE" 
-  style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-  allowfullscreen
-  title="Simple Backup & Restore Live Demo"
-></iframe>
-</div>
-</div>
+### Simple Backup & Restore Live Demo
 
-<div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); border-radius: 12px; padding: 1.5rem; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-<h3 style="color: white; margin-top: 0; margin-bottom: 1rem; font-size: 1.25rem;">OrbitDB Replication Demo</h3>
-<div style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 8px; background: #000;">
-<iframe 
-  src="https://www.youtube.com/embed/ZOYeMIiVwr8" 
-  style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;"
-  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-  allowfullscreen
-  title="OrbitDB Replication Live Demo"
-></iframe>
-</div>
-</div>
+[![Simple Backup & Restore Demo](https://img.youtube.com/vi/Bzeg5gHlQvE/maxresdefault.jpg)](https://www.youtube.com/watch?v=Bzeg5gHlQvE)
 
-</div>
+**Watch on YouTube:** [Simple Backup & Restore Demo →](https://www.youtube.com/watch?v=Bzeg5gHlQvE)
+
+---
+
+### OrbitDB Replication Live Demo
+
+[![OrbitDB Replication Demo](https://img.youtube.com/vi/ZOYeMIiVwr8/maxresdefault.jpg)](https://www.youtube.com/watch?v=ZOYeMIiVwr8)
+
+**Watch on YouTube:** [OrbitDB Replication Demo →](https://www.youtube.com/watch?v=ZOYeMIiVwr8)
 
 ## Return to Main Documentation
 
