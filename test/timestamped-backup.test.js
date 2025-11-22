@@ -13,9 +13,10 @@ describe("Timestamped backups", () => {
   let sourceNode, targetNode;
 
   beforeEach(async () => {
-    // Create test nodes
-    sourceNode = await createHeliaOrbitDB("-source");
-    targetNode = await createHeliaOrbitDB("-target");
+    // Create test nodes connected to public IPFS network
+    // This allows them to fetch backup metadata from IPFS
+    sourceNode = await createHeliaOrbitDB("-source", true);
+    targetNode = await createHeliaOrbitDB("-target", true);
   });
 
   afterEach(async () => {
@@ -95,9 +96,10 @@ describe("Timestamped backups", () => {
     // Wait for Storacha to process uploads (eventual consistency)
     await new Promise((resolve) => setTimeout(resolve, 3000));
 
-    // List available backups
+    // List available backups - pass the OrbitDB instance so it can use Helia
     const backups = await listAvailableBackups({
       spaceName: "test-space",
+      orbitdb: sourceNode.orbitdb,
     });
 
     // Should have at least 2 backups (may have more from previous test runs)
