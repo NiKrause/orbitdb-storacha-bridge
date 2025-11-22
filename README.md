@@ -132,15 +132,34 @@ For browser-based integration, this project includes Svelte components for authe
 
 ## Logging
 
-The library uses **Pino** for structured, high-performance logging. Control logging with environment variables:
+The library uses **@libp2p/logger** for consistent logging across the libp2p ecosystem. Control logging with the `DEBUG` environment variable:
 
+**Node.js:**
 ```bash
-# Set log level (trace, debug, info, warn, error, fatal, silent)
-export LOG_LEVEL=debug
+# Enable all OrbitDB Storacha Bridge logs
+DEBUG=libp2p:orbitdb-storacha:* node your-script.js
 
-# Enable pretty printing for development
-export LOG_PRETTY=true
+# Enable specific components
+DEBUG=libp2p:orbitdb-storacha:bridge node your-script.js
+
+# Enable all libp2p logs (includes this library + libp2p internals)
+DEBUG=libp2p:* node your-script.js
 ```
+
+**Browser:**
+```javascript
+// In browser console or before loading the application
+localStorage.setItem('debug', 'libp2p:orbitdb-storacha:*')
+// Then refresh the page
+```
+
+The logger supports printf-style formatting:
+- `%s` - string
+- `%d` - number
+- `%o` - object
+- `%p` - peer ID
+- `%b` - base58btc encoded data
+- `%t` - base32 encoded data
 
 ## Testing
 

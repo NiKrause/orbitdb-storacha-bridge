@@ -10,7 +10,7 @@
     Column,
   } from "carbon-components-svelte";
   import { identityService } from "../../lib/services/IdentityService.js";
-  import { logger } from "../../../../lib/logger.js";
+  import { logger } from "../../lib/logger.js";
 
   let testing = false;
   let testResults = [];

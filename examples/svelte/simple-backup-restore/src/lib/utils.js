@@ -14,7 +14,7 @@ import { createHelia } from "helia";
 import { createOrbitDB } from "@orbitdb/core";
 import { LevelBlockstore } from "blockstore-level";
 import { LevelDatastore } from "datastore-level";
-import { logger } from "../../../../lib/logger.js";
+import { logger } from "./logger.js";
 
 /**
  * Clean up OrbitDB directories

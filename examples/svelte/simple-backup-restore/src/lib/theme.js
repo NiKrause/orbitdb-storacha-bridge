@@ -1,5 +1,5 @@
 import { writable } from "svelte/store";
-import { logger } from "../../../../lib/logger.js";
+import { logger } from "./logger.js";
 
 // Create a writable store for the theme
 function createThemeStore() {

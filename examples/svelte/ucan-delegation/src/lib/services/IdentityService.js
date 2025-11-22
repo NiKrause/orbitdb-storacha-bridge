@@ -18,7 +18,7 @@ import {
   storeWebAuthnCredential,
   loadWebAuthnCredential,
 } from "@le-space/orbitdb-identity-provider-webauthn-did";
-import { logger } from "../../../../lib/logger.js";
+import { logger } from "../logger.js";
 
 export class IdentityService {
   constructor() {

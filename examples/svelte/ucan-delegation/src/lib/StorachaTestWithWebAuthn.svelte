@@ -68,7 +68,7 @@
     Checkmark,
     Warning,
   } from "carbon-icons-svelte";
-  import { logger } from "../../../lib/logger.js";
+  import { logger } from "./logger.js";
 
   // Storacha authentication state
   let storachaAuthenticated = false;

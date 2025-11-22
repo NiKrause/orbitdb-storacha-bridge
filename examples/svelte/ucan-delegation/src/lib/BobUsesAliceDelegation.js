@@ -5,7 +5,7 @@
 // Commented out unused imports
 // import { invoke } from "@ucanto/core";
 // import { Verifier } from "@ucanto/principal";
-import { logger } from "../../../lib/logger.js";
+import { logger } from "./logger.js";
 
 /**
  * Bob creates a Storacha client using Alice's delegation

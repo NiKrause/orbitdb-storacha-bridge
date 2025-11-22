@@ -17,7 +17,7 @@ import * as ed25519 from "@le-space/ucanto-principal/ed25519";
 import { generateMnemonic, mnemonicToSeedSync } from "@scure/bip39";
 import { wordlist as english } from "@scure/bip39/wordlists/english";
 import { createHash } from "crypto";
-import { logger } from "../../../lib/logger.js";
+import { logger } from "./logger.js";
 
 /**
  * Initialize Storacha client with key/proof credentials

@@ -18,7 +18,7 @@ import { autoNAT } from "@libp2p/autonat";
 import { gossipsub } from "@chainsafe/libp2p-gossipsub";
 import { pubsubPeerDiscovery } from "@libp2p/pubsub-peer-discovery";
 import { bootstrap } from "@libp2p/bootstrap";
-import { logger } from "../../../lib/logger.js";
+import { logger } from "./logger.js";
 import { all } from "@libp2p/websockets/filters";
 
 // Local relay configuration (your relay)

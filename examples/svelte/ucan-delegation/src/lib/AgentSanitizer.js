@@ -5,7 +5,7 @@
  * which can occur when Storacha agents have internal properties set to undefined.
  */
 
-import { logger } from "../../../lib/logger.js";
+import { logger } from "./logger.js";
 
 /**
  * Detect signature algorithm from DID or agent properties

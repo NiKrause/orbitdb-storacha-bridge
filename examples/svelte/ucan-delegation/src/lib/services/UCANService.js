@@ -4,7 +4,7 @@
  */
 
 import { sanitizeAgent } from "../AgentSanitizer.js";
-import { logger } from "../../../../lib/logger.js";
+import { logger } from "../logger.js";
 
 export class UCANService {
   constructor() {

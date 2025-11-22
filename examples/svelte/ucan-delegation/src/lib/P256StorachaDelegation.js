@@ -5,7 +5,7 @@
 
 import { delegate } from "@le-space/ucanto-client";
 import { Verifier } from "@le-space/ucanto-principal";
-import { logger } from "../../../lib/logger.js";
+import { logger } from "./logger.js";
 
 /**
  * Create Storacha delegation using Alice's P-256 OrbitDB identity

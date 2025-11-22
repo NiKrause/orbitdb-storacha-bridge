@@ -6,7 +6,7 @@
 import { createOrbitDB, Identities } from "@orbitdb/core";
 import { createLibp2pNode, createHeliaNode } from "../p2p.js";
 import UCANOrbitDBAccessController from "../UCANOrbitDBAccessController.js";
-import { logger } from "../../../../lib/logger.js";
+import { logger } from "../logger.js";
 
 export class OrbitDBService {
   constructor() {

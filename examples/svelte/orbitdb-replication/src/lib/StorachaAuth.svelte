@@ -35,7 +35,7 @@
   } from "./storacha-backup.js";
 
   const dispatch = createEventDispatcher();
-  import { logger } from "../../../../../lib/logger.js";
+  import { logger } from "./logger.js";
 
   // Component props
   export let autoLogin = true;

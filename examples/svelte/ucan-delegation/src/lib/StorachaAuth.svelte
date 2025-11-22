@@ -1,6 +1,6 @@
 <script>
   import { createEventDispatcher, onMount } from "svelte";
-  import { logger } from "../../../lib/logger.js";
+  import { logger } from "./logger.js";
   // Import Carbon components and icons
   import {
     Tile,

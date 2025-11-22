@@ -36,13 +36,13 @@ async function runBackupDemo() {
 
     for (const entry of sampleEntries) {
       const hash = await database.add(entry);
-      logger.info({ hash, entry }, `   ✓ Added: ${hash} - "${entry}"`);
+      logger.info(`   ✓ Added: %s - "%s"`, hash, entry);
     }
 
     logger.info("\n📋 Database created:");
-    logger.info({ name: database.name }, "   Name");
-    logger.info({ address: database.address }, "   Address");
-    logger.info({ entryCount: (await database.all()).length }, "   Entries");
+    logger.info("   Name: %s", database.name);
+    logger.info("   Address: %s", database.address);
+    logger.info("   Entries: %d", (await database.all()).length);
 
     // Step 3: Backup to Storacha
     logger.info("\n💾 Starting backup...");
@@ -53,40 +53,37 @@ async function runBackupDemo() {
 
     if (backupResult.success) {
       logger.info("\n🎉 Backup completed successfully!");
-      logger.info({ manifestCID: backupResult.manifestCID }, "📋 Manifest CID");
+      logger.info("📋 Manifest CID: %s", backupResult.manifestCID);
       logger.info(
-        {
-          uploaded: backupResult.blocksUploaded,
-          total: backupResult.blocksTotal,
-        },
-        "📊 Blocks uploaded",
+        "📊 Blocks uploaded: %d/%d",
+        backupResult.blocksUploaded,
+        backupResult.blocksTotal,
       );
       logger.info("📈 Block breakdown:");
       for (const [type, count] of Object.entries(backupResult.blockSummary)) {
-        logger.info({ type, count }, `   ${type}: ${count} blocks`);
+        logger.info(`   ${type}: %d blocks`, count);
       }
 
       // Save backup info for restoration demo
       logger.info("\n💾 Backup information (save this for restore):");
-      logger.info({ manifestCID: backupResult.manifestCID }, "Manifest CID");
+      logger.info("Manifest CID: %s", backupResult.manifestCID);
       logger.info(
-        { databaseAddress: backupResult.databaseAddress },
-        "Database Address",
+        "Database Address: %s",
+        backupResult.databaseAddress,
       );
       logger.info(
-        {
-          sampleCidMappings: Object.keys(backupResult.cidMappings).slice(0, 2),
-        },
-        "CID Mappings (sample)",
+        "CID Mappings (sample): %o",
+        Object.keys(backupResult.cidMappings).slice(0, 2),
       );
     } else {
-      logger.error({ error: backupResult.error }, "\n❌ Backup failed");
+      logger.error("\n❌ Backup failed: %o", backupResult.error);
       process.exit(1);
     }
   } catch (error) {
     logger.error(
-      { error: error.message, stack: error.stack },
-      "\n💥 Demo failed",
+      "\n💥 Demo failed: %s\nStack: %s",
+      error.message,
+      error.stack,
     );
     process.exit(1);
   } finally {
@@ -99,7 +96,7 @@ async function runBackupDemo() {
         await sourceNode.datastore.close();
         logger.info("\n🧹 Cleanup completed");
       } catch (error) {
-        logger.warn({ error: error.message }, "⚠️ Cleanup warning");
+        logger.warn("⚠️ Cleanup warning: %s", error.message);
       }
     }
   }

@@ -42,7 +42,7 @@
   export let compact = false;
   export let enableSeedAuth = true;
   export let enableEmailAuth = true;
-  import { logger } from "../../../../lib/logger.js";
+  import { logger } from "./logger.js";
 
   // Authentication state
   let isAuthenticated = false;
