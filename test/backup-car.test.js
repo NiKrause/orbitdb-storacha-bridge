@@ -21,7 +21,7 @@ import {
   createCARFromBlocks,
 } from "../lib/backup-car.js";
 import { backupDatabase as backupDatabaseLegacy } from "../lib/orbitdb-storacha-bridge.js";
-import { createHeliaOrbitDB } from "../lib/utils.js";
+import { createHeliaOrbitDB, cleanupOrbitDBDirectories } from "../lib/utils.js";
 
 describe("CAR-based Timestamped Backup", () => {
   let orbitdb;
@@ -41,6 +41,7 @@ describe("CAR-based Timestamped Backup", () => {
       await orbitdb.blockstore.close();
       await orbitdb.datastore.close();
     }
+    await cleanupOrbitDBDirectories();
   });
 
   describe("createCARFromBlocks", () => {
@@ -372,6 +373,7 @@ describe("List and Restore Specific Backups", () => {
       await orbitdb.helia.stop();
       await orbitdb.blockstore.close();
       await orbitdb.datastore.close();
+      await cleanupOrbitDBDirectories();
     }
   });
 
@@ -395,6 +397,7 @@ describe("List and Restore Specific Backups", () => {
       await orbitdb.helia.stop();
       await orbitdb.blockstore.close();
       await orbitdb.datastore.close();
+      await cleanupOrbitDBDirectories();
     }
   });
 });
@@ -431,6 +434,7 @@ describe("Integration: Full Backup and Restore Cycle (Mocked)", () => {
       await orbitdb.helia.stop();
       await orbitdb.blockstore.close();
       await orbitdb.datastore.close();
+      await cleanupOrbitDBDirectories();
     }
   });
 });
@@ -558,6 +562,7 @@ describe("Integration: Real Storacha Credentials (when available)", () => {
           await targetNode.helia.stop();
           await targetNode.blockstore.close();
           await targetNode.datastore.close();
+          await cleanupOrbitDBDirectories();
         }
       } catch (error) {
         // Cleanup on error
@@ -571,7 +576,11 @@ describe("Integration: Real Storacha Credentials (when available)", () => {
             console.warn("Cleanup error:", cleanupError.message);
           }
         }
+        await cleanupOrbitDBDirectories();
         throw error;
+      } finally {
+        // Final cleanup to ensure directories are removed
+        await cleanupOrbitDBDirectories();
       }
     },
     120000,
