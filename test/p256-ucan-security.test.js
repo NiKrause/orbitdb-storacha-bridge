@@ -12,9 +12,9 @@
  * @author @NiKrause
  */
 
-import * as P256 from "@ucanto/principal/p256";
+import * as P256 from "@le-space/ucanto-principal/p256";
 import * as Ed25519 from "@ucanto/principal/ed25519";
-import { Verifier } from "@ucanto/principal";
+import { Verifier } from "@le-space/ucanto-principal";
 import { webcrypto } from "crypto";
 
 // Mock WebCrypto for CI environments

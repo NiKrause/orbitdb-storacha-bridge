@@ -21,7 +21,7 @@ describe("Timestamped backups", () => {
   afterEach(async () => {
     // Wait for any pending operations
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    
+
     // Cleanup
     if (sourceNode) {
       // Close all open databases first
@@ -66,15 +66,15 @@ describe("Timestamped backups", () => {
 
     // Wait for database operations to complete and flush to storage
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    
+
     // Save the address
     const dbAddress = sourceDB.address;
-    
+
     // Create first backup with CAR
     const backup1 = await backupDatabaseCAR(sourceNode.orbitdb, dbAddress, {
       spaceName: "test-space",
     });
-    
+
     // Database is still open - backup function doesn't close it
     expect(backup1.success).toBe(true);
     expect(backup1.method).toBe("car-timestamped");
@@ -86,9 +86,13 @@ describe("Timestamped backups", () => {
 
     // Add more data and create second backup
     await sourceDB.add("Test entry 3");
-    const backup2 = await backupDatabaseCAR(sourceNode.orbitdb, sourceDB.address, {
-      spaceName: "test-space",
-    });
+    const backup2 = await backupDatabaseCAR(
+      sourceNode.orbitdb,
+      sourceDB.address,
+      {
+        spaceName: "test-space",
+      },
+    );
     expect(backup2.success).toBe(true);
     expect(backup2.method).toBe("car-timestamped");
 
@@ -111,7 +115,7 @@ describe("Timestamped backups", () => {
       expect(backup.date).toBeDefined();
       expect(backup.metadata.spaceName).toBe("test-space");
     }
-    
+
     // Close source database before cleanup
     await sourceDB.close();
   }, 120000); // Long timeout for backup operations + Storacha API calls
@@ -127,17 +131,17 @@ describe("Timestamped backups", () => {
 
     // Wait for database operations to complete
     await new Promise((resolve) => setTimeout(resolve, 2000));
-    
+
     const dbAddress = sourceDB.address;
-    
+
     // Create backup
     const backup = await backupDatabaseCAR(sourceNode.orbitdb, dbAddress, {
       spaceName: "test-restore-space",
     });
-    
+
     expect(backup.success).toBe(true);
     await sourceDB.close();
-    
+
     // Wait longer for Storacha to process and avoid rate limiting
     // When running multiple tests, we need more time to avoid 429 errors
     await new Promise((resolve) => setTimeout(resolve, 8000));
@@ -155,8 +159,8 @@ describe("Timestamped backups", () => {
     // Verify restored data
     const restoredEntries = await restored.database.all();
     expect(restoredEntries.length).toBe(3);
-    expect(restoredEntries.map(e => e.value)).toEqual(
-      expect.arrayContaining(["Entry 1", "Entry 2", "Entry 3"])
+    expect(restoredEntries.map((e) => e.value)).toEqual(
+      expect.arrayContaining(["Entry 1", "Entry 2", "Entry 3"]),
     );
 
     // Cleanup
