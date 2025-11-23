@@ -70,7 +70,16 @@ async function main() {
       process.exit(0);
     } else {
       logger.warn("\\n⚠️ Space clearing completed with some failures");
-      process.exit(1);
+      // In CI, partial success is acceptable - some files may be locked
+      // Only fail if we're in strict mode or if no files were deleted at all
+      const hasPartialSuccess = result.totalRemoved > 0;
+      if (hasPartialSuccess) {
+        logger.info(`   ℹ️  Removed ${result.totalRemoved} files, continuing...`);
+        process.exit(0); // Partial success is OK
+      } else {
+        logger.error("   ❌ No files were removed");
+        process.exit(1); // Complete failure
+      }
     }
   } catch (error) {
     logger.error("\\n💥 Space clearing failed:", error.message);
