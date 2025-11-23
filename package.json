@@ -24,7 +24,7 @@
     "test:p256-ucan": "npm test -- test/p256-ucan-security.test.js",
     "test:car-backup": "npm test -- test/backup-car.test.js",
     "test:timestamped-backup": "npm test -- test/timestamped-backup.test.js",
-    "clear-space": "node scripts/clear-space.js",
+    "clear-space": "node examples/clear-space.js",
     "car-demo": "node examples/car-backup-demo.js",
     "ucan-demo": "node examples/ucan-demo.js",
     "lint": "eslint '{lib,examples,test}/**/*.{js,svelte}' --ignore-pattern 'examples/svelte/*/build/**' --ignore-pattern 'examples/svelte/*/dist/**'",

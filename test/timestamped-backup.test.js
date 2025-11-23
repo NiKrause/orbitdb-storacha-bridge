@@ -116,6 +116,33 @@ describe("Timestamped backups", () => {
       expect(backup.metadata.spaceName).toBe("test-space");
     }
 
+    // After listing backups, also verify we can restore from one
+    if (backups.length > 0) {
+      const latestBackup = backups[0];
+      
+      // Create a new node to restore to
+      const restoreNode = await createHeliaOrbitDB("-restore-verify");
+      
+      // Restore from the latest backup - use metadataCID instead of timestamp
+      // OR find the backup by timestamp first
+      const restored = await restoreFromSpaceCAR(restoreNode.orbitdb, {
+        spaceName: "test-space",
+        // Use metadataCID directly, or let it find latest (don't use timestamp)
+        metadataCID: latestBackup.metadataCID,
+      });
+      
+      expect(restored.success).toBe(true);
+      
+      // Verify restored data matches what we backed up
+      const restoredEntries = await restored.database.all();
+      expect(restoredEntries.length).toBeGreaterThanOrEqual(2); // At least 2 entries from first backup
+      
+      // Cleanup
+      await restored.database.close();
+      await restoreNode.orbitdb.stop();
+      await restoreNode.helia.stop();
+    }
+
     // Close source database before cleanup
     await sourceDB.close();
   }, 120000); // Long timeout for backup operations + Storacha API calls
@@ -158,10 +185,37 @@ describe("Timestamped backups", () => {
 
     // Verify restored data
     const restoredEntries = await restored.database.all();
+    
+    // Check exact count
     expect(restoredEntries.length).toBe(3);
-    expect(restoredEntries.map((e) => e.value)).toEqual(
-      expect.arrayContaining(["Entry 1", "Entry 2", "Entry 3"]),
-    );
+    
+    // Get original entries for comparison
+    const originalEntries = ["Entry 1", "Entry 2", "Entry 3"];
+    
+    // Extract values and sort for comparison (order may vary)
+    const restoredValues = restoredEntries
+      .map((e) => e.value)
+      .sort();
+    const expectedValues = [...originalEntries].sort();
+    
+    // Verify exact match (same values, same count, no extras)
+    expect(restoredValues).toEqual(expectedValues);
+    
+    // Verify entry structure (each entry should have proper OrbitDB structure)
+    restoredEntries.forEach((entry) => {
+      expect(entry).toHaveProperty("value");
+      expect(entry).toHaveProperty("hash");
+      // Events databases don't have 'id' property, they have 'hash' instead
+      // Remove the id check for events databases
+      expect(typeof entry.value).toBe("string");
+      expect(originalEntries).toContain(entry.value);
+      // Verify hash format (OrbitDB format)
+      expect(entry.hash).toMatch(/^zdpu/);
+    });
+    
+    // Verify no duplicates
+    const uniqueValues = new Set(restoredValues);
+    expect(uniqueValues.size).toBe(restoredValues.length);
 
     // Cleanup
     await restored.database.close();
