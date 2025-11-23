@@ -50,10 +50,14 @@ jobs:
           echo "STORACHA_KEY=${{ secrets.STORACHA_KEY }}" >> .env
           echo "STORACHA_PROOF=${{ secrets.STORACHA_PROOF }}" >> .env
 
+      - name: Clear Storacha space before tests
+        run: npm run clear-space
+
       - name: Run integration tests
         run: npm run test:integration
         env:
           NODE_OPTIONS: '--experimental-vm-modules --no-warnings'
+          DEBUG: 'libp2p:*'
 
       - name: Clean up test artifacts
         if: always()
@@ -81,10 +85,14 @@ jobs:
           echo "STORACHA_KEY=${{ secrets.STORACHA_KEY }}" >> .env
           echo "STORACHA_PROOF=${{ secrets.STORACHA_PROOF }}" >> .env
 
+      - name: Clear Storacha space before tests
+        run: npm run clear-space
+
       - name: Run CAR backup tests
         run: npm run test:car-backup
         env:
           NODE_OPTIONS: '--experimental-vm-modules --no-warnings'
+          DEBUG: 'libp2p:*'
 
       - name: Clean up test artifacts
         if: always()
@@ -116,6 +124,7 @@ jobs:
         run: npm run test:p256-ucan
         env:
           NODE_OPTIONS: '--experimental-vm-modules --no-warnings'
+          DEBUG: 'libp2p:*'
 
       - name: Clean up test artifacts
         if: always()
@@ -142,10 +151,14 @@ jobs:
           echo "STORACHA_KEY=${{ secrets.STORACHA_KEY }}" >> .env
           echo "STORACHA_PROOF=${{ secrets.STORACHA_PROOF }}" >> .env
 
+      - name: Clear Storacha space before tests
+        run: npm run clear-space
+
       - name: Run timestamped backup tests
         run: npm run test:timestamped-backup
         env:
           NODE_OPTIONS: '--experimental-vm-modules --no-warnings'
+          DEBUG: 'libp2p:*'
 
       - name: Clean up test artifacts
         if: always()
