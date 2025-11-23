@@ -7,7 +7,7 @@
  */
 
 import { promises as fs } from "fs";
-import { OrbitDBStorachaBridgeUCAN } from "./lib/ucan-bridge.js";
+import { OrbitDBStorachaBridgeUCAN } from "../lib/ucan-bridge.js";
 import { logger } from "../lib/logger.js";
 
 async function testUCANListing() {

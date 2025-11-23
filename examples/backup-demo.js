@@ -67,10 +67,7 @@ async function runBackupDemo() {
       // Save backup info for restoration demo
       logger.info("\n💾 Backup information (save this for restore):");
       logger.info("Manifest CID: %s", backupResult.manifestCID);
-      logger.info(
-        "Database Address: %s",
-        backupResult.databaseAddress,
-      );
+      logger.info("Database Address: %s", backupResult.databaseAddress);
       logger.info(
         "CID Mappings (sample): %o",
         Object.keys(backupResult.cidMappings).slice(0, 2),
@@ -80,11 +77,7 @@ async function runBackupDemo() {
       process.exit(1);
     }
   } catch (error) {
-    logger.error(
-      "\n💥 Demo failed: %s\nStack: %s",
-      error.message,
-      error.stack,
-    );
+    logger.error("\n💥 Demo failed: %s\nStack: %s", error.message, error.stack);
     process.exit(1);
   } finally {
     // Cleanup

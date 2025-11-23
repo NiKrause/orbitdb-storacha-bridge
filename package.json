@@ -23,13 +23,10 @@
     "test:integration": "npm test -- test/integration.test.js",
     "test:p256-ucan": "npm test -- test/p256-ucan-security.test.js",
     "test:car-backup": "npm test -- test/backup-car.test.js",
-    "test:space-download": "node --experimental-vm-modules test/test-space-download-approach.js",
-    "test:w3-cli": "node --experimental-vm-modules test/test-w3-cli-integration.js",
+    "test:timestamped-backup": "npm test -- test/timestamped-backup.test.js",
     "clear-space": "node scripts/clear-space.js",
-    "ucan-demo": "node examples/ucan-demo.js",
     "car-demo": "node examples/car-backup-demo.js",
-    "seed-backup-demo": "node examples/seed-to-orbitdb-backup.js",
-    "monitor-propagation": "node monitor-propagation.js",
+    "ucan-demo": "node examples/ucan-demo.js",
     "lint": "eslint '{lib,examples,test}/**/*.{js,svelte}' --ignore-pattern 'examples/svelte/*/build/**' --ignore-pattern 'examples/svelte/*/dist/**'",
     "format": "prettier --write lib/ examples/ test/ --ignore-path '.prettierignore'",
     "clean": "rm -rf ./cid-bridge-test* ./demo-test*",
@@ -86,6 +83,7 @@
   },
   "devDependencies": {
     "@ibm/plex": "^6.4.1",
+    "@le-space/ucanto-principal": "^9.1.1",
     "@types/jest": "^29.5.5",
     "@ucanto/core": "^10.4.0",
     "@ucanto/principal": "^9.0.2",
@@ -121,12 +119,10 @@
     "passWithNoTests": true,
     "maxWorkers": 1,
     "testPathIgnorePatterns": [
+      "/node_modules/",
       "/examples/",
-      "/examples/svelte/",
-      "<rootDir>/test/car-storage.test.js",
-      "<rootDir>/test/integration.test.js",
-      "<rootDir>/test/access-control-integration.test.js",
-      "<rootDir>/test/p256-ucan-security.test.js"
+      "/dist/",
+      "/coverage/"
     ]
   }
 }
