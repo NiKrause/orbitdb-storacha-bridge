@@ -88,6 +88,41 @@ async function displaySpaceAndDIDInfo(options) {
 }
 
 /**
+ * Helper function to wait for peers to connect (with timeout)
+ * @param {Object} heliaNode - The Helia node instance
+ * @param {number} minPeers - Minimum number of peers to wait for (default: 1)
+ * @param {number} timeout - Maximum time to wait in milliseconds (default: 30000)
+ * @returns {Promise<number>} The number of connected peers
+ */
+async function waitForPeers(heliaNode, minPeers = 1, timeout = 30000) {
+  if (!heliaNode?.libp2p) {
+    return 0;
+  }
+
+  const startTime = Date.now();
+  while (Date.now() - startTime < timeout) {
+    try {
+      const connections = heliaNode.libp2p.getConnections();
+      const peerCount = connections.length;
+      if (peerCount >= minPeers) {
+        return peerCount;
+      }
+      // Wait a bit before checking again
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    } catch (error) {
+      logger.warn(`Error checking peer count: ${error.message}`);
+      return 0;
+    }
+  }
+  // Return current count even if minPeers not reached
+  try {
+    return heliaNode.libp2p.getConnections().length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
  * @namespace OrbitDBStorachaBridgeIntegration
  * @description Integration test suite for OrbitDB Storacha Bridge functionality
  */
@@ -261,6 +296,9 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       // Create target node with different suffix for complete isolation
       targetNode = await createHeliaOrbitDB("-test-target-restore");
 
+      // Wait for peers to connect before restore operations
+      await waitForPeers(targetNode, 5, 10000); // Wait up to 10s, but don't require any peers
+
       // Restore database using the isolated target node with explicit credentials
       const restoreResult = await restoreDatabase(
         targetNode.orbitdb,
@@ -371,6 +409,9 @@ describe("OrbitDB Storacha Bridge Integration", () => {
 
       // Create isolated target node
       targetNode = await createHeliaOrbitDB("-test-target-space");
+
+      // Wait for peers to connect before restore operations
+      await waitForPeers(targetNode, 5, 10000); // Wait up to 10s, but don't require any peers
 
       // Restore from space WITHOUT CID mappings (breakthrough feature)
       const restoreResult = await restoreDatabaseFromSpace(targetNode.orbitdb, {
@@ -551,6 +592,9 @@ describe("OrbitDB Storacha Bridge Integration", () => {
 
       // Create isolated target node
       targetNode = await createHeliaOrbitDB("-test-target-keyvalue");
+
+      // Wait for peers to connect before restore operations
+      await waitForPeers(targetNode, 5, 10000); // Wait up to 10s, but don't require any peers
 
       // Restore from space WITHOUT CID mappings (breakthrough feature)
       const restoreResult = await restoreDatabaseFromSpace(targetNode.orbitdb, {
@@ -855,6 +899,9 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       targetNode = await createHeliaOrbitDB("-test-target-keyvalue-del");
       logger.info("\n🎯 Created isolated target node for restoration...");
 
+      // Wait for peers to connect before restore operations
+      await waitForPeers(targetNode, 5, 10000); // Wait up to 10s, but don't require any peers
+
       // **Restore from space with DEL operations**
       logger.info(
         "\n📥 Restoring database with DEL operations from Storacha...",
@@ -1092,6 +1139,9 @@ describe("OrbitDB Storacha Bridge Integration", () => {
 
       // **Create isolated target node**
       targetNode = await createHeliaOrbitDB("-test-target-docs-del");
+
+      // Wait for peers to connect before restore operations
+      await waitForPeers(targetNode, 5, 10000); // Wait up to 10s, but don't require any peers
 
       // **Restore from space**
       const restoreResult = await restoreDatabaseFromSpace(targetNode.orbitdb, {

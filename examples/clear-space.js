@@ -74,7 +74,9 @@ async function main() {
       // Only fail if we're in strict mode or if no files were deleted at all
       const hasPartialSuccess = result.totalRemoved > 0;
       if (hasPartialSuccess) {
-        logger.info(`   ℹ️  Removed ${result.totalRemoved} files, continuing...`);
+        logger.info(
+          `   ℹ️  Removed ${result.totalRemoved} files, continuing...`,
+        );
         process.exit(0); // Partial success is OK
       } else {
         logger.error("   ❌ No files were removed");
