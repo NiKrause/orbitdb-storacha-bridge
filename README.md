@@ -27,6 +27,7 @@
     - [NodeJS Demo Scripts (full backup with Manifest, Identity and AccessController and entries blocks)](#nodejs-demo-scripts-full-backup-with-manifest-identity-and-accesscontroller-and-entries-blocks)
     - [Svelte Components](#svelte-components)
   - [How It Works](#how-it-works)
+  - [Restore Mechanism](#restore-mechanism)
   - [Logging](#logging)
   - [Testing](#testing)
     - [CAR Storage Tests](#car-storage-tests)
@@ -129,6 +130,10 @@ For browser-based integration, this project includes Svelte components for authe
 3. **Block Discovery** - Lists all files in Storacha space using Storacha SDK APIs
 4. **CID Bridging** - Converts between Storacha CIDs (`bafkre*`) and OrbitDB CIDs (`zdpu*`)
 5. **Reconstruct Database** - Reassembles blocks and opens database with original identity
+
+## Restore Mechanism
+
+The restore process uses a **ipfs-p2p-first approach with ipfs-http-gateway fallback** for downloading backups for restore. File listing and metadata discovery are currently performed via the Storacha SDK (using Storacha gateway API). We are working on an **IPNS-based mechanism** to find the latest heads blocks and OrbitDB address directly from the IPFS network via IPNS, eliminating the need to list all files via the centralized Storacha gateway API.
 
 ## Logging
 

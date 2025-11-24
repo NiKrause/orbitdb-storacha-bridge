@@ -850,7 +850,7 @@ describe("Network Download Tests", () => {
       expect(new TextDecoder().decode(networkBytes)).toBe(testContent);
     }, 60000);
 
-    it.only("Restore from network should match restore from gateway", async () => {
+    it("Restore from network should match restore from gateway", async () => {
       // Create backup
       const sourceNode = await createHeliaOrbitDB("-source-consistency");
       const sourceDB = await sourceNode.orbitdb.open("test-consistency", {

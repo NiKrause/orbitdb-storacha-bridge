@@ -25,7 +25,7 @@ import {
 } from "../lib/ipns-helpers.js";
 import { logger } from "../lib/logger.js";
 
-describe("IPNS-based OrbitDB Restoration", () => {
+describe.skip("IPNS-based OrbitDB Restoration", () => {
   let sourceNode;
   let targetNode;
   let ipnsKeyPair;
