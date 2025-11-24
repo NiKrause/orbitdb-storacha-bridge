@@ -876,11 +876,11 @@ describe("Network Download Tests", () => {
 
       // Restore using network
       const networkNode = await createHeliaOrbitDB("-network-consistency");
-      
+
       // Wait for peers to connect before attempting network restore
       // Network restore requires peers, so wait for at least 5 connections
       await waitForPeers(networkNode, 5, 30000); // Wait up to 30s for 5 peers
-      
+
       logPeerCount(networkNode, "Result consistency - network restore");
       const networkRestored = await restoreFromSpaceCAR(networkNode.orbitdb, {
         spaceName: "test-consistency-space",
