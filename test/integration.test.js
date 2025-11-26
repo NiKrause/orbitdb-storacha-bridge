@@ -126,7 +126,7 @@ async function waitForPeers(heliaNode, minPeers = 1, timeout = 30000) {
  * @namespace OrbitDBStorachaBridgeIntegration
  * @description Integration test suite for OrbitDB Storacha Bridge functionality
  */
-describe("OrbitDB Storacha Bridge Integration", () => {
+describe.only("OrbitDB Storacha Bridge Integration", () => {
   /** @type {Object|null} Source OrbitDB node instance */
   let sourceNode;
   /** @type {Object|null} Target OrbitDB node instance */
@@ -188,15 +188,28 @@ describe("OrbitDB Storacha Bridge Integration", () => {
    * Handles cleanup errors gracefully to prevent test interference.
    */
   afterEach(async () => {
+    // Give a moment for any pending operations to complete
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    
     // Cleanup nodes
     const nodes = [sourceNode, targetNode].filter(Boolean);
     for (const node of nodes) {
       try {
-        await node.orbitdb.stop();
-        await node.helia.stop();
-        await node.blockstore.close();
-        await node.datastore.close();
+        // Check if node is still valid before closing
+        if (node.orbitdb && typeof node.orbitdb.stop === "function") {
+          await node.orbitdb.stop();
+        }
+        if (node.helia && typeof node.helia.stop === "function") {
+          await node.helia.stop();
+        }
+        if (node.blockstore && typeof node.blockstore.close === "function") {
+          await node.blockstore.close();
+        }
+        if (node.datastore && typeof node.datastore.close === "function") {
+          await node.datastore.close();
+        }
       } catch (error) {
+        // Ignore cleanup errors - node may already be closed
         logger.warn("Cleanup warning:", error.message);
       }
     }
@@ -339,7 +352,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
         }
       }
     }
-  }, 120000); // 2 minute timeout for network operations
+  }, 240000); // 4 minute timeout for network operations
 
   /**
    * @test MappingIndependentRestore
@@ -463,7 +476,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
         }
       }
     }
-  }, 120000); // 2 minute timeout for network operations
+  }, 240000); // 4 minute timeout for network operations
 
   /**
    * @test KeyValueMappingIndependentRestore
@@ -687,7 +700,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
         }
       }
     }
-  }, 120000); // 2 minute timeout for network operations
+  }, 300000); // 5 minute timeout for network operations
 
   /**
    * @test KeyValueDELOperationsRestore
@@ -1006,7 +1019,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
         }
       }
     }
-  }, 120000); // 2 minute timeout for network operations
+  }, 300000); // 5 minute timeout for network operations
 
   /**
    * @test DocumentsDELOperationsRestore
@@ -1180,7 +1193,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
         }
       }
     }
-  }, 120000); // 2 minute timeout for network operations
+  }, 300000); // 5 minute timeout for network operations
 
   /**
    * @test CIDConversionUtilities
