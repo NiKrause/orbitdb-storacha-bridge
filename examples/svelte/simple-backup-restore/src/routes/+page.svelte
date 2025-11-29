@@ -59,14 +59,16 @@
 </Header>
 
 <Content>
-  <div style="display:flex;justify-content:center;margin:2rem 0;">
-    <div>
-      <div style="display:flex;justify-content:center;margin-bottom:1rem;">
+  <!-- Hero Section -->
+  <div class="hero-section">
+    <div class="hero-content">
+      <div class="logo-container">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           width="120"
           height="120"
           viewBox="0 0 32 32"
+          class="hero-logo"
         >
           <defs>
             <linearGradient
@@ -98,7 +100,7 @@
             stroke="var(--cds-border-subtle)"
             stroke-width="1"
           />
-          <circle cx="16" cy="16" r="4" fill="url(#storageGradient)" />
+          <circle cx="16" cy="16" r="4" fill="url(#storageGradient)" class="pulse-animation" />
           <g class="orbit-animation" style="transform-origin: 16px 16px;">
             <ellipse
               cx="16"
@@ -137,57 +139,79 @@
           />
         </svg>
       </div>
-      <h1
-        style="text-align:center;margin:0 0 0.5rem 0;"
-        class="gradient-text-purple"
-      >
-        OrbitDB Storacha Bridge
+
+      <h1 class="hero-title gradient-text-purple">
+        OrbitDB × Storacha Bridge
       </h1>
-      <p
-        style="text-align:center;margin:0 0 1rem 0;color:var(--cds-text-secondary);"
-      >
-        Test backup and restore functionality with <span
+
+      <p class="hero-subtitle">
+        Decentralized Database Backup & Restore via <span
           class="gradient-text-cyan"
-          style="font-weight:600;">Storacha/Filecoin</span
+          style="font-weight:600;">Filecoin Storage</span
         >
       </p>
-      <p
-        style="text-align:center;color:var(--cds-text-helper);font-size:0.875rem;"
-      >
-        Decentralized Filecoin Storage for Local-First Peer-To-Peer Web & Mobile
-        Apps
+
+      <p class="hero-description">
+        Bridge local-first peer-to-peer databases with permanent decentralized storage
       </p>
-      
-      <!-- Technology Stack Logos Row -->
-      <div style="display:flex;align-items:center;justify-content:center;gap:1.5rem;margin-top:1.5rem;flex-wrap:wrap;">
-        <a href="https://orbitdb.org/" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:0.25rem;text-decoration:none;color:inherit;">
-          <img src="/orbitdb.png" alt="OrbitDB" style="width:20px;height:20px;object-fit:contain;" />
-          <span style="font-size:0.75rem;color:var(--cds-text-secondary);">OrbitDB</span>
-        </a>
-        <a href="https://docs.storacha.network/" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:0.25rem;text-decoration:none;color:inherit;">
-          <img src="/storacha-logo.jpeg" alt="Storacha" style="width:20px;height:20px;object-fit:contain;border-radius:4px;" />
-          <span style="font-size:0.75rem;color:var(--cds-text-secondary);">Storacha</span>
-        </a>
-        <a href="https://helia.io/" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:0.25rem;text-decoration:none;color:inherit;">
-          <img src="/helia.svg" alt="Helia" style="width:20px;height:20px;object-fit:contain;" />
-          <span style="font-size:0.75rem;color:var(--cds-text-secondary);">Helia</span>
-        </a>
-        <a href="https://docs.ipfs.tech/" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:0.25rem;text-decoration:none;color:inherit;">
-          <img src="/ipfs.png" alt="IPFS" style="width:20px;height:20px;object-fit:contain;" />
-          <span style="font-size:0.75rem;color:var(--cds-text-secondary);">IPFS</span>
-        </a>
-        <a href="https://docs.libp2p.io/" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:0.25rem;text-decoration:none;color:inherit;">
-          <img src="/libp2p.png" alt="libp2p" style="width:20px;height:20px;object-fit:contain;" />
-          <span style="font-size:0.75rem;color:var(--cds-text-secondary);">libp2p</span>
-        </a>
-        <a href="https://docs.filecoin.io/" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:0.25rem;text-decoration:none;color:inherit;">
-          <img src="/filecoin.svg" alt="Filecoin" style="width:20px;height:20px;object-fit:contain;" />
-          <span style="font-size:0.75rem;color:var(--cds-text-secondary);">Filecoin</span>
-        </a>
-        <a href="https://protocol.ai/" target="_blank" rel="noopener noreferrer" style="display:flex;align-items:center;gap:0.25rem;text-decoration:none;color:inherit;">
-          <img src="/protocol-labs.png" alt="Protocol Labs" style="width:20px;height:20px;object-fit:contain;" />
-          <span style="font-size:0.75rem;color:var(--cds-text-secondary);">Protocol Labs</span>
-        </a>
+
+      <!-- Feature Pills -->
+      <div class="feature-pills">
+        <div class="feature-pill">
+          <span class="pill-icon">🔐</span>
+          <span>Identity Preservation</span>
+        </div>
+        <div class="feature-pill">
+          <span class="pill-icon">🔑</span>
+          <span>WebAuthn Support</span>
+        </div>
+        <div class="feature-pill">
+          <span class="pill-icon">📦</span>
+          <span>CAR Archives</span>
+        </div>
+        <div class="feature-pill">
+          <span class="pill-icon">⚡</span>
+          <span>IPFS Network</span>
+        </div>
+        <div class="feature-pill">
+          <span class="pill-icon">🌐</span>
+          <span>Browser & Node.js</span>
+        </div>
+      </div>
+
+      <!-- Technology Stack -->
+      <div class="tech-stack">
+        <div class="tech-stack-label">Powered by</div>
+        <div class="tech-logos">
+          <a href="https://orbitdb.org/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/orbitdb.png" alt="OrbitDB" />
+            <span>OrbitDB</span>
+          </a>
+          <a href="https://docs.storacha.network/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/storacha-logo.jpeg" alt="Storacha" class="rounded" />
+            <span>Storacha</span>
+          </a>
+          <a href="https://helia.io/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/helia.svg" alt="Helia" />
+            <span>Helia</span>
+          </a>
+          <a href="https://docs.ipfs.tech/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/ipfs.png" alt="IPFS" />
+            <span>IPFS</span>
+          </a>
+          <a href="https://docs.libp2p.io/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/libp2p.png" alt="libp2p" />
+            <span>libp2p</span>
+          </a>
+          <a href="https://docs.filecoin.io/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/filecoin.svg" alt="Filecoin" />
+            <span>Filecoin</span>
+          </a>
+          <a href="https://protocol.ai/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/protocol-labs.png" alt="Protocol Labs" />
+            <span>Protocol Labs</span>
+          </a>
+        </div>
       </div>
     </div>
   </div>
@@ -199,12 +223,41 @@
     <StorachaTestWithWebAuthn />
   </div>
 
-  <div style="text-align:center;margin:2rem 0;color:var(--cds-text-secondary);">
-    <small>OrbitDB Storacha Bridge Demo</small>
-    <div
-      style="margin-top:0.5rem;color:var(--cds-text-helper);font-size:0.75rem;"
-    >
-      Bridging distributed databases with decentralized storage
+  <!-- Footer -->
+  <footer class="app-footer">
+    <div class="footer-content">
+      <div class="footer-section">
+        <h3>Resources</h3>
+        <ul>
+          <li><a href="https://github.com/NiKrause/orbitdb-storacha-bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          <li><a href="https://github.com/NiKrause/orbitdb-storacha-bridge#readme" target="_blank" rel="noopener noreferrer">Documentation</a></li>
+          <li><a href="https://github.com/NiKrause/orbitdb-storacha-bridge/issues" target="_blank" rel="noopener noreferrer">Issues</a></li>
+        </ul>
+      </div>
+      <div class="footer-section">
+        <h3>Learn More</h3>
+        <ul>
+          <li><a href="https://orbitdb.org/" target="_blank" rel="noopener noreferrer">OrbitDB</a></li>
+          <li><a href="https://docs.storacha.network/" target="_blank" rel="noopener noreferrer">Storacha</a></li>
+          <li><a href="https://docs.ipfs.tech/" target="_blank" rel="noopener noreferrer">IPFS</a></li>
+        </ul>
+      </div>
+      <div class="footer-section">
+        <h3>Community</h3>
+        <ul>
+          <li><a href="https://protocol.ai/" target="_blank" rel="noopener noreferrer">Protocol Labs</a></li>
+          <li><a href="https://filecoin.io/" target="_blank" rel="noopener noreferrer">Filecoin</a></li>
+          <li><a href="https://docs.libp2p.io/" target="_blank" rel="noopener noreferrer">libp2p</a></li>
+        </ul>
+      </div>
+      <div class="footer-section footer-about">
+        <h3>OrbitDB × Storacha Bridge</h3>
+        <p>Bridging local-first peer-to-peer databases with permanent decentralized storage on Filecoin.</p>
+        <p class="footer-license">MIT License</p>
+      </div>
     </div>
-  </div>
+    <div class="footer-bottom">
+      <p>Bridging distributed databases with decentralized storage</p>
+    </div>
+  </footer>
 </Content>
