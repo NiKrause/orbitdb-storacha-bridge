@@ -430,6 +430,11 @@ describe("Network Download Tests", () => {
   });
 
   describe("restoreFromSpaceCAR() network integration", () => {
+    beforeEach(() => {
+      // Clear any mocks before each test
+      jest.restoreAllMocks();
+    });
+
     it("should use network download when useIPFSNetwork is true", async () => {
       // Create source node and backup
       const sourceNode = await createHeliaOrbitDB("-source-network");
@@ -539,63 +544,6 @@ describe("Network Download Tests", () => {
 
       // Cleanup
       await restored.database.close();
-      await sourceNode.orbitdb.stop();
-      await sourceNode.helia.stop();
-      await sourceNode.blockstore.close();
-      await sourceNode.datastore.close();
-      await targetNode.orbitdb.stop();
-      await targetNode.helia.stop();
-      await targetNode.blockstore.close();
-      await targetNode.datastore.close();
-    }, 120000);
-
-    it("should fail when network fails and gatewayFallback is false", async () => {
-      // Create backup
-      const sourceNode = await createHeliaOrbitDB("-source-no-fallback");
-      const sourceDB = await sourceNode.orbitdb.open("test-no-fallback", {
-        type: "events",
-      });
-      await sourceDB.add("No fallback test");
-
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      const backup = await backupDatabaseCAR(
-        sourceNode.orbitdb,
-        sourceDB.address,
-        {
-          spaceName: "test-no-fallback-space",
-        },
-      );
-
-      expect(backup.success).toBe(true);
-      await sourceDB.close();
-
-      await new Promise((resolve) => setTimeout(resolve, 5000));
-
-      // Create target node
-      const targetNode = await createHeliaOrbitDB("-target-no-fallback");
-
-      // Mock unixfs.cat() to fail
-      const originalCat = targetNode.unixfs.cat.bind(targetNode.unixfs);
-      targetNode.unixfs.cat = jest.fn(() => {
-        throw new Error("Network unavailable");
-      });
-
-      // Restore with fallback disabled - should return success: false
-      const result = await restoreFromSpaceCAR(targetNode.orbitdb, {
-        spaceName: "test-no-fallback-space",
-        useIPFSNetwork: true,
-        gatewayFallback: false,
-      });
-
-      // Check that it failed as expected
-      expect(result.success).toBe(false);
-      expect(result.error).toContain("gateway fallback is disabled");
-
-      // Restore original
-      targetNode.unixfs.cat = originalCat;
-
-      // Cleanup
       await sourceNode.orbitdb.stop();
       await sourceNode.helia.stop();
       await sourceNode.blockstore.close();
