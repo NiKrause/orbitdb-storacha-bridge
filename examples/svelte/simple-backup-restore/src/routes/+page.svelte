@@ -58,152 +58,206 @@
   </HeaderUtilities>
 </Header>
 
-<Content style="padding: 0;">
+<Content>
   <!-- Hero Section -->
   <div class="hero-section">
     <div class="hero-content">
-      <!-- Animated Logo -->
       <div class="logo-container">
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="140"
-          height="140"
+          width="120"
+          height="120"
           viewBox="0 0 32 32"
-          class="main-logo"
+          class="hero-logo"
         >
           <defs>
-            <linearGradient id="orbitGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style="stop-color:#667EEA;stop-opacity:1" />
-              <stop offset="100%" style="stop-color:#764BA2;stop-opacity:1" />
+            <linearGradient
+              id="orbitGradient"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="100%"
+            >
+              <stop offset="0%" style="stop-color:#4F46E5;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#7C3AED;stop-opacity:1" />
             </linearGradient>
-            <linearGradient id="storageGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient
+              id="storageGradient"
+              x1="0%"
+              y1="0%"
+              x2="100%"
+              y2="100%"
+            >
               <stop offset="0%" style="stop-color:#06B6D4;stop-opacity:1" />
-              <stop offset="100%" style="stop-color:#3B82F6;stop-opacity:1" />
+              <stop offset="100%" style="stop-color:#0891B2;stop-opacity:1" />
             </linearGradient>
-            <filter id="glow">
-              <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
-              <feMerge>
-                <feMergeNode in="coloredBlur"/>
-                <feMergeNode in="SourceGraphic"/>
-              </feMerge>
-            </filter>
           </defs>
-          
-          <!-- Outer ring with gradient -->
-          <circle cx="16" cy="16" r="14" fill="none" stroke="url(#orbitGradient)" stroke-width="0.5" opacity="0.3"/>
-          
-          <!-- Main orbital paths -->
+          <circle
+            cx="16"
+            cy="16"
+            r="15"
+            fill="var(--cds-layer)"
+            stroke="var(--cds-border-subtle)"
+            stroke-width="1"
+          />
+          <circle cx="16" cy="16" r="4" fill="url(#storageGradient)" class="pulse-animation" />
           <g class="orbit-animation" style="transform-origin: 16px 16px;">
-            <ellipse cx="16" cy="16" rx="12" ry="7" fill="none" stroke="url(#orbitGradient)" stroke-width="1" opacity="0.6" stroke-dasharray="2,1"/>
-            <ellipse cx="16" cy="16" rx="7" ry="12" fill="none" stroke="url(#orbitGradient)" stroke-width="1" opacity="0.6" stroke-dasharray="2,1"/>
-            
-            <!-- Orbiting nodes -->
-            <circle cx="28" cy="16" r="2" fill="url(#storageGradient)" filter="url(#glow)">
-              <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" repeatCount="indefinite"/>
-            </circle>
-            <circle cx="4" cy="16" r="2" fill="url(#storageGradient)" filter="url(#glow)">
-              <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" begin="0.75s" repeatCount="indefinite"/>
-            </circle>
-            <circle cx="16" cy="4" r="2" fill="url(#storageGradient)" filter="url(#glow)">
-              <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" begin="1.5s" repeatCount="indefinite"/>
-            </circle>
-            <circle cx="16" cy="28" r="2" fill="url(#storageGradient)" filter="url(#glow)">
-              <animate attributeName="opacity" values="0.4;1;0.4" dur="3s" begin="2.25s" repeatCount="indefinite"/>
-            </circle>
+            <ellipse
+              cx="16"
+              cy="16"
+              rx="10"
+              ry="6"
+              fill="none"
+              stroke="url(#orbitGradient)"
+              stroke-width="1.5"
+              opacity="0.8"
+            />
+            <ellipse
+              cx="16"
+              cy="16"
+              rx="6"
+              ry="10"
+              fill="none"
+              stroke="url(#orbitGradient)"
+              stroke-width="1.5"
+              opacity="0.8"
+            />
+            <circle cx="26" cy="16" r="1.5" fill="url(#orbitGradient)" />
+            <circle cx="6" cy="16" r="1.5" fill="url(#orbitGradient)" />
+            <circle cx="16" cy="6" r="1.5" fill="url(#orbitGradient)" />
+            <circle cx="16" cy="26" r="1.5" fill="url(#orbitGradient)" />
           </g>
-          
-          <!-- Central core -->
-          <circle cx="16" cy="16" r="5" fill="url(#storageGradient)" filter="url(#glow)"/>
-          <circle cx="16" cy="16" r="3" fill="var(--cds-background)" opacity="0.8"/>
+          <path
+            d="M12 12 Q10 10 8 12 Q6 14 8 16 Q10 18 12 16 Q14 14 12 12"
+            fill="url(#storageGradient)"
+            opacity="0.6"
+          />
+          <path
+            d="M20 20 Q22 18 24 20 Q26 22 24 24 Q22 26 20 24 Q18 22 20 20"
+            fill="url(#storageGradient)"
+            opacity="0.6"
+          />
         </svg>
       </div>
 
-      <!-- Title and Description -->
-      <h1 class="hero-title">
-        <span class="gradient-text">OrbitDB</span>
-        <span class="connector">×</span>
-        <span class="gradient-text-alt">Storacha</span>
+      <h1 class="hero-title gradient-text-purple">
+        OrbitDB × Storacha Bridge
       </h1>
-      
+
       <p class="hero-subtitle">
-        Bridging distributed databases with decentralized storage
+        Decentralized Database Backup & Restore via <span
+          class="gradient-text-cyan"
+          style="font-weight:600;">Filecoin Storage</span
+        >
       </p>
-      
+
       <p class="hero-description">
-        Seamlessly backup and restore your OrbitDB databases to Filecoin's permanent storage network
-        through Storacha's powerful infrastructure
+        Bridge local-first peer-to-peer databases with permanent decentralized storage
       </p>
 
       <!-- Feature Pills -->
       <div class="feature-pills">
-        <span class="pill">🔐 Identity Preservation</span>
-        <span class="pill">🌐 P2P Replication</span>
-        <span class="pill">💾 CAR Archives</span>
-        <span class="pill">🔑 UCAN Auth</span>
-        <span class="pill">⚡ WebAuthn</span>
+        <div class="feature-pill">
+          <span class="pill-icon">🔐</span>
+          <span>Identity Preservation</span>
+        </div>
+        <div class="feature-pill">
+          <span class="pill-icon">🔑</span>
+          <span>WebAuthn Support</span>
+        </div>
+        <div class="feature-pill">
+          <span class="pill-icon">📦</span>
+          <span>CAR Archives</span>
+        </div>
+        <div class="feature-pill">
+          <span class="pill-icon">⚡</span>
+          <span>IPFS Network</span>
+        </div>
+        <div class="feature-pill">
+          <span class="pill-icon">🌐</span>
+          <span>Browser & Node.js</span>
+        </div>
       </div>
 
-      <!-- Technology Stack with better styling -->
+      <!-- Technology Stack -->
       <div class="tech-stack">
-        <a href="https://orbitdb.org/" target="_blank" rel="noopener noreferrer" class="tech-item">
-          <img src="/orbitdb.png" alt="OrbitDB" />
-          <span>OrbitDB</span>
-        </a>
-        <a href="https://docs.storacha.network/" target="_blank" rel="noopener noreferrer" class="tech-item">
-          <img src="/storacha-logo.jpeg" alt="Storacha" style="border-radius:4px;" />
-          <span>Storacha</span>
-        </a>
-        <a href="https://helia.io/" target="_blank" rel="noopener noreferrer" class="tech-item">
-          <img src="/helia.svg" alt="Helia" />
-          <span>Helia</span>
-        </a>
-        <a href="https://docs.ipfs.tech/" target="_blank" rel="noopener noreferrer" class="tech-item">
-          <img src="/ipfs.png" alt="IPFS" />
-          <span>IPFS</span>
-        </a>
-        <a href="https://docs.libp2p.io/" target="_blank" rel="noopener noreferrer" class="tech-item">
-          <img src="/libp2p.png" alt="libp2p" />
-          <span>libp2p</span>
-        </a>
-        <a href="https://docs.filecoin.io/" target="_blank" rel="noopener noreferrer" class="tech-item">
-          <img src="/filecoin.svg" alt="Filecoin" />
-          <span>Filecoin</span>
-        </a>
+        <div class="tech-stack-label">Powered by</div>
+        <div class="tech-logos">
+          <a href="https://orbitdb.org/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/orbitdb.png" alt="OrbitDB" />
+            <span>OrbitDB</span>
+          </a>
+          <a href="https://docs.storacha.network/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/storacha-logo.jpeg" alt="Storacha" class="rounded" />
+            <span>Storacha</span>
+          </a>
+          <a href="https://helia.io/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/helia.svg" alt="Helia" />
+            <span>Helia</span>
+          </a>
+          <a href="https://docs.ipfs.tech/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/ipfs.png" alt="IPFS" />
+            <span>IPFS</span>
+          </a>
+          <a href="https://docs.libp2p.io/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/libp2p.png" alt="libp2p" />
+            <span>libp2p</span>
+          </a>
+          <a href="https://docs.filecoin.io/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/filecoin.svg" alt="Filecoin" />
+            <span>Filecoin</span>
+          </a>
+          <a href="https://protocol.ai/" target="_blank" rel="noopener noreferrer" class="tech-link">
+            <img src="/protocol-labs.png" alt="Protocol Labs" />
+            <span>Protocol Labs</span>
+          </a>
+        </div>
       </div>
     </div>
   </div>
 
-  <!-- Main Content Area -->
-  <div class="main-content">
-    <div class="content-card">
+  <div
+    class="orbital-card"
+    style="border-radius:1rem;padding:1rem;margin:0 auto;"
+  >
     <StorachaTestWithWebAuthn />
-    </div>
   </div>
 
-  <!-- Footer Section -->
-  <footer class="footer-section">
+  <!-- Footer -->
+  <footer class="app-footer">
     <div class="footer-content">
-      <div class="footer-logo">
-        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 32 32">
-          <defs>
-            <linearGradient id="footerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" style="stop-color:#667EEA;stop-opacity:0.6" />
-              <stop offset="100%" style="stop-color:#764BA2;stop-opacity:0.6" />
-            </linearGradient>
-          </defs>
-          <circle cx="16" cy="16" r="14" fill="none" stroke="url(#footerGradient)" stroke-width="1" opacity="0.5"/>
-          <circle cx="16" cy="16" r="3" fill="url(#footerGradient)"/>
-        </svg>
+      <div class="footer-section">
+        <h3>Resources</h3>
+        <ul>
+          <li><a href="https://github.com/NiKrause/orbitdb-storacha-bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          <li><a href="https://github.com/NiKrause/orbitdb-storacha-bridge#readme" target="_blank" rel="noopener noreferrer">Documentation</a></li>
+          <li><a href="https://github.com/NiKrause/orbitdb-storacha-bridge/issues" target="_blank" rel="noopener noreferrer">Issues</a></li>
+        </ul>
       </div>
-      <p class="footer-text">OrbitDB Storacha Bridge</p>
-      <p class="footer-subtext">Bridging distributed databases with decentralized storage</p>
-      <div class="footer-links">
-        <a href="https://github.com/NiKrause/orbitdb-storacha-bridge" target="_blank" rel="noopener noreferrer">GitHub</a>
-        <span class="separator">•</span>
-        <a href="https://docs.storacha.network/" target="_blank" rel="noopener noreferrer">Storacha Docs</a>
-        <span class="separator">•</span>
-        <a href="https://orbitdb.org/" target="_blank" rel="noopener noreferrer">OrbitDB</a>
+      <div class="footer-section">
+        <h3>Learn More</h3>
+        <ul>
+          <li><a href="https://orbitdb.org/" target="_blank" rel="noopener noreferrer">OrbitDB</a></li>
+          <li><a href="https://docs.storacha.network/" target="_blank" rel="noopener noreferrer">Storacha</a></li>
+          <li><a href="https://docs.ipfs.tech/" target="_blank" rel="noopener noreferrer">IPFS</a></li>
+        </ul>
+      </div>
+      <div class="footer-section">
+        <h3>Community</h3>
+        <ul>
+          <li><a href="https://protocol.ai/" target="_blank" rel="noopener noreferrer">Protocol Labs</a></li>
+          <li><a href="https://filecoin.io/" target="_blank" rel="noopener noreferrer">Filecoin</a></li>
+          <li><a href="https://docs.libp2p.io/" target="_blank" rel="noopener noreferrer">libp2p</a></li>
+        </ul>
+      </div>
+      <div class="footer-section footer-about">
+        <h3>OrbitDB × Storacha Bridge</h3>
+        <p>Bridging local-first peer-to-peer databases with permanent decentralized storage on Filecoin.</p>
+        <p class="footer-license">MIT License</p>
+      </div>
     </div>
-  </div>
+    <div class="footer-bottom">
+      <p>Bridging distributed databases with decentralized storage</p>
+    </div>
   </footer>
 </Content>
