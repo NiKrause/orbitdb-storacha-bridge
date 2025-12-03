@@ -126,7 +126,7 @@ async function waitForPeers(heliaNode, minPeers = 1, timeout = 30000) {
  * @namespace OrbitDBStorachaBridgeIntegration
  * @description Integration test suite for OrbitDB Storacha Bridge functionality
  */
-describe.only("OrbitDB Storacha Bridge Integration", () => {
+describe("OrbitDB Storacha Bridge Integration", () => {
   /** @type {Object|null} Source OrbitDB node instance */
   let sourceNode;
   /** @type {Object|null} Target OrbitDB node instance */
@@ -190,7 +190,7 @@ describe.only("OrbitDB Storacha Bridge Integration", () => {
   afterEach(async () => {
     // Give a moment for any pending operations to complete
     await new Promise((resolve) => setTimeout(resolve, 1000));
-    
+
     // Cleanup nodes
     const nodes = [sourceNode, targetNode].filter(Boolean);
     for (const node of nodes) {
@@ -1019,7 +1019,7 @@ describe.only("OrbitDB Storacha Bridge Integration", () => {
         }
       }
     }
-  }, 300000); // 5 minute timeout for network operations
+  }, 420000); // 7 minute timeout for network operations
 
   /**
    * @test DocumentsDELOperationsRestore
