@@ -210,7 +210,11 @@ jobs:
     needs: [lint]
     strategy:
       matrix:
-        example: [simple-backup-restore, orbitdb-replication]
+        include:
+          - example: simple-backup-restore
+            port: 5173
+          - example: orbitdb-replication
+            port: 5174
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -232,6 +236,8 @@ jobs:
         working-directory: examples/svelte/${{ matrix.example }}
 
       - name: Run E2E tests - ${{ matrix.example }}
+        env:
+          PORT: ${{ matrix.port }}
         run: npx playwright test
         working-directory: examples/svelte/${{ matrix.example }}
 
