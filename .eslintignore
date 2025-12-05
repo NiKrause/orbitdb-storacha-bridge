@@ -2,7 +2,9 @@
 examples/svelte/*/build/**/*
 examples/svelte/*/dist/**/*
 examples/svelte/*/dev-dist/**/*
+examples/svelte/*/.svelte-kit/**/*
 examples/svelte/*/e2e/**/*
+node_modules/**/*
 
 # Svelte and browser files
 examples/svelte/**/*.svelte
