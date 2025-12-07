@@ -40,64 +40,26 @@ export default defineConfig({
       },
       protocolImports: true,
     }),
-    VitePWA({
-      // PWA configuration optimized for mobile browsers and IndexedDB
-      registerType: "autoUpdate",
-      workbox: {
-        // Increase file size limit to handle large bundles (OrbitDB/libp2p dependencies are large)
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5 MB limit
-        // Use network-first strategy to avoid interfering with OrbitDB/libp2p
-        runtimeCaching: [
-          {
-            urlPattern: ({ request }) => {
-              // Only cache navigation requests, avoid OrbitDB/IPFS requests
-              return (
-                request.mode === "navigate" &&
-                !request.url.includes("/ipfs/") &&
-                !request.url.includes("/orbitdb/")
-              );
-            },
-            handler: "NetworkFirst",
-            options: {
-              cacheName: "navigation-cache",
-              networkTimeoutSeconds: 3,
-              cacheableResponse: {
-                statuses: [0, 200],
-              },
-            },
-          },
-          {
-            urlPattern: ({ request }) => {
-              return (
-                request.destination === "style" ||
-                request.destination === "script"
-              );
-            },
-            handler: "StaleWhileRevalidate",
-            options: {
-              cacheName: "assets-cache",
-            },
-          },
-        ],
-        // Skip waiting for immediate activation
-        skipWaiting: true,
-        clientsClaim: true,
-        // Exclude OrbitDB and large files from precaching
-        globIgnores: ["**/orbitdb/**", "**/ipfs/**", "**/node_modules/**"],
-      },
-      // Use existing manifest.json
-      manifest: false, // We'll use our custom manifest.json
-      // Development options
-      devOptions: {
-        enabled: process.env.NODE_ENV === "development",
-        type: "module",
-      },
-      // Enable periodic SW updates
-      periodicSyncForUpdates: 20,
-    }),
+    // VitePWA disabled - use custom service worker if needed
+    // VitePWA({
+    //   registerType: "autoUpdate",
+    //   ...
+    // }),
   ],
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_DATE__: JSON.stringify(buildDate),
+  },
+  build: {
+    rollupOptions: {
+      external: [
+        "vite-plugin-node-polyfills/shims/process",
+        "vite-plugin-node-polyfills/shims/buffer",
+        "vite-plugin-node-polyfills/shims/path",
+        "vite-plugin-node-polyfills/shims/util",
+        "vite-plugin-node-polyfills/shims/crypto",
+        "vite-plugin-node-polyfills/shims/stream",
+      ],
+    },
   },
 });

@@ -28,7 +28,7 @@
     "clear-space": "node examples/clear-space.js",
     "car-demo": "node examples/car-backup-demo.js",
     "ucan-demo": "node examples/ucan-demo.js",
-    "lint": "eslint '{lib,examples,test}/**/*.{js,svelte}' --ignore-pattern 'examples/svelte/*/build/**' --ignore-pattern 'examples/svelte/*/dist/**'",
+    "lint": "eslint '{lib,examples,test}/**/*.{js,svelte}' --ignore-pattern 'examples/svelte/*/build/**' --ignore-pattern 'examples/svelte/*/dist/**' --ignore-pattern 'examples/svelte/**/.svelte-kit/**' --ignore-pattern 'node_modules/**'",
     "format": "prettier --write lib/ examples/ test/ --ignore-path '.prettierignore'",
     "clean": "rm -rf ./cid-bridge-test* ./demo-test*",
     "build:components": "mkdir -p dist/components && cp src/components/*.svelte dist/components/ && cp src/components/*.js dist/components/",
@@ -88,6 +88,7 @@
     "multiformats": "^12.1.3"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
     "@ibm/plex": "^6.4.1",
     "@le-space/ucanto-principal": "^9.1.1",
     "@types/jest": "^29.5.5",

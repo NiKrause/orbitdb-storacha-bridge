@@ -257,9 +257,8 @@ describe("CAR-based Timestamped Backup", () => {
     });
 
     it("should generate unique backup filenames", async () => {
-      const { generateBackupPrefix, getBackupFilenames } = await import(
-        "../lib/backup-helpers.js"
-      );
+      const { generateBackupPrefix, getBackupFilenames } =
+        await import("../lib/backup-helpers.js");
 
       const prefix1 = generateBackupPrefix("test-space");
       await new Promise((resolve) => setTimeout(resolve, 10)); // Wait 10ms
@@ -491,9 +490,8 @@ describe("Integration: Real Storacha Credentials (when available)", () => {
 
         // Verify files were uploaded - list space to check
         console.log("\n🔍 Verifying uploaded files...");
-        const { listStorachaSpaceFiles } = await import(
-          "../lib/orbitdb-storacha-bridge.js"
-        );
+        const { listStorachaSpaceFiles } =
+          await import("../lib/orbitdb-storacha-bridge.js");
         const spaceFiles = await listStorachaSpaceFiles();
         console.log(
           "Files in space:",

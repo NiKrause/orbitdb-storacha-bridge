@@ -204,27 +204,83 @@ jobs:
         if: always()
         run: npm run clean
 
+  e2e-tests:
+    name: E2E Tests (Examples)
+    runs-on: ubuntu-latest
+    needs: [lint]
+    strategy:
+      matrix:
+        include:
+          - example: simple-backup-restore
+            port: 5173
+          - example: orbitdb-replication
+            port: 5174
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install example dependencies
+        run: npm ci
+        working-directory: examples/svelte/${{ matrix.example }}
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+        working-directory: examples/svelte/${{ matrix.example }}
+
+      - name: Run E2E tests - ${{ matrix.example }}
+        env:
+          PORT: ${{ matrix.port }}
+        run: npx playwright test
+        working-directory: examples/svelte/${{ matrix.example }}
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.example }}
+          path: examples/svelte/${{ matrix.example }}/playwright-report/
+          retention-days: 30
+
   notify:
     name: Notify Results
     runs-on: ubuntu-latest
-    needs: [lint, integration-tests, car-backup-tests, p256-ucan-tests, timestamped-backup-tests, network-download-tests]
+    needs: [lint, integration-tests, car-backup-tests, p256-ucan-tests, timestamped-backup-tests, network-download-tests, e2e-tests]
     if: always()
     steps:
       - name: Notify Success
-        if: needs.lint.result == 'success' && needs.integration-tests.result == 'success' && needs.car-backup-tests.result == 'success' && needs.p256-ucan-tests.result == 'success' && needs.timestamped-backup-tests.result == 'success' && needs.network-download-tests.result == 'success'
+        if: needs.lint.result == 'success' && needs.integration-tests.result == 'success' && needs.car-backup-tests.result == 'success' && needs.p256-ucan-tests.result == 'success' && needs.timestamped-backup-tests.result == 'success' && needs.network-download-tests.result == 'success' && needs.e2e-tests.result == 'success'
         run: |
           echo "✅ All tests passed successfully!"
           echo "🎉 OrbitDB Storacha Bridge is working correctly"
+          echo "📋 Test Summary:"
+          echo "  - Linting: PASSED"
+          echo "  - Integration Tests: PASSED"
+          echo "  - CAR Backup Tests: PASSED"
+          echo "  - P256 UCAN Tests: PASSED"
+          echo "  - Timestamped Backup Tests: PASSED"
+          echo "  - Network Download Tests: PASSED"
+          echo "  - E2E Tests: PASSED"
 
       - name: Notify Failure
-        if: needs.lint.result == 'failure' || needs.integration-tests.result == 'failure' || needs.car-backup-tests.result == 'failure' || needs.p256-ucan-tests.result == 'failure' || needs.timestamped-backup-tests.result == 'failure' || needs.network-download-tests.result == 'failure'
+        if: needs.lint.result == 'failure' || needs.integration-tests.result == 'failure' || needs.car-backup-tests.result == 'failure' || needs.p256-ucan-tests.result == 'failure' || needs.timestamped-backup-tests.result == 'failure' || needs.network-download-tests.result == 'failure' || needs.e2e-tests.result == 'failure'
         run: |
           echo "❌ Some tests failed"
           echo "🔍 Please check the logs above for details"
-          echo "Lint: ${{ needs.lint.result }}"
-          echo "Integration Tests: ${{ needs.integration-tests.result }}"
-          echo "CAR Backup Tests: ${{ needs.car-backup-tests.result }}"
-          echo "P256 UCAN Tests: ${{ needs.p256-ucan-tests.result }}"
-          echo "Timestamped Backup Tests: ${{ needs.timestamped-backup-tests.result }}"
-          echo "Network Download Tests: ${{ needs.network-download-tests.result }}"
+          echo "📋 Test Summary:"
+          echo "  - Lint: ${{ needs.lint.result }}"
+          echo "  - Integration Tests: ${{ needs.integration-tests.result }}"
+          echo "  - CAR Backup Tests: ${{ needs.car-backup-tests.result }}"
+          echo "  - P256 UCAN Tests: ${{ needs.p256-ucan-tests.result }}"
+          echo "  - Timestamped Backup Tests: ${{ needs.timestamped-backup-tests.result }}"
+          echo "  - Network Download Tests: ${{ needs.network-download-tests.result }}"
+          echo "  - E2E Tests: ${{ needs.e2e-tests.result }}"
           exit 1
