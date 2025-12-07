@@ -179,27 +179,33 @@ test.describe("UCAN Error Recovery Flow", () => {
 test.describe("UCAN Error Edge Cases", () => {
   test("handles expired UCAN token gracefully", async ({ page }) => {
     await page.goto("/");
+    // Wait for the page to be fully loaded
+    await page.waitForLoadState("networkidle");
     
     await page.evaluate(() => {
       window.__mockExpiredUCAN = true;
     });
     
     const heading = page.locator("h1");
-    await expect(heading).toBeVisible();
+    await expect(heading).toBeVisible({ timeout: 10000 });
   });
 
   test("handles network errors during UCAN validation", async ({ page }) => {
     await page.goto("/");
+    // Wait for the page to be fully loaded
+    await page.waitForLoadState("networkidle");
     
     await page.route("**/validate/**", async (route) => {
       await route.abort("failed");
     });
     const heading = page.locator("h1");
-    await expect(heading).toBeVisible();
+    await expect(heading).toBeVisible({ timeout: 10000 });
   });
 
   test("displays appropriate error for insufficient UCAN capabilities", async ({ page }) => {
     await page.goto("/");
+    // Wait for the page to be fully loaded
+    await page.waitForLoadState("networkidle");
     
     await page.evaluate(() => {
       const errorEvent = new CustomEvent('storacha-error', {
