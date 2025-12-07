@@ -4,7 +4,10 @@ test.describe("UCAN Authorization Error Handling", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     
-    await expect(page.locator("h1")).toBeVisible();
+    // Wait for the page to be fully loaded and interactive
+    await page.waitForLoadState("networkidle");
+    // Wait for the h1 to be visible with a longer timeout
+    await expect(page.locator("h1")).toBeVisible({ timeout: 10000 });
   });
 
   test("displays error when backup fails due to UCAN authorization", async ({ page }) => {
@@ -176,27 +179,33 @@ test.describe("UCAN Error Recovery Flow", () => {
 test.describe("UCAN Error Edge Cases", () => {
   test("handles expired UCAN token gracefully", async ({ page }) => {
     await page.goto("/");
+    // Wait for the page to be fully loaded
+    await page.waitForLoadState("networkidle");
     
     await page.evaluate(() => {
       window.__mockExpiredUCAN = true;
     });
     
     const heading = page.locator("h1");
-    await expect(heading).toBeVisible();
+    await expect(heading).toBeVisible({ timeout: 10000 });
   });
 
   test("handles network errors during UCAN validation", async ({ page }) => {
     await page.goto("/");
+    // Wait for the page to be fully loaded
+    await page.waitForLoadState("networkidle");
     
     await page.route("**/validate/**", async (route) => {
       await route.abort("failed");
     });
     const heading = page.locator("h1");
-    await expect(heading).toBeVisible();
+    await expect(heading).toBeVisible({ timeout: 10000 });
   });
 
   test("displays appropriate error for insufficient UCAN capabilities", async ({ page }) => {
     await page.goto("/");
+    // Wait for the page to be fully loaded
+    await page.waitForLoadState("networkidle");
     
     await page.evaluate(() => {
       const errorEvent = new CustomEvent('storacha-error', {

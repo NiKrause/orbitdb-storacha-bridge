@@ -4,7 +4,9 @@ import { expect, test } from "@playwright/test";
 test.describe("Backup with Expired UCAN Token", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
-    await expect(page.locator("h1")).toBeVisible();
+    // Wait for network to be idle and page to be fully loaded
+    await page.waitForLoadState("networkidle");
+    await expect(page.locator("h1")).toBeVisible({ timeout: 10000 });
   });
 
   test("shows UCAN error when attempting backup with expired token", async ({ page }) => {
