@@ -6,7 +6,7 @@ const port = process.env.PORT
 
 export default defineConfig({
   webServer: {
-    command: "npm run dev",
+    command: `npm run dev -- --port ${port}`,
     port: port,
     reuseExistingServer: !process.env.CI,
     env: {
