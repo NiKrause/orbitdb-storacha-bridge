@@ -4,7 +4,10 @@ test.describe("UCAN Authorization Error Handling", () => {
   test.beforeEach(async ({ page }) => {
     await page.goto("/");
     
-    await expect(page.locator("h1")).toBeVisible();
+    // Wait for the page to be fully loaded and interactive
+    await page.waitForLoadState("networkidle");
+    // Wait for the h1 to be visible with a longer timeout
+    await expect(page.locator("h1")).toBeVisible({ timeout: 10000 });
   });
 
   test("displays error when backup fails due to UCAN authorization", async ({ page }) => {
