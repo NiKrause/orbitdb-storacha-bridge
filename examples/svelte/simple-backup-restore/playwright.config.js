@@ -9,6 +9,9 @@ export default defineConfig({
     command: "npm run dev",
     port: port,
     reuseExistingServer: !process.env.CI,
+    env: {
+      PORT: process.env.PORT || "5173",
+    },
   },
   testDir: "e2e",
   use: {
