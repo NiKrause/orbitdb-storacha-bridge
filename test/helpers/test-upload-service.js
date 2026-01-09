@@ -324,3 +324,21 @@ export async function withTestService(testFn, options = {}) {
     await teardownTestUploadService(testService);
   }
 }
+
+/**
+ * Get a block from the test service's storage
+ * @param {Object} testService - Test service from setupTestUploadService
+ * @param {string} cid - CID of the block to retrieve
+ * @returns {Promise<Uint8Array|null>} Block bytes or null if not found
+ */
+export async function getBlockFromTestService(testService, cid) {
+  try {
+    const { context } = testService;
+    // The context.blocks is a blockstore that implements get(cid)
+    const block = await context.blocks.get(cid);
+    return block?.bytes || null;
+  } catch (error) {
+    // Block not found
+    return null;
+  }
+}

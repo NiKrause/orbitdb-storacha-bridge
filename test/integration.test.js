@@ -11,22 +11,22 @@
 
 import "dotenv/config";
 import { IPFSAccessController } from "@orbitdb/core";
-import * as Client from "@storacha/client";
-import { StoreMemory } from "@storacha/client/stores/memory";
-import { Signer } from "@storacha/client/principal/ed25519";
-import * as Proof from "@storacha/client/proof";
 import { logger } from "../lib/logger.js";
 import {
-  backupDatabase,
-  restoreDatabase,
   restoreDatabaseFromSpace,
   convertStorachaCIDToOrbitDB,
   extractManifestCID,
-  clearStorachaSpace,
 } from "../lib/orbitdb-storacha-bridge.js";
+import { backupDatabaseWithUCANTO, restoreDatabaseWithUCANTO } from "../lib/backup-ucanto.js";
 
 // Import utilities separately
 import { createHeliaOrbitDB, cleanupOrbitDBDirectories } from "../lib/utils.js";
+import {
+  setupTestUploadService,
+  teardownTestUploadService,
+  createTestCredentials,
+  createUCANTOConfig,
+} from "./helpers/test-upload-service.js";
 
 /**
  * ANSI color codes for bright console output
@@ -41,50 +41,28 @@ const colors = {
 };
 
 /**
- * Display space and DID information in bright colors
- * @param {Object} options - Configuration options
- * @param {string} options.storachaKey - Storacha private key
- * @param {string} options.storachaProof - Storacha proof
+ * Display test service information
+ * @param {Object} testCredentials - Test credentials object
  */
-async function displaySpaceAndDIDInfo(options) {
-  try {
-    logger.info(
-      `${colors.bright}${colors.cyan}╔════════════════════════════════════════════════════════════════╗${colors.reset}`,
-    );
-    logger.info(
-      `${colors.bright}${colors.cyan}║                    STORACHA TEST CONFIGURATION                 ║${colors.reset}`,
-    );
-    logger.info(
-      `${colors.bright}${colors.cyan}╚════════════════════════════════════════════════════════════════╝${colors.reset}`,
-    );
-
-    // Initialize Storacha client to get space/DID info
-    const principal = Signer.parse(options.storachaKey);
-    const store = new StoreMemory();
-    const client = await Client.create({ principal, store });
-
-    const proof = await Proof.parse(options.storachaProof);
-    const space = await client.addSpace(proof);
-    await client.setCurrentSpace(space.did());
-
-    // Display DID information
-    const spaceDID = space.did();
-    const agentDID = client.agent.did();
-
-    logger.info(
-      `${colors.bright}${colors.magenta}🆔 Agent DID: ${colors.yellow}${agentDID}${colors.reset}`,
-    );
-    logger.info(
-      `${colors.bright}${colors.green}🚀 Space DID: ${colors.yellow}${spaceDID}${colors.reset}`,
-    );
-    logger.info(
-      `${colors.bright}${colors.cyan}═══════════════════════════════════════════════════════════════════${colors.reset}\n`,
-    );
-  } catch (error) {
-    logger.warn(
-      `${colors.bright}${colors.yellow}⚠️ Could not retrieve space/DID info: ${error.message}${colors.reset}`,
-    );
-  }
+function displayTestServiceInfo(testCredentials) {
+  logger.info(
+    `${colors.bright}${colors.cyan}╔════════════════════════════════════════════════════════════════╗${colors.reset}`,
+  );
+  logger.info(
+    `${colors.bright}${colors.cyan}║                 IN-MEMORY TEST CONFIGURATION                   ║${colors.reset}`,
+  );
+  logger.info(
+    `${colors.bright}${colors.cyan}╚════════════════════════════════════════════════════════════════╝${colors.reset}`,
+  );
+  logger.info(
+    `${colors.bright}${colors.magenta}🆔 Agent DID: ${colors.yellow}${testCredentials.space.spaceAgent.did()}${colors.reset}`,
+  );
+  logger.info(
+    `${colors.bright}${colors.green}🚀 Space DID: ${colors.yellow}${testCredentials.space.spaceDid}${colors.reset}`,
+  );
+  logger.info(
+    `${colors.bright}${colors.cyan}═══════════════════════════════════════════════════════════════════${colors.reset}\n`,
+  );
 }
 
 /**
@@ -131,48 +109,38 @@ describe("OrbitDB Storacha Bridge Integration", () => {
   let sourceNode;
   /** @type {Object|null} Target OrbitDB node instance */
   let targetNode;
+  /** @type {Object|null} In-memory test service context */
+  let testService;
+  /** @type {Object|null} Test credentials */
+  let testCredentials;
+  /** @type {Object|null} UCANTO config for direct invocations */
+  let ucantoConfig;
+  /** @type {Map|null} Block cache for transferring blocks between nodes */
+  let blockCache;
 
   /**
    * @function beforeEach
-   * @description Pre-test setup that validates Storacha credentials availability
-   *
-   * Checks for required environment variables:
-   * - STORACHA_KEY: Authentication key for Storacha service
-   * - STORACHA_PROOF: Proof token for Storacha service
-   *
-   * If credentials are missing, tests will be skipped with a warning.
+   * @description Pre-test setup that initializes in-memory Storacha service
    */
   beforeEach(async () => {
-    // Skip tests if no credentials available
-    if (!process.env.STORACHA_KEY || !process.env.STORACHA_PROOF) {
-      logger.warn("⚠️ Skipping integration tests - no Storacha credentials");
-      return;
-    }
-
-    // Display space and DID information in bright colors
-    await displaySpaceAndDIDInfo({
-      storachaKey: process.env.STORACHA_KEY,
-      storachaProof: process.env.STORACHA_PROOF,
-    });
-
-    // Clear Storacha space before each test to ensure clean state
-    logger.info("🧹 Clearing Storacha space before test...");
-    try {
-      const clearResult = await clearStorachaSpace({
-        storachaKey: process.env.STORACHA_KEY,
-        storachaProof: process.env.STORACHA_PROOF,
-      });
-      if (clearResult.success) {
-        logger.info("✅ Space cleared successfully");
-      } else {
-        logger.warn(
-          `⚠️ Space clearing incomplete: ${clearResult.totalFailed} failures`,
-        );
-      }
-    } catch (error) {
-      logger.warn(`⚠️ Space clearing failed: ${error.message}`);
-      // Don't fail the test, just warn
-    }
+    // Setup in-memory test upload service
+    testService = await setupTestUploadService();
+    testCredentials = await createTestCredentials(testService);
+    
+    // Add serviceConf to testCredentials for convenience
+    testCredentials.serviceConf = {
+      access: testService.serverURL,
+      upload: testService.serverURL,
+    };
+    
+    // Create UCANTO config for direct invocations
+    ucantoConfig = await createUCANTOConfig(testService);
+    
+    // Create block cache for transferring blocks between nodes
+    blockCache = new Map();
+    
+    // Display test service information
+    displayTestServiceInfo(testCredentials);
   });
 
   /**
@@ -184,6 +152,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
    * - Helia IPFS nodes
    * - Blockstore connections
    * - Datastore connections
+   * - In-memory test service
    *
    * Handles cleanup errors gracefully to prevent test interference.
    */
@@ -215,6 +184,12 @@ describe("OrbitDB Storacha Bridge Integration", () => {
     }
     sourceNode = null;
     targetNode = null;
+    
+    // Teardown test service
+    if (testService) {
+      await teardownTestUploadService(testService);
+      testService = null;
+    }
   });
 
   /**
@@ -260,11 +235,6 @@ describe("OrbitDB Storacha Bridge Integration", () => {
    * @requires STORACHA_PROOF environment variable
    */
   test("Complete backup and restore cycle", async () => {
-    // Skip if no credentials
-    if (!process.env.STORACHA_KEY || !process.env.STORACHA_PROOF) {
-      return;
-    }
-
     /** @type {Object|null} Source database instance */
     let sourceDB;
 
@@ -281,13 +251,14 @@ describe("OrbitDB Storacha Bridge Integration", () => {
         await sourceDB.add(entry);
       }
 
-      // Backup database with explicit credentials
-      const backupResult = await backupDatabase(
+      // Backup database using direct UCANTO
+      const backupResult = await backupDatabaseWithUCANTO(
         sourceNode.orbitdb,
         sourceDB.address,
         {
-          storachaKey: process.env.STORACHA_KEY,
-          storachaProof: process.env.STORACHA_PROOF,
+          connection: ucantoConfig.connection,
+          invocationConfig: ucantoConfig.invocationConfig,
+          blockCache,
         },
       );
       expect(backupResult.success).toBe(true);
@@ -312,16 +283,18 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       // Wait for peers to connect before restore operations
       await waitForPeers(targetNode, 5, 10000); // Wait up to 10s, but don't require any peers
 
-      // Restore database using the isolated target node with explicit credentials
-      const restoreResult = await restoreDatabase(
+      // Restore database using direct UCANTO - loads blocks from cache
+      const restoreResult = await restoreDatabaseWithUCANTO(
         targetNode.orbitdb,
         backupResult.manifestCID,
         backupResult.cidMappings,
         {
-          storachaKey: process.env.STORACHA_KEY,
-          storachaProof: process.env.STORACHA_PROOF,
+          blockCache,
         },
       );
+      if (!restoreResult.success) {
+        console.log('Restore failed:', restoreResult);
+      }
 
       expect(restoreResult.success).toBe(true);
       expect(restoreResult.entriesRecovered).toBe(testEntries.length);
@@ -374,10 +347,6 @@ describe("OrbitDB Storacha Bridge Integration", () => {
    * @timeout 120000 - 2 minutes for network operations
    */
   test("Mapping-independent restore from space", async () => {
-    // Skip if no credentials
-    if (!process.env.STORACHA_KEY || !process.env.STORACHA_PROOF) {
-      return;
-    }
 
     /** @type {Object|null} Source database instance */
     let sourceDB;
@@ -401,12 +370,13 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       }
 
       // Backup database
-      const backupResult = await backupDatabase(
+      const backupResult = await backupDatabaseWithUCANTO(
         sourceNode.orbitdb,
         sourceDB.address,
         {
-          storachaKey: process.env.STORACHA_KEY,
-          storachaProof: process.env.STORACHA_PROOF,
+          storachaKey: testCredentials.storachaKey,
+          storachaProof: testCredentials.storachaProof,
+          serviceConf: testCredentials.serviceConf,
         },
       );
       expect(backupResult.success).toBe(true);
@@ -428,8 +398,9 @@ describe("OrbitDB Storacha Bridge Integration", () => {
 
       // Restore from space WITHOUT CID mappings (breakthrough feature)
       const restoreResult = await restoreDatabaseFromSpace(targetNode.orbitdb, {
-        storachaKey: process.env.STORACHA_KEY,
-        storachaProof: process.env.STORACHA_PROOF,
+        storachaKey: testCredentials.storachaKey,
+        storachaProof: testCredentials.storachaProof,
+          serviceConf: testCredentials.serviceConf,
       });
 
       expect(restoreResult.success).toBe(true);
@@ -511,9 +482,6 @@ describe("OrbitDB Storacha Bridge Integration", () => {
    * @timeout 120000 - 2 minutes for network operations
    */
   test("Key-value mapping-independent restore with todos and identity", async () => {
-    if (!process.env.STORACHA_KEY || !process.env.STORACHA_PROOF) {
-      return;
-    }
 
     /** @type {Object|null} Source database instance */
     let sourceDB;
@@ -582,12 +550,13 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       );
 
       // Backup database with identity and access controller
-      const backupResult = await backupDatabase(
+      const backupResult = await backupDatabaseWithUCANTO(
         sourceNode.orbitdb,
         sourceDB.address,
         {
-          storachaKey: process.env.STORACHA_KEY,
-          storachaProof: process.env.STORACHA_PROOF,
+          storachaKey: testCredentials.storachaKey,
+          storachaProof: testCredentials.storachaProof,
+          serviceConf: testCredentials.serviceConf,
         },
       );
       expect(backupResult.success).toBe(true);
@@ -611,8 +580,9 @@ describe("OrbitDB Storacha Bridge Integration", () => {
 
       // Restore from space WITHOUT CID mappings (breakthrough feature)
       const restoreResult = await restoreDatabaseFromSpace(targetNode.orbitdb, {
-        storachaKey: process.env.STORACHA_KEY,
-        storachaProof: process.env.STORACHA_PROOF,
+        storachaKey: testCredentials.storachaKey,
+        storachaProof: testCredentials.storachaProof,
+          serviceConf: testCredentials.serviceConf,
       });
       logger.info("restoreResult", restoreResult);
       expect(restoreResult.success).toBe(true);
@@ -734,9 +704,6 @@ describe("OrbitDB Storacha Bridge Integration", () => {
    * @timeout 120000 - 2 minutes for network operations
    */
   test("Key-value database with DEL operations - complete backup and restore cycle", async () => {
-    if (!process.env.STORACHA_KEY || !process.env.STORACHA_PROOF) {
-      return;
-    }
 
     /** @type {Object|null} Source database instance */
     let sourceDB;
@@ -885,12 +852,13 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       logger.info(
         "\n💾 Backing up database with DEL operations to Storacha...",
       );
-      const backupResult = await backupDatabase(
+      const backupResult = await backupDatabaseWithUCANTO(
         sourceNode.orbitdb,
         sourceDB.address,
         {
-          storachaKey: process.env.STORACHA_KEY,
-          storachaProof: process.env.STORACHA_PROOF,
+          storachaKey: testCredentials.storachaKey,
+          storachaProof: testCredentials.storachaProof,
+          serviceConf: testCredentials.serviceConf,
         },
       );
       expect(backupResult.success).toBe(true);
@@ -920,8 +888,9 @@ describe("OrbitDB Storacha Bridge Integration", () => {
         "\n📥 Restoring database with DEL operations from Storacha...",
       );
       const restoreResult = await restoreDatabaseFromSpace(targetNode.orbitdb, {
-        storachaKey: process.env.STORACHA_KEY,
-        storachaProof: process.env.STORACHA_PROOF,
+        storachaKey: testCredentials.storachaKey,
+        storachaProof: testCredentials.storachaProof,
+          serviceConf: testCredentials.serviceConf,
       });
 
       expect(restoreResult.success).toBe(true);
@@ -1043,9 +1012,6 @@ describe("OrbitDB Storacha Bridge Integration", () => {
    * @timeout 120000 - 2 minutes for network operations
    */
   test("Documents database with DEL operations - complete backup and restore cycle", async () => {
-    if (!process.env.STORACHA_KEY || !process.env.STORACHA_PROOF) {
-      return;
-    }
 
     /** @type {Object|null} Source database instance */
     let sourceDB;
@@ -1132,12 +1098,13 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       expect(sourceIds).toEqual(["post-1", "post-3"]);
 
       // **Backup database**
-      const backupResult = await backupDatabase(
+      const backupResult = await backupDatabaseWithUCANTO(
         sourceNode.orbitdb,
         sourceDB.address,
         {
-          storachaKey: process.env.STORACHA_KEY,
-          storachaProof: process.env.STORACHA_PROOF,
+          storachaKey: testCredentials.storachaKey,
+          storachaProof: testCredentials.storachaProof,
+          serviceConf: testCredentials.serviceConf,
         },
       );
       expect(backupResult.success).toBe(true);
@@ -1158,8 +1125,9 @@ describe("OrbitDB Storacha Bridge Integration", () => {
 
       // **Restore from space**
       const restoreResult = await restoreDatabaseFromSpace(targetNode.orbitdb, {
-        storachaKey: process.env.STORACHA_KEY,
-        storachaProof: process.env.STORACHA_PROOF,
+        storachaKey: testCredentials.storachaKey,
+        storachaProof: testCredentials.storachaProof,
+          serviceConf: testCredentials.serviceConf,
       });
 
       expect(restoreResult.success).toBe(true);
