@@ -326,6 +326,45 @@ export async function withTestService(testFn, options = {}) {
 }
 
 /**
+ * Create a working UCAN client that can upload to the test service
+ * This avoids the JWT encoding issue by using proper UCAN client initialization
+ * 
+ * @param {Object} testService - Test service from setupTestUploadService  
+ * @returns {Promise<Object>} { client, spaceDID }
+ */
+export async function createWorkingUCANClient(testService) {
+  if (!testService.serverURL) {
+    throw new Error('Test service must have HTTP server (serverURL) for @storacha/client');
+  }
+  
+  // Create space
+  const space = await createTestSpace(testService);
+  
+  // Create a proper w3up client with the space
+  // IMPORTANT: Must configure serviceConf to point to test service
+  const store = new StoreMemory();
+  const client = await Client.create({
+    principal: space.spaceAgent,
+    store,
+    serviceConf: {
+      access: testService.serverURL,
+      upload: testService.serverURL,
+    },
+    receiptsEndpoint: testService.serverURL,
+  });
+  
+  // Add the space to the client using the proof
+  await client.addSpace(space.spaceProof);
+  await client.setCurrentSpace(space.spaceDid);
+  
+  return {
+    client,
+    spaceDID: space.spaceDid,
+    space,
+  };
+}
+
+/**
  * Get a block from the test service's storage
  * @param {Object} testService - Test service from setupTestUploadService
  * @param {string} cid - CID of the block to retrieve

@@ -12,12 +12,15 @@
 import "dotenv/config";
 import { IPFSAccessController } from "@orbitdb/core";
 import { logger } from "../lib/logger.js";
+import * as Client from '@storacha/client';
+import { StoreMemory } from '@storacha/client/stores/memory';
 import {
+  backupDatabase,
+  restoreDatabase,
   restoreDatabaseFromSpace,
   convertStorachaCIDToOrbitDB,
   extractManifestCID,
 } from "../lib/orbitdb-storacha-bridge.js";
-import { backupDatabaseWithUCANTO, restoreDatabaseWithUCANTO } from "../lib/backup-ucanto.js";
 
 // Import utilities separately
 import { createHeliaOrbitDB, cleanupOrbitDBDirectories } from "../lib/utils.js";
@@ -26,6 +29,7 @@ import {
   teardownTestUploadService,
   createTestCredentials,
   createUCANTOConfig,
+  createWorkingUCANClient,
 } from "./helpers/test-upload-service.js";
 
 /**
@@ -251,19 +255,23 @@ describe("OrbitDB Storacha Bridge Integration", () => {
         await sourceDB.add(entry);
       }
 
-      // Backup database using direct UCANTO
-      const backupResult = await backupDatabaseWithUCANTO(
+      // Backup database with blockCache for in-memory testing
+      const backupResult = await backupDatabase(
         sourceNode.orbitdb,
         sourceDB.address,
         {
-          connection: ucantoConfig.connection,
-          invocationConfig: ucantoConfig.invocationConfig,
+          storachaKey: testCredentials.storachaKey,
+          storachaProof: testCredentials.storachaProof,
+          serviceConf: testCredentials.serviceConf,
           blockCache,
         },
       );
+      if (!backupResult.success) {
+        console.log('Backup failed:', backupResult);
+      }
       expect(backupResult.success).toBe(true);
       expect(backupResult.manifestCID).toBeTruthy();
-      expect(backupResult.blocksUploaded).toBeGreaterThan(0);
+      expect(backupResult.blocksTotal).toBeGreaterThan(0);
 
       // Close source database and clean up source node completely
       try {
@@ -283,8 +291,8 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       // Wait for peers to connect before restore operations
       await waitForPeers(targetNode, 5, 10000); // Wait up to 10s, but don't require any peers
 
-      // Restore database using direct UCANTO - loads blocks from cache
-      const restoreResult = await restoreDatabaseWithUCANTO(
+      // Restore database with blockCache - loads blocks from cache
+      const restoreResult = await restoreDatabase(
         targetNode.orbitdb,
         backupResult.manifestCID,
         backupResult.cidMappings,
@@ -369,18 +377,21 @@ describe("OrbitDB Storacha Bridge Integration", () => {
         await sourceDB.add(entry);
       }
 
-      // Backup database
-      const backupResult = await backupDatabaseWithUCANTO(
+      // Backup database (this test uses UCAN client to actually upload to in-memory service)
+      const { client: ucanClient, spaceDID, space: testSpace } = await createWorkingUCANClient(testService);
+      const backupResult = await backupDatabase(
         sourceNode.orbitdb,
         sourceDB.address,
         {
-          storachaKey: testCredentials.storachaKey,
-          storachaProof: testCredentials.storachaProof,
-          serviceConf: testCredentials.serviceConf,
+          ucanClient,
+          spaceDID,
         },
       );
+      if (!backupResult.success) {
+        console.log('Backup failed:', backupResult);
+      }
       expect(backupResult.success).toBe(true);
-      expect(backupResult.blocksUploaded).toBeGreaterThan(0);
+      expect(backupResult.blocksTotal).toBeGreaterThan(0);
 
       // Close source and clean up completely
       await sourceDB.close();
@@ -397,10 +408,17 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       await waitForPeers(targetNode, 5, 10000); // Wait up to 10s, but don't require any peers
 
       // Restore from space WITHOUT CID mappings (breakthrough feature)
+      // Use same space as backup so restoreDatabaseFromSpace can discover the files
+      const restoreClient = await Client.create({
+        principal: testSpace.spaceAgent,
+        store: new StoreMemory(),
+      });
+      await restoreClient.addSpace(testSpace.spaceProof);
+      await restoreClient.setCurrentSpace(testSpace.spaceDid);
+      
       const restoreResult = await restoreDatabaseFromSpace(targetNode.orbitdb, {
-        storachaKey: testCredentials.storachaKey,
-        storachaProof: testCredentials.storachaProof,
-          serviceConf: testCredentials.serviceConf,
+        ucanClient: restoreClient,
+        spaceDID: testSpace.spaceDid,
       });
 
       expect(restoreResult.success).toBe(true);
@@ -549,18 +567,18 @@ describe("OrbitDB Storacha Bridge Integration", () => {
         `   📊 Source database has ${Object.keys(allTodos).length} todos`,
       );
 
-      // Backup database with identity and access controller
-      const backupResult = await backupDatabaseWithUCANTO(
+      // Backup database with identity and access controller (using UCAN client)
+      const { client: ucanClient, spaceDID, space: testSpace } = await createWorkingUCANClient(testService);
+      const backupResult = await backupDatabase(
         sourceNode.orbitdb,
         sourceDB.address,
         {
-          storachaKey: testCredentials.storachaKey,
-          storachaProof: testCredentials.storachaProof,
-          serviceConf: testCredentials.serviceConf,
+          ucanClient,
+          spaceDID,
         },
       );
       expect(backupResult.success).toBe(true);
-      expect(backupResult.blocksUploaded).toBeGreaterThan(0);
+      expect(backupResult.blocksTotal).toBeGreaterThan(0);
 
       // Address will be verified through restoreResult.addressMatch
 
@@ -579,10 +597,17 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       await waitForPeers(targetNode, 5, 10000); // Wait up to 10s, but don't require any peers
 
       // Restore from space WITHOUT CID mappings (breakthrough feature)
+      // Reuse same space from backup
+      const restoreClient = await Client.create({
+        principal: testSpace.spaceAgent,
+        store: new StoreMemory(),
+      });
+      await restoreClient.addSpace(testSpace.spaceProof);
+      await restoreClient.setCurrentSpace(testSpace.spaceDid);
+      
       const restoreResult = await restoreDatabaseFromSpace(targetNode.orbitdb, {
-        storachaKey: testCredentials.storachaKey,
-        storachaProof: testCredentials.storachaProof,
-          serviceConf: testCredentials.serviceConf,
+        ucanClient: restoreClient,
+        spaceDID: testSpace.spaceDid,
       });
       logger.info("restoreResult", restoreResult);
       expect(restoreResult.success).toBe(true);
@@ -852,19 +877,19 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       logger.info(
         "\n💾 Backing up database with DEL operations to Storacha...",
       );
-      const backupResult = await backupDatabaseWithUCANTO(
+      const { client: ucanClient, spaceDID, space: testSpace } = await createWorkingUCANClient(testService);
+      const backupResult = await backupDatabase(
         sourceNode.orbitdb,
         sourceDB.address,
         {
-          storachaKey: testCredentials.storachaKey,
-          storachaProof: testCredentials.storachaProof,
-          serviceConf: testCredentials.serviceConf,
+          ucanClient,
+          spaceDID,
         },
       );
       expect(backupResult.success).toBe(true);
-      expect(backupResult.blocksUploaded).toBeGreaterThan(0);
+      expect(backupResult.blocksTotal).toBeGreaterThan(0);
       logger.info(
-        `   ✅ Backup completed: ${backupResult.blocksUploaded} blocks uploaded`,
+        `   ✅ Backup completed: ${backupResult.blocksTotal} blocks uploaded`,
       );
 
       // **Close source and clean up completely**
@@ -887,10 +912,17 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       logger.info(
         "\n📥 Restoring database with DEL operations from Storacha...",
       );
+      // Reuse same space from backup
+      const restoreClient = await Client.create({
+        principal: testSpace.spaceAgent,
+        store: new StoreMemory(),
+      });
+      await restoreClient.addSpace(testSpace.spaceProof);
+      await restoreClient.setCurrentSpace(testSpace.spaceDid);
+      
       const restoreResult = await restoreDatabaseFromSpace(targetNode.orbitdb, {
-        storachaKey: testCredentials.storachaKey,
-        storachaProof: testCredentials.storachaProof,
-          serviceConf: testCredentials.serviceConf,
+        ucanClient: restoreClient,
+        spaceDID: testSpace.spaceDid,
       });
 
       expect(restoreResult.success).toBe(true);
@@ -1098,13 +1130,13 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       expect(sourceIds).toEqual(["post-1", "post-3"]);
 
       // **Backup database**
-      const backupResult = await backupDatabaseWithUCANTO(
+      const { client: ucanClient, spaceDID, space: testSpace } = await createWorkingUCANClient(testService);
+      const backupResult = await backupDatabase(
         sourceNode.orbitdb,
         sourceDB.address,
         {
-          storachaKey: testCredentials.storachaKey,
-          storachaProof: testCredentials.storachaProof,
-          serviceConf: testCredentials.serviceConf,
+          ucanClient,
+          spaceDID,
         },
       );
       expect(backupResult.success).toBe(true);
@@ -1124,10 +1156,17 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       await waitForPeers(targetNode, 5, 10000); // Wait up to 10s, but don't require any peers
 
       // **Restore from space**
+      // Reuse same space from backup
+      const restoreClient = await Client.create({
+        principal: testSpace.spaceAgent,
+        store: new StoreMemory(),
+      });
+      await restoreClient.addSpace(testSpace.spaceProof);
+      await restoreClient.setCurrentSpace(testSpace.spaceDid);
+      
       const restoreResult = await restoreDatabaseFromSpace(targetNode.orbitdb, {
-        storachaKey: testCredentials.storachaKey,
-        storachaProof: testCredentials.storachaProof,
-          serviceConf: testCredentials.serviceConf,
+        ucanClient: restoreClient,
+        spaceDID: testSpace.spaceDid,
       });
 
       expect(restoreResult.success).toBe(true);
