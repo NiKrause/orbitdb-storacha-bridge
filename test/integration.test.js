@@ -16,6 +16,7 @@ import { StoreMemory } from "@storacha/client/stores/memory";
 import { Signer } from "@storacha/client/principal/ed25519";
 import * as Proof from "@storacha/client/proof";
 import { logger } from "../lib/logger.js";
+import { LOCAL_STORAGE_CONFIG, isLocalStorageRunning } from "./helpers/local-storage-config.js";
 import {
   backupDatabase,
   restoreDatabase,
@@ -52,7 +53,7 @@ async function displaySpaceAndDIDInfo(options) {
       `${colors.bright}${colors.cyan}╔════════════════════════════════════════════════════════════════╗${colors.reset}`,
     );
     logger.info(
-      `${colors.bright}${colors.cyan}║                    STORACHA TEST CONFIGURATION                 ║${colors.reset}`,
+      `${colors.bright}${colors.cyan}║              LOCAL.STORAGE TEST CONFIGURATION               ║${colors.reset}`,
     );
     logger.info(
       `${colors.bright}${colors.cyan}╚════════════════════════════════════════════════════════════════╝${colors.reset}`,
@@ -61,7 +62,12 @@ async function displaySpaceAndDIDInfo(options) {
     // Initialize Storacha client to get space/DID info
     const principal = Signer.parse(options.storachaKey);
     const store = new StoreMemory();
-    const client = await Client.create({ principal, store });
+    const client = await Client.create({ 
+      principal, 
+      store,
+      serviceConf: options.serviceConf,
+      receiptsEndpoint: LOCAL_STORAGE_CONFIG.receiptsEndpoint,
+    });
 
     const proof = await Proof.parse(options.storachaProof);
     const space = await client.addSpace(proof);
@@ -143,6 +149,18 @@ describe("OrbitDB Storacha Bridge Integration", () => {
    * If credentials are missing, tests will be skipped with a warning.
    */
   beforeEach(async () => {
+    // Check if local.storage service is running
+    const isRunning = await isLocalStorageRunning();
+    if (!isRunning) {
+      logger.error("❌ local.storage service is not running on http://localhost:3000");
+      logger.info("Please start local.storage with: cd /Users/nandi/local.storage && npm start");
+      throw new Error("local.storage service not running");
+    }
+    
+    logger.info(
+      `${colors.bright}${colors.green}✅ local.storage service is running${colors.reset}`,
+    );
+    
     // Skip tests if no credentials available
     if (!process.env.STORACHA_KEY || !process.env.STORACHA_PROOF) {
       logger.warn("⚠️ Skipping integration tests - no Storacha credentials");
@@ -153,6 +171,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
     await displaySpaceAndDIDInfo({
       storachaKey: process.env.STORACHA_KEY,
       storachaProof: process.env.STORACHA_PROOF,
+      serviceConf: LOCAL_STORAGE_CONFIG.serviceConf,
     });
 
     // Clear Storacha space before each test to ensure clean state
@@ -281,13 +300,14 @@ describe("OrbitDB Storacha Bridge Integration", () => {
         await sourceDB.add(entry);
       }
 
-      // Backup database with explicit credentials
+      // Backup database with explicit credentials and local.storage service
       const backupResult = await backupDatabase(
         sourceNode.orbitdb,
         sourceDB.address,
         {
           storachaKey: process.env.STORACHA_KEY,
           storachaProof: process.env.STORACHA_PROOF,
+          serviceConf: LOCAL_STORAGE_CONFIG.serviceConf,
         },
       );
       expect(backupResult.success).toBe(true);
@@ -312,7 +332,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       // Wait for peers to connect before restore operations
       await waitForPeers(targetNode, 5, 10000); // Wait up to 10s, but don't require any peers
 
-      // Restore database using the isolated target node with explicit credentials
+      // Restore database using the isolated target node with explicit credentials and local.storage
       const restoreResult = await restoreDatabase(
         targetNode.orbitdb,
         backupResult.manifestCID,
@@ -320,6 +340,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
         {
           storachaKey: process.env.STORACHA_KEY,
           storachaProof: process.env.STORACHA_PROOF,
+          serviceConf: LOCAL_STORAGE_CONFIG.serviceConf,
         },
       );
 
