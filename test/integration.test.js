@@ -46,6 +46,8 @@ const colors = {
  * @param {Object} options - Configuration options
  * @param {string} options.storachaKey - Storacha private key
  * @param {string} options.storachaProof - Storacha proof
+ * @param {Object} options.serviceConf - Service configuration
+ * @param {URL} options.receiptsEndpoint - Receipts endpoint URL
  */
 async function displaySpaceAndDIDInfo(options) {
   try {
@@ -59,6 +61,20 @@ async function displaySpaceAndDIDInfo(options) {
       `${colors.bright}${colors.cyan}╚════════════════════════════════════════════════════════════════╝${colors.reset}`,
     );
 
+    // Log service endpoints being used
+    logger.info(
+      `${colors.bright}${colors.magenta}🌐 Service Endpoints:${colors.reset}`,
+    );
+    logger.info(
+      `   Access:   ${colors.yellow}${options.serviceConf.access.channel.url}${colors.reset}`,
+    );
+    logger.info(
+      `   Upload:   ${colors.yellow}${options.serviceConf.upload.channel.url}${colors.reset}`,
+    );
+    logger.info(
+      `   Service:  ${colors.yellow}${options.serviceConf.access.id.did()}${colors.reset}`,
+    );
+
     // Initialize Storacha client to get space/DID info
     const principal = Signer.parse(options.storachaKey);
     const store = new StoreMemory();
@@ -66,7 +82,7 @@ async function displaySpaceAndDIDInfo(options) {
       principal, 
       store,
       serviceConf: options.serviceConf,
-      receiptsEndpoint: LOCAL_STORAGE_CONFIG.receiptsEndpoint,
+      receiptsEndpoint: options.receiptsEndpoint,
     });
 
     const proof = await Proof.parse(options.storachaProof);
@@ -137,6 +153,10 @@ describe("OrbitDB Storacha Bridge Integration", () => {
   let sourceNode;
   /** @type {Object|null} Target OrbitDB node instance */
   let targetNode;
+  /** @type {string|null} Storacha key (agent) for tests */
+  let storachaKey;
+  /** @type {string|null} Storacha proof (space delegation) for tests */
+  let storachaProof;
 
   /**
    * @function beforeEach
@@ -150,8 +170,8 @@ describe("OrbitDB Storacha Bridge Integration", () => {
    */
   beforeEach(async () => {
     // Check if local.storage service is running
-    const isRunning = await isLocalStorageRunning();
-    if (!isRunning) {
+    const { running } = await isLocalStorageRunning();
+    if (!running) {
       logger.error("❌ local.storage service is not running on http://localhost:3000");
       logger.info("Please start local.storage with: cd /Users/nandi/local.storage && npm start");
       throw new Error("local.storage service not running");
@@ -161,25 +181,36 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       `${colors.bright}${colors.green}✅ local.storage service is running${colors.reset}`,
     );
     
+    // Use local.storage credentials if available, otherwise use production
+    const useLocalStorage = !!process.env.LOCAL_STORAGE_AGENT_KEY
+    storachaKey = useLocalStorage ? process.env.LOCAL_STORAGE_AGENT_KEY : process.env.STORACHA_KEY
+    storachaProof = useLocalStorage ? process.env.LOCAL_STORAGE_PROOF : process.env.STORACHA_PROOF
+    
     // Skip tests if no credentials available
-    if (!process.env.STORACHA_KEY || !process.env.STORACHA_PROOF) {
-      logger.warn("⚠️ Skipping integration tests - no Storacha credentials");
+    if (!storachaKey || !storachaProof) {
+      logger.warn("⚠️ Skipping integration tests - no credentials");
       return;
     }
+    
+    logger.info(
+      `${colors.bright}${colors.cyan}🔑 Using ${useLocalStorage ? 'local.storage' : 'production'} credentials${colors.reset}`,
+    );
 
     // Display space and DID information in bright colors
     await displaySpaceAndDIDInfo({
-      storachaKey: process.env.STORACHA_KEY,
-      storachaProof: process.env.STORACHA_PROOF,
+      storachaKey,
+      storachaProof,
       serviceConf: LOCAL_STORAGE_CONFIG.serviceConf,
+      receiptsEndpoint: LOCAL_STORAGE_CONFIG.receiptsEndpoint,
     });
 
     // Clear Storacha space before each test to ensure clean state
     logger.info("🧹 Clearing Storacha space before test...");
     try {
       const clearResult = await clearStorachaSpace({
-        storachaKey: process.env.STORACHA_KEY,
-        storachaProof: process.env.STORACHA_PROOF,
+        storachaKey,
+        storachaProof,
+        serviceConf: LOCAL_STORAGE_CONFIG.serviceConf,
       });
       if (clearResult.success) {
         logger.info("✅ Space cleared successfully");
@@ -278,9 +309,9 @@ describe("OrbitDB Storacha Bridge Integration", () => {
    * @requires STORACHA_KEY environment variable
    * @requires STORACHA_PROOF environment variable
    */
-  test("Complete backup and restore cycle", async () => {
+  test.only("Complete backup and restore cycle", async () => {
     // Skip if no credentials
-    if (!process.env.STORACHA_KEY || !process.env.STORACHA_PROOF) {
+    if (!storachaKey || !storachaProof) {
       return;
     }
 
@@ -301,15 +332,28 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       }
 
       // Backup database with explicit credentials and local.storage service
+      logger.info(
+        `${colors.bright}${colors.cyan}🔧 Backup Service Configuration:${colors.reset}`,
+      );
+      logger.info(
+        `   Upload URL: ${colors.yellow}${LOCAL_STORAGE_CONFIG.serviceConf.upload.channel.url}${colors.reset}`,
+      );
+      logger.info(
+        `   Service DID: ${colors.yellow}${LOCAL_STORAGE_CONFIG.serviceConf.upload.id.did()}${colors.reset}`,
+      );
+      
       const backupResult = await backupDatabase(
         sourceNode.orbitdb,
         sourceDB.address,
         {
-          storachaKey: process.env.STORACHA_KEY,
-          storachaProof: process.env.STORACHA_PROOF,
+          storachaKey,
+          storachaProof,
           serviceConf: LOCAL_STORAGE_CONFIG.serviceConf,
         },
       );
+      if (!backupResult.success) {
+        console.error('❌ Backup failed:', backupResult.error || backupResult.message || backupResult);
+      }
       expect(backupResult.success).toBe(true);
       expect(backupResult.manifestCID).toBeTruthy();
       expect(backupResult.blocksUploaded).toBeGreaterThan(0);
@@ -338,8 +382,8 @@ describe("OrbitDB Storacha Bridge Integration", () => {
         backupResult.manifestCID,
         backupResult.cidMappings,
         {
-          storachaKey: process.env.STORACHA_KEY,
-          storachaProof: process.env.STORACHA_PROOF,
+          storachaKey,
+          storachaProof,
           serviceConf: LOCAL_STORAGE_CONFIG.serviceConf,
         },
       );
