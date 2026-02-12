@@ -1,4 +1,6 @@
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
 import * as client from "@ucanto/client";
 import { createHelia } from "helia";
 import { unixfs } from "@helia/unixfs";
@@ -278,6 +280,84 @@ function createCorsHttp() {
         return handler(req, res);
       }),
   };
+}
+
+async function getOrCreateServiceSigner({
+  persist = false,
+  signerPath,
+  defaultDid,
+} = {}) {
+  if (!persist) {
+    const signer = await ed25519.generate();
+    return defaultDid ? signer.withDID(defaultDid) : signer;
+  }
+
+  const file = signerPath || path.resolve(".tmp/in-memory-service-did.json");
+
+  try {
+    if (fs.existsSync(file)) {
+      const data = JSON.parse(fs.readFileSync(file, "utf8"));
+      if (typeof data.privateKey === "string") {
+        let signer = ed25519.parse(data.privateKey);
+        if (defaultDid) {
+          signer = signer.withDID(defaultDid);
+        }
+        serverLogger(
+          colorize(
+            colors.teal,
+            `🌐 Using persisted service DID: ${signer.did()} (key: ${signer.toDIDKey()})`,
+          ),
+        );
+        return signer;
+      }
+    }
+  } catch (err) {
+    serverLogger(
+      colorize(
+        colors.teal,
+        `⚠️ [in-memory-storacha] failed to load persisted signer: ${err.message}`,
+      ),
+    );
+  }
+
+  const signer = await ed25519.generate();
+  const finalSigner = defaultDid ? signer.withDID(defaultDid) : signer;
+  serverLogger(
+    colorize(
+      colors.teal,
+      `🌐 Generated fresh service DID: ${finalSigner.did()} (key: ${finalSigner.toDIDKey()})`,
+    ),
+  );
+
+  try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(
+      file,
+      JSON.stringify(
+        {
+          did: finalSigner.did(),
+          key: finalSigner.toDIDKey(),
+          privateKey: ed25519.format(signer),
+          createdAt: new Date().toISOString(),
+        },
+        null,
+        2,
+      ),
+      "utf8",
+    );
+    serverLogger(
+      colorize(colors.teal, `🌐 Persisted service DID to: ${file}`),
+    );
+  } catch (err) {
+    serverLogger(
+      colorize(
+        colors.teal,
+        `⚠️ [in-memory-storacha] failed to persist signer: ${err.message}`,
+      ),
+    );
+  }
+
+  return finalSigner;
 }
 
 async function startUploadApiServer(context) {
@@ -562,13 +642,23 @@ function buildServiceConf(url, serviceDid) {
   };
 }
 
-export async function startInMemoryStorachaService() {
+export async function startInMemoryStorachaService(options = {}) {
   await ensureHelia();
   const gateway = await startGatewayServer();
   const context = await createContext({
     requirePaymentPlan: false,
     http: createCorsHttp(),
   });
+
+  const signer = await getOrCreateServiceSigner({
+    persist: options.persistServiceDid === true,
+    signerPath: options.serviceDidPath,
+    defaultDid: context.id.did(),
+  });
+
+  context.id = signer;
+  context.signer = signer;
+
   const { server, url } = await startUploadApiServer(context);
   const credentials = await createLocalCredentials(context);
   const serviceConf = buildServiceConf(url, context.id.did());
