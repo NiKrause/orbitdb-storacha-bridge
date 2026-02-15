@@ -242,54 +242,54 @@ jobs:
           name: playwright-report-simple-backup-restore
           path: examples/svelte/simple-backup-restore/playwright-report/
           retention-days: 30
+ 
+  e2e-tests-orbitdb:
+    name: E2E Tests (orbitdb-replication)
+    runs-on: ubuntu-latest
+    needs: [e2e-tests-simple]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-  # e2e-tests-orbitdb:
-  #   name: E2E Tests (orbitdb-replication)
-  #   runs-on: ubuntu-latest
-  #   needs: [e2e-tests-simple]
-  #   steps:
-  #     - name: Checkout code
-  #       uses: actions/checkout@v4
-  #
-  #     - name: Setup Node.js
-  #       uses: actions/setup-node@v4
-  #       with:
-  #         node-version: '22'
-  #         cache: 'npm'
-  #
-  #     - name: Install root dependencies
-  #       run: npm ci
-  #
-  #     - name: Install example dependencies
-  #       run: npm ci
-  #       working-directory: examples/svelte/orbitdb-replication
-  #
-  #     - name: Install Playwright browsers
-  #       run: npx playwright install --with-deps
-  #       working-directory: examples/svelte/orbitdb-replication
-  #
-  #     - name: Run E2E tests - orbitdb-replication
-  #       env:
-  #         PORT: 5174
-  #       run: npx playwright test
-  #       working-directory: examples/svelte/orbitdb-replication
-  #
-  #     - name: Upload Playwright report
-  #       if: always()
-  #       uses: actions/upload-artifact@v4
-  #       with:
-  #         name: playwright-report-orbitdb-replication
-  #         path: examples/svelte/orbitdb-replication/playwright-report/
-  #         retention-days: 30
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install root dependencies
+        run: npm ci
+
+      - name: Install example dependencies
+        run: npm ci
+        working-directory: examples/svelte/orbitdb-replication
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+        working-directory: examples/svelte/orbitdb-replication
+
+      - name: Run E2E tests - orbitdb-replication
+        env:
+          PORT: 5174
+        run: npx playwright test
+        working-directory: examples/svelte/orbitdb-replication
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-orbitdb-replication
+          path: examples/svelte/orbitdb-replication/playwright-report/
+          retention-days: 30
 
   notify:
     name: Notify Results
     runs-on: ubuntu-latest
-    needs: [lint, integration-tests, car-backup-tests, p256-ucan-tests, timestamped-backup-tests, network-download-tests, e2e-tests-simple]
+    needs: [lint, integration-tests, car-backup-tests, p256-ucan-tests, timestamped-backup-tests, network-download-tests, e2e-tests-simple, e2e-tests-orbitdb]
     if: always()
     steps:
       - name: Notify Success
-        if: needs.lint.result == 'success' && needs.integration-tests.result == 'success' && needs.car-backup-tests.result == 'success' && needs.p256-ucan-tests.result == 'success' && needs.timestamped-backup-tests.result == 'success' && needs.network-download-tests.result == 'success' && needs.e2e-tests-simple.result == 'success'
+        if: needs.lint.result == 'success' && needs.integration-tests.result == 'success' && needs.car-backup-tests.result == 'success' && needs.p256-ucan-tests.result == 'success' && needs.timestamped-backup-tests.result == 'success' && needs.network-download-tests.result == 'success' && needs.e2e-tests-simple.result == 'success' && needs.e2e-tests-orbitdb.result == 'success'
         run: |
           echo "✅ All tests passed successfully!"
           echo "🎉 OrbitDB Storacha Bridge is working correctly"
@@ -301,8 +301,9 @@ jobs:
           echo "  - Timestamped Backup Tests: PASSED"
           echo "  - Network Download Tests: PASSED"
           echo "  - E2E Tests (simple-backup-restore): PASSED"
+          echo "  - E2E Tests (orbitdb-replication): PASSED"
       - name: Notify Failure
-        if: needs.lint.result == 'failure' || needs.integration-tests.result == 'failure' || needs.car-backup-tests.result == 'failure' || needs.p256-ucan-tests.result == 'failure' || needs.timestamped-backup-tests.result == 'failure' || needs.network-download-tests.result == 'failure' || needs.e2e-tests-simple.result == 'failure'
+        if: needs.lint.result == 'failure' || needs.integration-tests.result == 'failure' || needs.car-backup-tests.result == 'failure' || needs.p256-ucan-tests.result == 'failure' || needs.timestamped-backup-tests.result == 'failure' || needs.network-download-tests.result == 'failure' || needs.e2e-tests-simple.result == 'failure' || needs.e2e-tests-orbitdb.result == 'failure'
         run: |
           echo "❌ Some tests failed"
           echo "🔍 Please check the logs above for details"
@@ -314,4 +315,5 @@ jobs:
           echo "  - Timestamped Backup Tests: ${{ needs.timestamped-backup-tests.result }}"
           echo "  - Network Download Tests: ${{ needs.network-download-tests.result }}"
           echo "  - E2E Tests (simple-backup-restore): ${{ needs.e2e-tests-simple.result }}"
+          echo "  - E2E Tests (orbitdb-replication): ${{ needs.e2e-tests-orbitdb.result }}"
           exit 1
