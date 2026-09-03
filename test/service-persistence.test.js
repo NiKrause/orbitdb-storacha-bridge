@@ -23,7 +23,8 @@ describe('Storacha In-memory Service Persistence', () => {
       if (fs.readdirSync(tmpDir).length === 0) {
         fs.rmdirSync(tmpDir);
       }
-    } catch (err) {
+    } catch {
+      // best-effort: a non-empty .tmp dir is fine to leave behind
     }
   });
 
