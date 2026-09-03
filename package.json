@@ -11,6 +11,8 @@
       "default": "./lib/orbitdb-storacha-bridge.js"
     },
     "./backup-car": "./lib/backup-car.js",
+    "./courier-sync": "./lib/courier-sync.js",
+    "./memory-courier": "./lib/memory-courier.js",
     "./StorachaIntegration.svelte": "./dist/components/StorachaIntegration.svelte",
     "./StorachaTest.svelte": "./dist/components/StorachaTest.svelte",
     "./StorachaAuth.svelte": "./dist/components/StorachaAuth.svelte",
