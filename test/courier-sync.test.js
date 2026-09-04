@@ -27,11 +27,13 @@ import {
   databaseTag,
 } from "../lib/courier-sync.js";
 import { createMemoryCourierPair } from "../lib/memory-courier.js";
+import * as dagCbor from "@ipld/dag-cbor";
 import { createHeliaOrbitDB, cleanupOrbitDBDirectories } from "../lib/utils.js";
 
 jest.setTimeout(180000);
 
 const OFFLINE = { useBootstrap: false, useDHT: false, autoDial: false };
+const GZIP_THRESHOLD_FOR_TEST = 256; // mirrors courier-sync GZIP_THRESHOLD
 
 /**
  * Drive both couriers and both protocol queues until nothing moves anymore.
@@ -365,6 +367,91 @@ describe("Courier Sync — OrbitDB replication over a byte courier, no libp2p", 
 
     await syncA.stop();
     await foreign.stop();
+  });
+
+  test("a large first-contact bootstrap compresses on the wire and still converges", async () => {
+    const db = track(
+      await alice.orbitdb.open("courier-compress", { type: "keyvalue" }),
+    );
+    for (let i = 0; i < 25; i++) {
+      await db.put(`k${i}`, {
+        text: `entry number ${i} — some repetitive filler that deflates well`,
+      });
+    }
+
+    // What the bootstrap would weigh uncompressed.
+    const delta = await createDelta({ db, theirHeads: [] });
+    const tagBytes = await databaseTag(db.address);
+    const rawLen = dagCbor.encode({
+      v: 1,
+      tag: tagBytes,
+      t: "blocks",
+      heads: delta.heads,
+      blocks: delta.blocks,
+    }).length;
+
+    const pair = createMemoryCourierPair();
+    const syncA = await createCourierSync({ db, courier: pair.a });
+    let blocksWire = 0;
+    syncA.on("message", (m) => {
+      if (m.direction === "out" && m.type === "blocks")
+        blocksWire = Math.max(blocksWire, m.bytes);
+    });
+    const syncB = await createCourierSync({
+      orbitdb: bob.orbitdb,
+      address: db.address,
+      courier: pair.b,
+    });
+    await syncA.start();
+    await syncB.start();
+    await converge(pair, [syncA, syncB]);
+
+    expect((await keysOf(track(syncB.db))).length).toBe(25);
+    expect(rawLen).toBeGreaterThan(GZIP_THRESHOLD_FOR_TEST);
+    expect(blocksWire).toBeGreaterThan(0);
+    expect(blocksWire).toBeLessThan(rawLen); // compression shrank it on the wire
+
+    await syncA.stop();
+    await syncB.stop();
+  });
+
+  test("a joiner re-wants on its own until the bootstrap arrives (no manual poke)", async () => {
+    const db = track(
+      await alice.orbitdb.open("courier-rejoin", { type: "keyvalue" }),
+    );
+    await db.put("r1", { text: "will be dropped on the first pass" });
+
+    // Drop the first blocks payload wholesale; let everything after through.
+    let blockade = true;
+    const pair = createMemoryCourierPair({
+      dropFn: ({ bytes }) => {
+        if (blockade && bytes.length > 200) {
+          blockade = false; // only the first big one
+          return true;
+        }
+        return false;
+      },
+    });
+    const syncA = await createCourierSync({ db, courier: pair.a });
+    const syncB = await createCourierSync({
+      orbitdb: bob.orbitdb,
+      address: db.address,
+      courier: pair.b,
+      rejoinIntervalMs: 40, // re-ask quickly for the test
+    });
+    await syncA.start();
+    await syncB.start();
+
+    // The first bootstrap was lost. Without touching syncB, the periodic
+    // re-want must recover it. Give the interval room to fire, then converge.
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    await converge(pair, [syncA, syncB]);
+
+    expect(track(syncB.db)).toBeTruthy();
+    expect(await keysOf(syncB.db)).toEqual(["r1"]);
+
+    await syncA.stop();
+    await syncB.stop();
   });
 
   test("createDelta/applyDelta round-trip carries exactly the missing suffix", async () => {
