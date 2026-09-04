@@ -3,7 +3,7 @@
  *
  * Two OrbitDB instances converge over an in-memory byte courier — no libp2p
  * connection, no pubsub, no network. This is phase 0 of the LoRa data plane
- * (https://github.com/NiKrause/libp2p-webrtc-qr-meshtastic/issues/1, tracked
+ * (https://github.com/NiKrause/funkpost/issues/1, tracked
  * here as issue #50): the protocol logic, tested against a courier that is
  * deliberately lossy, duplicating and reordering, the way a mesh is.
  *
