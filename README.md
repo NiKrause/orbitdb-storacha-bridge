@@ -10,10 +10,19 @@
 [![npm version](https://img.shields.io/npm/v/orbitdb-storacha-bridge.svg)](https://www.npmjs.com/package/orbitdb-storacha-bridge)
 
 
+> [!IMPORTANT]
+> **The Storacha upload service is gone.** Writes were switched off in May 2026 and the
+> service has since been decommissioned. Backup no longer works, and restore only reaches
+> blocks that something other than Storacha still holds. See
+> [Status: Storacha sunset](#status-storacha-sunset-may-2026) and
+> [docs/STORAGE-BACKENDS.md](docs/STORAGE-BACKENDS.md) for where to go instead.
+
+
 ## Table of Contents
 
 - [OrbitDB Storacha Bridge](#orbitdb-storacha-bridge)
   - [Table of Contents](#table-of-contents)
+  - [Status: Storacha sunset (May 2026)](#status-storacha-sunset-may-2026)
   - [What we want to accomplish](#what-we-want-to-accomplish)
     - [The Challenge of Distributed Data Persistence](#the-challenge-of-distributed-data-persistence)
     - [Architectural Considerations for Local-First Applications](#architectural-considerations-for-local-first-applications)
@@ -32,6 +41,48 @@
   - [Testing](#testing)
   - [Contributing](#contributing)
   - [License](#license)
+
+
+## Status: Storacha sunset (May 2026)
+
+Storacha switched off user writes in **May 2026** and has since decommissioned the service.
+Verified on 2026-09-05:
+
+| Check | Result |
+| --- | --- |
+| `up.storacha.network`, `console.storacha.network`, `indexer.storacha.network`, `forge.storacha.network` | no DNS record — upload, console and indexing endpoints are gone |
+| `storacha.network`, `docs.storacha.network` | `301` → `fil.one`, the team's new S3-compatible product |
+| `storacha.link`, `w3s.link` | `301` → `dweb.link`; the gateways only forward to the public IPFS gateway now |
+| the widget demo CID linked in the roadmap below | `504` on `w3s.link`, `dweb.link`, `ipfs.io` and `trustless-gateway.link` |
+| `@storacha/client` on npm | last release `2.1.4`, 2026-05-15, not marked deprecated |
+
+The shutdown is traceable in the open:
+[`upload-service#708`](https://github.com/storacha/upload-service/pull/708) added a `writesDisabled`
+kill switch that makes the eight user-initiated write capabilities
+(`space/blob/{add,remove,replicate}`, `space/index/add`, `upload/{add,remove}`, `store/{add,remove}`)
+return `ServiceUnavailable`, and [`w3infra#636`](https://github.com/storacha/w3infra/pull/636) wired
+`WRITES_DISABLED=true` into the production stack — both merged 2026-05-15. Five days later Storacha
+shipped `storacha space migrate`
+([`@storacha/filecoin-pin-migration`](https://www.npmjs.com/package/@storacha/filecoin-pin-migration)),
+a migration path from Storacha spaces to Filecoin Onchain Cloud. That tool reads spaces through
+endpoints that no longer resolve, so the official migration window has closed.
+
+We found no announcement page: the Storacha blog now redirects to `fil.one/blog`, which carries a
+single post ("Introducing Fil One", 2026-08-12). The dates above come from the code and the DNS,
+not from a press release.
+
+**What this means for this library**
+
+- **Backup does not work.** Every write path ends in `client.uploadFile()` against `up.storacha.network`.
+- **Restore only reaches what someone else still holds.** The p2p-first path still finds blocks that a
+  peer or another pinning service pins; the gateway fallback and the `capability.upload.list`
+  discovery step cannot reach Storacha any more.
+- **The OrbitDB half is unaffected.** Block extraction, CID bridging, CAR packing, identity
+  preservation, UCAN signing and courier-sync are backend-agnostic — only the handful of Storacha
+  client methods mapped in [docs/STORAGE-BACKENDS.md](docs/STORAGE-BACKENDS.md) need a new home.
+
+If you still have an OrbitDB instance with the blocks in it, re-pin them somewhere else now: the data
+is only as alive as the peers that hold it.
 
 
 ## What we want to accomplish
@@ -68,6 +119,8 @@ The bridge supports UCAN (User Controlled Authorization Networks) authentication
 
 Currently, Storacha backup and restore operations utilize Storacha's gateway infrastructure to interface with Filecoin's decentralized storage network. This hybrid approach balances accessibility with decentralization during the current phase of the Filecoin ecosystem's evolution.
 
+That description is now historical: the gateway infrastructure it relies on was decommissioned in 2026 (see [Status: Storacha sunset](#status-storacha-sunset-may-2026)). The hybrid shape of the design still holds — a backend that stores bytes, an IPFS network that serves them — but the backend slot is open. [docs/STORAGE-BACKENDS.md](docs/STORAGE-BACKENDS.md) compares the candidates.
+
 ## What This Does
 
 Backup and restore between **OrbitDB databases** and **Storacha/Filecoin** with full hash and identity preservation. Works in both Node.js and browser environments. [See Storacha Integration Widget in Simple Todo Example](https://simple-todo.le-space.de/)
@@ -85,6 +138,10 @@ The project includes **Svelte components** for browser-based demos and integrati
 - OrbitDB CAR file storage [OrbitDB CustomStorage](https://github.com/orbitdb/orbitdb/blob/main/docs/STORAGE.md)
 
 ## Roadmap (Current version: 0.4.3, as of 23.01.2026)
+
+> Being re-based on a backend interface instead of a single vendor — the plan is
+> [issue 54](https://github.com/NiKrause/orbitdb-storacha-bridge/issues/54), not here. The WebAuthn/varsig items below survive
+> unchanged; the Storacha-named ones become backend-agnostic.
 
 - [ ] v0.4.4 (Feb 2026): Latest-backup pointer (single CID) to avoid listing via the Storacha SDK and restore from the IPFS network for initial OrbitDB syncs.
   - [ ] After each backup, write a small pointer record (JSON) that stores the latest metadata CID, CAR CID, and last heads (block CID).
@@ -110,7 +167,7 @@ Install the package via npm. ```npm install orbitdb-storacha-bridge```
 
 ## Environment Setup
 
-Get Storacha credentials from [storacha.network quickstart](https://docs.storacha.network/quickstart/), install w3 for the console, get storacha key and proof then set up your environment variables (.env) for STORACHA_KEY and STORACHA_PROOF.
+`STORACHA_KEY` and `STORACHA_PROOF` in `.env` are still what the code reads, and existing credentials still parse — but there is no longer a service to present them to, and no way to mint new ones: the console and the quickstart docs are gone (see [Status: Storacha sunset](#status-storacha-sunset-may-2026)). The test suite's in-memory modes run without credentials; see `test/README.md`.
 
 ## Demo
 
