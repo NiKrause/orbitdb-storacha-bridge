@@ -26,6 +26,7 @@ import { sha256 } from "multiformats/hashes/sha2";
 import { createMemoryBackend } from "../../lib/backends/memory.js";
 import { createStorachaBackend } from "../../lib/backends/storacha.js";
 import { createPinataBackend } from "../../lib/backends/pinata.js";
+import { createLighthouseBackend } from "../../lib/backends/lighthouse.js";
 import { BackendError, defineBackend } from "../../lib/backends/types.js";
 import {
   startInMemoryStorachaService,
@@ -130,6 +131,37 @@ const drivers = [
               // fetch from an in-process map, so that test skips itself here.
               publish: () => {},
             };
+          },
+          async tearDown(context) {
+            for (const handle of context?.created || []) {
+              await context.real.remove(handle).catch(() => {});
+            }
+          },
+        },
+      ]
+    : []),
+  // Lighthouse needs two gates rather than one. Its model is pay once, stored forever, so
+  // every run of this suite buys permanent storage that deleting does not refund -- an
+  // API key sitting in the environment is not consent to spend on each test run.
+  ...(process.env.LIGHTHOUSE_API_KEY && process.env.LIGHTHOUSE_LIVE_TEST === "1"
+    ? [
+        {
+          name: "lighthouse (live account)",
+          async setUp() {
+            const real = createLighthouseBackend({
+              apiKey: process.env.LIGHTHOUSE_API_KEY,
+              gateway: process.env.LIGHTHOUSE_GATEWAY,
+            });
+            const created = [];
+            const backend = {
+              ...real,
+              putBlob: async (bytes, meta) => {
+                const handle = await real.putBlob(bytes, meta);
+                created.push(handle);
+                return handle;
+              },
+            };
+            return { backend, created, real, publish: () => {} };
           },
           async tearDown(context) {
             for (const handle of context?.created || []) {
