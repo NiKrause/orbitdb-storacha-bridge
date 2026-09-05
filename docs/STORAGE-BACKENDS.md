@@ -258,6 +258,10 @@ choosing.
 The phased plan built on this is [issue 54](https://github.com/NiKrause/orbitdb-storacha-bridge/issues/54), kept out of
 this page so a stale plan cannot be mistaken for a fact.
 
+Which of these has actually been run against its service, and what a live run costs, is in
+[BACKEND-VERIFICATION.md](BACKEND-VERIFICATION.md). Three of the drivers have never moved a
+byte.
+
 **Open questions to measure before committing**
 
 - The FOC per-operation provider fee, at the backup frequency we actually want.

@@ -74,13 +74,15 @@ real backend, not a broken one.
 npm run test:backends
 ```
 
-Pinata joins the driver table only when `PINATA_JWT` is set, because it is a real account
-with real files and a real bill. Everything the suite stores there is tracked and deleted
-again on teardown. CAR uploads need a paid Pinata plan; without one, that driver's CAR test
-will fail with the plan error rather than a contract violation.
+Live backends join the driver table only when their credentials are present, because they
+are real accounts with real files and a real bill. Everything the suite stores is tracked
+and deleted again on teardown. Which drivers have actually been run against their service,
+what each run costs, and what to report is in
+[../docs/BACKEND-VERIFICATION.md](../docs/BACKEND-VERIFICATION.md).
 
 ```bash
-PINATA_JWT=... PINATA_GATEWAY=https://your-gateway.mypinata.cloud npm run test:backends
+PINATA_JWT=... npm run test:backends
+LIGHTHOUSE_API_KEY=... LIGHTHOUSE_LIVE_TEST=1 npm run test:backends
 ```
 
 ## Other Suites
