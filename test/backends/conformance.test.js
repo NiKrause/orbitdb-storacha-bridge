@@ -25,6 +25,7 @@ import { CID } from "multiformats/cid";
 import { sha256 } from "multiformats/hashes/sha2";
 import { createMemoryBackend } from "../../lib/backends/memory.js";
 import { createStorachaBackend } from "../../lib/backends/storacha.js";
+import { createPinataBackend } from "../../lib/backends/pinata.js";
 import { BackendError, defineBackend } from "../../lib/backends/types.js";
 import {
   startInMemoryStorachaService,
@@ -97,6 +98,47 @@ const drivers = [
       await stopInMemoryStorachaService(context?.service);
     },
   },
+  // Pinata is a real account with real files and a real bill, so it only joins the
+  // table when someone has opted in with a token. Everything it stores is tracked and
+  // deleted again, because a test suite that leaves litter in a paid account will be
+  // switched off and then never run.
+  ...(process.env.PINATA_JWT
+    ? [
+        {
+          name: "pinata (live account)",
+          async setUp() {
+            const real = createPinataBackend({
+              jwt: process.env.PINATA_JWT,
+              gateway: process.env.PINATA_GATEWAY,
+            });
+            const created = [];
+            const track = (handle) => {
+              created.push(handle);
+              return handle;
+            };
+            const backend = {
+              ...real,
+              putBlob: async (bytes, meta) =>
+                track(await real.putBlob(bytes, meta)),
+              pinCid: async (cid, meta) => track(await real.pinCid(cid, meta)),
+            };
+            return {
+              backend,
+              created,
+              real,
+              // pinCid needs the content to already be on IPFS; a live Pinata cannot
+              // fetch from an in-process map, so that test skips itself here.
+              publish: () => {},
+            };
+          },
+          async tearDown(context) {
+            for (const handle of context?.created || []) {
+              await context.real.remove(handle).catch(() => {});
+            }
+          },
+        },
+      ]
+    : []),
 ];
 
 describe.each(drivers.map((driver) => [driver.name, driver]))(

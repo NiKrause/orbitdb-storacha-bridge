@@ -10,7 +10,6 @@ export default [
         window: "readonly",
         document: "readonly",
         localStorage: "readonly",
-        File: "readonly",
         // Node globals
         process: "readonly",
         Buffer: "readonly",
@@ -37,6 +36,8 @@ export default [
         URL: "readonly",
         Blob: "readonly",
         File: "readonly",
+        FormData: "readonly",
+        URLSearchParams: "readonly",
         CustomEvent: "readonly",
         AbortSignal: "readonly",
         navigator: "readonly",

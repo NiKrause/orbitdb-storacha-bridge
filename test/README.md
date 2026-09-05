@@ -74,6 +74,15 @@ real backend, not a broken one.
 npm run test:backends
 ```
 
+Pinata joins the driver table only when `PINATA_JWT` is set, because it is a real account
+with real files and a real bill. Everything the suite stores there is tracked and deleted
+again on teardown. CAR uploads need a paid Pinata plan; without one, that driver's CAR test
+will fail with the plan error rather than a contract violation.
+
+```bash
+PINATA_JWT=... PINATA_GATEWAY=https://your-gateway.mypinata.cloud npm run test:backends
+```
+
 ## Other Suites
 
 - `test/access-control-integration.test.js`: UCAN access control flows.
