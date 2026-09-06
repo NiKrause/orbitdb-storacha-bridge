@@ -151,6 +151,85 @@ describe("Courier Sync — OrbitDB replication over a byte courier, no libp2p", 
     await syncB.stop();
   });
 
+  test("announceOnLocalUpdate: false stays quiet until asked, and answers when it is", async () => {
+    // For a courier that costs money or airtime: several writes, one send.
+    // The application decides when the radio is used, not the keystroke.
+    const db = track(
+      await alice.orbitdb.open("courier-on-demand", { type: "keyvalue" }),
+    );
+    await db.put("seed", { text: "hello" });
+
+    const pair = createMemoryCourierPair();
+    const syncA = await createCourierSync({
+      db,
+      courier: pair.a,
+      announceOnLocalUpdate: false,
+    });
+    const syncB = await createCourierSync({
+      orbitdb: bob.orbitdb,
+      address: db.address,
+      courier: pair.b,
+    });
+    await syncA.start();
+    await syncB.start();
+    await converge(pair, [syncA, syncB]);
+    expect(await syncB.db.get("seed")).toEqual({ text: "hello" });
+
+    // Three writes, and the courier must not move for any of them. Both the
+    // absence of data and the absence of *traffic* are asserted: a peer that
+    // stayed empty because messages were lost would pass the first check only.
+    const sentBefore = pair.stats.sent;
+    await db.put("one", { text: "1" });
+    await db.put("two", { text: "2" });
+    await db.put("three", { text: "3" });
+    await converge(pair, [syncA, syncB]);
+
+    expect(await syncB.db.get("one")).toBeUndefined();
+    expect(await syncB.db.get("three")).toBeUndefined();
+    expect(pair.stats.sent).toEqual(sentBefore);
+
+    // One deliberate announce carries all three at once — the point of opting
+    // out is batching, not silence.
+    await syncA.announce();
+    await converge(pair, [syncA, syncB]);
+
+    expect(await syncB.db.get("one")).toEqual({ text: "1" });
+    expect(await syncB.db.get("two")).toEqual({ text: "2" });
+    expect(await syncB.db.get("three")).toEqual({ text: "3" });
+
+    await syncA.stop();
+    await syncB.stop();
+  });
+
+  test("announceOnLocalUpdate: false still answers a peer that asks", async () => {
+    // Going quiet must not mean going deaf: a joiner who has never seen the
+    // database still bootstraps from a silent writer.
+    const db = track(
+      await alice.orbitdb.open("courier-quiet-but-awake", { type: "keyvalue" }),
+    );
+    await db.put("seed", { text: "hello" });
+
+    const pair = createMemoryCourierPair();
+    const syncA = await createCourierSync({
+      db,
+      courier: pair.a,
+      announceOnLocalUpdate: false,
+    });
+    const syncB = await createCourierSync({
+      orbitdb: bob.orbitdb,
+      address: db.address,
+      courier: pair.b,
+    });
+    await syncA.start();
+    await syncB.start();
+    await converge(pair, [syncA, syncB]);
+
+    expect(await syncB.db.get("seed")).toEqual({ text: "hello" });
+
+    await syncA.stop();
+    await syncB.stop();
+  });
+
   test("divergence: both sides write while unplugged, then merge to equal heads", async () => {
     const db = track(
       await alice.orbitdb.open("courier-diverge", {
