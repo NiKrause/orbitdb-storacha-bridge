@@ -1,6 +1,6 @@
 {
   "name": "orbitdb-storacha-bridge",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "OrbitDB database replication via Storacha/Filecoin",
   "main": "lib/orbitdb-storacha-bridge.js",
   "svelte": "dist/components/",
