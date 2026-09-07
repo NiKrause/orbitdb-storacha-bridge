@@ -74,6 +74,17 @@ real backend, not a broken one.
 npm run test:backends
 ```
 
+Live backends join the driver table only when their credentials are present, because they
+are real accounts with real files and a real bill. Everything the suite stores is tracked
+and deleted again on teardown. Which drivers have actually been run against their service,
+what each run costs, and what to report is in
+[../docs/BACKEND-VERIFICATION.md](../docs/BACKEND-VERIFICATION.md).
+
+```bash
+PINATA_JWT=... npm run test:backends
+LIGHTHOUSE_API_KEY=... LIGHTHOUSE_LIVE_TEST=1 npm run test:backends
+```
+
 ## Other Suites
 
 - `test/access-control-integration.test.js`: UCAN access control flows.

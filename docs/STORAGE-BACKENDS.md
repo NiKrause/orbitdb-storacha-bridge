@@ -157,14 +157,19 @@ through a vendor API and hash preservation stops being something a service could
   and $1.20 for a GB. For a browser with a wallet and no account, this is the shortest path on this
   page.
 
-**Limits.** 60 requests/minute on the free tier (250 Picnic, 500 Fiesta), 30/minute on `data/`
+**Limits.** Files up to 25 GB, TUS-resumable above 100 MB. 60 requests/minute on the free tier (250 Picnic, 500 Fiesta), 30/minute on `data/`
 endpoints; 25 GB per upload, resumable required above 100 MB; 10 MB for `pinJSONToIPFS`.
 
 **Limitations**
 
-- **"Binary files are only allowed on a case by case basis, please contact team@pinata.cloud."**
-  A CAR is `application/octet-stream`. This one line could invalidate the whole class-2 path here and
-  has to be tested before Pinata is trusted with CAR backups — the pin-by-CID path sidesteps it.
+- **CAR uploads need a paid plan.** They are documented and first class — `car: true` on the
+  upload, supported across every upload method — but not on the free tier, public network only,
+  and a CAR with more than one root CID is rejected. Ours has one, the manifest.
+- **CAR processing is asynchronous.** Pinata validates the blocks after accepting the upload and
+  reports the outcome by webhook, so a CID is not necessarily retrievable the moment the upload
+  returns. A backup that verifies itself by reading straight back has to allow for that.
+- **A plain file push is hashed by Pinata**, not by us, so per-block upload is not CID-safe here.
+  At 60 requests a minute on the free tier it would be unwise regardless. CAR or pin-by-CID.
 - A company with an account, a plan and a rate limit. No proofs, no on-chain anything, no way to
   verify a backup exists other than asking them.
 - HTML retrieval needs a dedicated gateway with a custom domain.
@@ -253,10 +258,12 @@ choosing.
 The phased plan built on this is [issue 54](https://github.com/NiKrause/orbitdb-storacha-bridge/issues/54), kept out of
 this page so a stale plan cannot be mistaken for a fact.
 
+Which of these has actually been run against its service, and what a live run costs, is in
+[BACKEND-VERIFICATION.md](BACKEND-VERIFICATION.md). Three of the drivers have never moved a
+byte.
+
 **Open questions to measure before committing**
 
-- Whether Pinata accepts a CAR at all — "binary files on a case by case basis" is a one-line
-  showstopper for the class-2 path there, and it is untested.
 - The FOC per-operation provider fee, at the backup frequency we actually want.
 - Whether a CAR round-trips byte-identically through Lighthouse's `dag/import` — verify by CID, not
   by trusting the API.
