@@ -57,7 +57,7 @@ jobs:
       # Credential-free suites only. courier-sync is the one downstream
       # projects depend on, and it never ran in CI at all before this.
       - name: Run the tests that need no secrets
-        run: npx jest test/courier-sync.test.js test/car-storage.test.js --forceExit
+        run: npx jest test/courier-sync.test.js test/car-storage.test.js test/restore-cid.test.js --forceExit
         env:
           NODE_OPTIONS: "--experimental-vm-modules --no-warnings"
 

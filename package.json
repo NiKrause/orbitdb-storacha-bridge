@@ -12,6 +12,7 @@
     },
     "./backup-car": "./lib/backup-car.js",
     "./courier-sync": "./lib/courier-sync.js",
+    "./restore-cid": "./lib/restore-cid.js",
     "./memory-courier": "./lib/memory-courier.js",
     "./StorachaIntegration.svelte": "./dist/components/StorachaIntegration.svelte",
     "./StorachaTest.svelte": "./dist/components/StorachaTest.svelte",
