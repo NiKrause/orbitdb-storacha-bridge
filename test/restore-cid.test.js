@@ -18,6 +18,11 @@ import { createCARFromBlocks } from "../lib/backup-car.js";
 import { extractDatabaseBlocks } from "../lib/orbitdb-storacha-bridge.js";
 import { createHeliaOrbitDB, cleanupOrbitDBDirectories } from "../lib/utils.js";
 import { CID } from "multiformats/cid";
+import { CarWriter } from "@ipld/car";
+import * as Block from "multiformats/block";
+import * as dagCbor from "@ipld/dag-cbor";
+import { sha256 } from "multiformats/hashes/sha2";
+import { Readable } from "stream";
 
 jest.setTimeout(180000);
 
@@ -174,5 +179,73 @@ describe("what it refuses, and how it says so", () => {
   test("the arguments it cannot work without are named", async () => {
     await expect(restoreFromCID(null, { metadataCID: "x" })).rejects.toThrow(/OrbitDB instance/);
     await expect(restoreFromCID(bob.orbitdb, {})).rejects.toThrow(/metadataCID is required/);
+  });
+});
+
+/** A CAR carrying `bytes` under `cid`, whether or not they belong together. */
+async function carWith(cid, bytes) {
+  const { writer, out } = CarWriter.create([cid]);
+  const chunks = [];
+  const reader = Readable.from(out);
+  reader.on("data", (chunk) => chunks.push(chunk));
+  await writer.put({ cid, bytes });
+  await writer.close();
+  await new Promise((resolve) => reader.on("end", resolve));
+  return new Uint8Array(Buffer.concat(chunks));
+}
+
+describe("a block is only as good as its own hash", () => {
+  test("CarReader does not check this, which is why we do", async () => {
+    const honest = await Block.encode({ value: { todo: "buy milk" }, codec: dagCbor, hasher: sha256 });
+    const other = await Block.encode({ value: { todo: "DELETE EVERYTHING" }, codec: dagCbor, hasher: sha256 });
+
+    // The forgery: one block's name over another block's bytes.
+    const tampered = await carWith(honest.cid, other.bytes);
+
+    await expect(readBlocksFromCAR(tampered)).rejects.toThrow(/does not hash to its own CID/);
+
+    // And the reason the check has to be ours: without it, this is accepted.
+    const waved = await readBlocksFromCAR(tampered, { verify: false });
+    expect(waved.get(honest.cid.toString()).bytes).toEqual(other.bytes);
+  });
+
+  test("an honest CAR passes, so verification is not just a refusal", async () => {
+    const block = await Block.encode({ value: { todo: "fix the antenna" }, codec: dagCbor, hasher: sha256 });
+    const car = await carWith(block.cid, block.bytes);
+    const blocks = await readBlocksFromCAR(car);
+    expect(blocks.get(block.cid.toString()).bytes).toEqual(block.bytes);
+  });
+
+  test("blocks that verify individually are still not any backup you like", async () => {
+    // Every block here is honest about itself. What makes this the wrong CAR is
+    // that it does not hold the manifest the metadata names — which no amount
+    // of per-block verification would catch.
+    const block = await Block.encode({ value: { todo: "someone else's" }, codec: dagCbor, hasher: sha256 });
+    const car = await carWith(block.cid, block.bytes);
+
+    const metadata = {
+      version: "1.0",
+      timestamp: Date.now(),
+      carCID: "bafyOTHERcar",
+      manifestCID: "bafyMANIFESTthatIsNotInThere",
+      databases: [
+        {
+          address: "/orbitdb/zdpuNotOurs",
+          type: "events",
+          manifestCID: "bafyMANIFESTthatIsNotInThere",
+        },
+      ],
+    };
+    const store = new Map([
+      ["bafyMETA", new TextEncoder().encode(JSON.stringify(metadata))],
+      ["bafyOTHERcar", car],
+    ]);
+
+    await expect(
+      restoreFromCID(bob.orbitdb, {
+        metadataCID: "bafyMETA",
+        fetchBytes: async (cid) => store.get(cid),
+      }),
+    ).rejects.toThrow(/does not contain the manifest/);
   });
 });
