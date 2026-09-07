@@ -8,6 +8,9 @@ on:
   schedule:
     # Run tests daily at 2 AM UTC
     - cron: '0 2 * * *'
+  # The jobs that need a live storage service are gated on this, so they can
+  # still be run deliberately once there is a service for them to reach.
+  workflow_dispatch:
 
 jobs:
   lint:
@@ -94,6 +97,12 @@ jobs:
     name: CAR Backup Tests
     runs-on: ubuntu-latest
     environment: STORACHA_KEY
+    # Needs a live Storacha upload service. Writes stopped 2026-05-15 and the
+    # endpoints are gone, so on a PR this can only ever be red — which is worse
+    # than absent, because a permanently failing pipeline teaches everyone to
+    # ignore it. Kept and gated rather than deleted: these are the only worked
+    # tests of the semantics a replacement driver has to reproduce (#54).
+    if: github.event_name == 'workflow_dispatch'
     needs: [integration-tests]
     steps:
       - name: Checkout code
@@ -130,6 +139,12 @@ jobs:
     name: P256 UCAN Security Tests
     runs-on: ubuntu-latest
     environment: STORACHA_KEY
+    # Needs a live Storacha upload service. Writes stopped 2026-05-15 and the
+    # endpoints are gone, so on a PR this can only ever be red — which is worse
+    # than absent, because a permanently failing pipeline teaches everyone to
+    # ignore it. Kept and gated rather than deleted: these are the only worked
+    # tests of the semantics a replacement driver has to reproduce (#54).
+    if: github.event_name == 'workflow_dispatch'
     needs: [car-backup-tests]
     steps:
       - name: Checkout code
@@ -162,6 +177,12 @@ jobs:
     name: Timestamped Backup Tests
     runs-on: ubuntu-latest
     environment: STORACHA_KEY
+    # Needs a live Storacha upload service. Writes stopped 2026-05-15 and the
+    # endpoints are gone, so on a PR this can only ever be red — which is worse
+    # than absent, because a permanently failing pipeline teaches everyone to
+    # ignore it. Kept and gated rather than deleted: these are the only worked
+    # tests of the semantics a replacement driver has to reproduce (#54).
+    if: github.event_name == 'workflow_dispatch'
     needs: [p256-ucan-tests]
     steps:
       - name: Checkout code
@@ -198,6 +219,12 @@ jobs:
     name: Network Download Tests
     runs-on: ubuntu-latest
     environment: STORACHA_KEY
+    # Needs a live Storacha upload service. Writes stopped 2026-05-15 and the
+    # endpoints are gone, so on a PR this can only ever be red — which is worse
+    # than absent, because a permanently failing pipeline teaches everyone to
+    # ignore it. Kept and gated rather than deleted: these are the only worked
+    # tests of the semantics a replacement driver has to reproduce (#54).
+    if: github.event_name == 'workflow_dispatch'
     needs: [timestamped-backup-tests]
     steps:
       - name: Checkout code
@@ -315,7 +342,7 @@ jobs:
     if: always()
     steps:
       - name: Notify Success
-        if: needs.lint.result == 'success' && needs.courier-sync-tests.result == 'success' && needs.integration-tests.result == 'success' && needs.car-backup-tests.result == 'success' && needs.p256-ucan-tests.result == 'success' && needs.timestamped-backup-tests.result == 'success' && needs.network-download-tests.result == 'success' && needs.e2e-tests-simple.result == 'success'
+        if: needs.lint.result == 'success' && needs.courier-sync-tests.result == 'success' && needs.integration-tests.result == 'success' && needs.e2e-tests-simple.result == 'success' && needs.car-backup-tests.result != 'failure' && needs.p256-ucan-tests.result != 'failure' && needs.timestamped-backup-tests.result != 'failure' && needs.network-download-tests.result != 'failure'
         run: |
           echo "✅ All tests passed successfully!"
           echo "🎉 OrbitDB Storacha Bridge is working correctly"
