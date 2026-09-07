@@ -23,13 +23,8 @@ import { CarWriter, CarReader } from "@ipld/car";
 import * as dagCbor from "@ipld/dag-cbor";
 import { CID } from "multiformats/cid";
 import { sha256 } from "multiformats/hashes/sha2";
-import { createMemoryBackend } from "../../lib/backends/memory.js";
-import { createStorachaBackend } from "../../lib/backends/storacha.js";
 import { BackendError, defineBackend } from "../../lib/backends/types.js";
-import {
-  startInMemoryStorachaService,
-  stopInMemoryStorachaService,
-} from "../helpers/in-memory-storacha.js";
+import { drivers } from "./drivers.js";
 
 const TIMEOUT = 120_000;
 
@@ -66,38 +61,6 @@ async function packCar(blocks) {
  * Drivers under test. Each entry brings the backend up and tears it down; anything a
  * driver needs (a service, a wallet, a key) is its own problem, not the suite's.
  */
-const drivers = [
-  {
-    name: "memory",
-    async setUp() {
-      // A resolver turns the memory backend into a pin-by-CID backend, so the
-      // pinCid path is exercised by something rather than only declared.
-      const published = new Map();
-      const backend = createMemoryBackend({
-        resolve: async (cid) => published.get(cid) || null,
-      });
-      return { backend, publish: (cid, bytes) => published.set(cid, bytes) };
-    },
-    async tearDown() {},
-  },
-  {
-    name: "storacha (in-memory upload-api)",
-    async setUp() {
-      const service = await startInMemoryStorachaService();
-      const backend = await createStorachaBackend({
-        storachaKey: service.storachaKey,
-        storachaProof: service.storachaProof,
-        serviceConf: service.serviceConf,
-        receiptsEndpoint: service.receiptsEndpoint,
-        gateways: [service.gatewayUrl],
-      });
-      return { backend, service };
-    },
-    async tearDown(context) {
-      await stopInMemoryStorachaService(context?.service);
-    },
-  },
-];
 
 describe.each(drivers.map((driver) => [driver.name, driver]))(
   "storage backend contract: %s",
@@ -144,6 +107,32 @@ describe.each(drivers.map((driver) => [driver.name, driver]))(
 
         const restored = await backend.getBlob(handle);
         expect(Buffer.from(restored).equals(Buffer.from(bytes))).toBe(true);
+      },
+      TIMEOUT,
+    );
+
+    test(
+      "stored bytes are the backend's, not the caller's",
+      async () => {
+        // A real backend puts the bytes on a wire, so the caller's array stops
+        // mattering the moment putBlob returns. A driver that keeps the array
+        // instead is the one place that behaves differently — and it fails
+        // silently: reusing a buffer rewrites what was stored, and mutating
+        // what getBlob returned rewrites it again. Both look like corruption
+        // arriving from somewhere else entirely.
+        const original = new TextEncoder().encode("do not let me change this");
+        const mutable = original.slice();
+
+        const handle = await backend.putBlob(mutable, { name: "aliasing.bin" });
+        mutable[0] ^= 0xff; // the caller reuses its buffer
+
+        const first = await backend.getBlob(handle);
+        expect(Buffer.from(first).equals(Buffer.from(original))).toBe(true);
+
+        first[0] ^= 0xff; // and now mutates what it was handed
+
+        const second = await backend.getBlob(handle);
+        expect(Buffer.from(second).equals(Buffer.from(original))).toBe(true);
       },
       TIMEOUT,
     );
