@@ -439,6 +439,15 @@ describe("Integration: Full Backup and Restore Cycle (Mocked)", () => {
 });
 
 describe("Integration: Real Storacha Credentials (when available)", () => {
+  // "When available" now means never: Storacha's upload service stopped
+  // accepting writes on 2026-05-15 and its endpoints are gone. Credentials can
+  // still be *present* — which is what this guard tests — and the backup will
+  // still fail at `Storacha authentication required`, so CI no longer runs this
+  // job on a pull request (see `.github/workflows/ci.yml`).
+  //
+  // Kept rather than deleted. It is the only worked example of the round trip a
+  // replacement driver has to reproduce, and the conformance suite in #54 is
+  // meant to grow out of exactly this shape.
   const hasRealCredentials =
     process.env.STORACHA_KEY && process.env.STORACHA_PROOF;
 
