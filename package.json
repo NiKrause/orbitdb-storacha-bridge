@@ -13,6 +13,8 @@
     "./backup-car": "./lib/backup-car.js",
     "./courier-sync": "./lib/courier-sync.js",
     "./restore-cid": "./lib/restore-cid.js",
+    "./backends/types": "./lib/backends/types.js",
+    "./backends/memory": "./lib/backends/memory.js",
     "./memory-courier": "./lib/memory-courier.js",
     "./StorachaIntegration.svelte": "./dist/components/StorachaIntegration.svelte",
     "./StorachaTest.svelte": "./dist/components/StorachaTest.svelte",

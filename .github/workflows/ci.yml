@@ -53,7 +53,7 @@ jobs:
         run: npm ci
 
       - name: Run courier-sync tests
-        run: npx jest test/courier-sync.test.js test/restore-cid.test.js --forceExit
+        run: npx jest test/courier-sync.test.js test/restore-cid.test.js test/backends/ --forceExit
         env:
           NODE_OPTIONS: '--experimental-vm-modules --no-warnings'
 
