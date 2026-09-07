@@ -56,6 +56,24 @@ Runs **in-memory by default**. To run against production Storacha:
 USE_PRODUCTION_STORACHA=1 STORACHA_KEY=... STORACHA_PROOF=... npm run test:timestamped-backup
 ```
 
+## Backend Conformance (`test/backends/conformance.test.js`)
+
+One suite every storage backend driver must pass, so that adding Pinata, Lighthouse,
+Aleph or Filecoin Onchain Cloud is a day of work rather than a rewrite. Drivers are
+listed in a table at the top of the file; each brings itself up and tears itself down.
+
+Runs with **no credentials and no network**: the memory driver is in-process, and the
+Storacha driver runs against the in-memory upload-api in `test/helpers/`.
+
+The load-bearing test is the CAR round trip — a backup is only restorable if every
+inner CID survives the trip, and that is what makes a CAR the safe unit to hand a
+backend. Capability-gated tests skip rather than fail: a backend that cannot list is a
+real backend, not a broken one.
+
+```bash
+npm run test:backends
+```
+
 ## Other Suites
 
 - `test/access-control-integration.test.js`: UCAN access control flows.

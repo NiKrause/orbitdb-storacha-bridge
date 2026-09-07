@@ -17,6 +17,7 @@ import {
 import { createHeliaOrbitDB, cleanupOrbitDBDirectories } from "../lib/utils.js";
 import {
   downloadBlockFromIPFSNetwork,
+  downloadBlock,
   downloadBlockFromStoracha,
   initializeStorachaClient,
 } from "../lib/orbitdb-storacha-bridge.js";
@@ -25,6 +26,15 @@ import {
   startInMemoryStorachaService,
   stopInMemoryStorachaService,
 } from "./helpers/in-memory-storacha.js";
+
+describe("the downloadBlockFromStoracha alias", () => {
+  it("is the same function as downloadBlock", () => {
+    // The old name never touched a Storacha client and now describes nothing, but
+    // downstream code imports it. If this ever stops being an alias, that is a
+    // breaking change and should read as one.
+    expect(downloadBlockFromStoracha).toBe(downloadBlock);
+  });
+});
 
 describe("Network Download Tests", () => {
   let heliaNode;
@@ -423,7 +433,7 @@ describe("Network Download Tests", () => {
    * In in-memory mode this uses the local upload-api server; in production mode
    * it requires STORACHA_KEY/STORACHA_PROOF.
    */
-  describe("downloadBlockFromStoracha() with Storacha upload", () => {
+  describe("downloadBlock() with Storacha upload", () => {
     it("should upload to Storacha and download using unixfs.cat()", async () => {
       // Skip if credentials are not available
       if (useProductionStoracha && (!storachaKey || !storachaProof)) {
@@ -442,8 +452,8 @@ describe("Network Download Tests", () => {
       await new Promise((resolve) => setTimeout(resolve, 3000));
 
       // Download using network from Storacha
-      logPeerCount(heliaNode, "downloadBlockFromStoracha - simple");
-      const downloadedBytes = await downloadBlockFromStoracha(cid, {
+      logPeerCount(heliaNode, "downloadBlock - simple");
+      const downloadedBytes = await downloadBlock(cid, {
         helia: heliaNode.helia,
         unixfs: heliaNode.unixfs,
         useIPFSNetwork: true,
@@ -485,8 +495,8 @@ describe("Network Download Tests", () => {
       await new Promise((resolve) => setTimeout(resolve, 5000));
 
       // Download using network from Storacha
-      logPeerCount(heliaNode, "downloadBlockFromStoracha - chunked");
-      const downloadedBytes = await downloadBlockFromStoracha(cid, {
+      logPeerCount(heliaNode, "downloadBlock - chunked");
+      const downloadedBytes = await downloadBlock(cid, {
         helia: heliaNode.helia,
         unixfs: heliaNode.unixfs,
         useIPFSNetwork: true,
@@ -539,7 +549,7 @@ describe("Network Download Tests", () => {
 
       try {
         // Download using gateway fallback
-        const downloadedBytes = await downloadBlockFromStoracha(cid, {
+        const downloadedBytes = await downloadBlock(cid, {
           helia: heliaNode.helia,
           unixfs: heliaNode.unixfs,
           useIPFSNetwork: true,
@@ -791,7 +801,7 @@ describe("Network Download Tests", () => {
    * and fallback configuration.
    */
   describe("Configuration options", () => {
-    it("downloadBlockFromStoracha should respect useIPFSNetwork option", async () => {
+    it("downloadBlock should respect useIPFSNetwork option", async () => {
       const testContent = "Test content for config";
       const cid = await uploadToIPFS(heliaNode.helia, testContent);
 
@@ -801,12 +811,9 @@ describe("Network Download Tests", () => {
       await waitForPeers(heliaNode, 5, 5000); // Quick check, don't require peers
 
       // Test with useIPFSNetwork: true
-      logPeerCount(
-        heliaNode,
-        "downloadBlockFromStoracha - useIPFSNetwork true",
-      );
+      logPeerCount(heliaNode, "downloadBlock - useIPFSNetwork true");
       const spy = jest.spyOn(heliaNode.unixfs, "cat");
-      const bytes1 = await downloadBlockFromStoracha(cid, {
+      const bytes1 = await downloadBlock(cid, {
         helia: heliaNode.helia,
         unixfs: heliaNode.unixfs,
         useIPFSNetwork: true,
@@ -828,7 +835,7 @@ describe("Network Download Tests", () => {
       const catSpy2 = jest.spyOn(heliaNode.unixfs, "cat");
 
       try {
-        await downloadBlockFromStoracha(cid, {
+        await downloadBlock(cid, {
           helia: heliaNode.helia,
           useIPFSNetwork: false,
           timeout: 5000,
@@ -844,7 +851,7 @@ describe("Network Download Tests", () => {
       global.fetch = originalFetch;
     }, 60000);
 
-    it("downloadBlockFromStoracha should respect gatewayFallback option", async () => {
+    it("downloadBlock should respect gatewayFallback option", async () => {
       const testContent = "Test fallback config";
       const cid = await uploadToIPFS(heliaNode.helia, testContent);
 
@@ -865,7 +872,7 @@ describe("Network Download Tests", () => {
       });
       global.fetch = fetchSpy;
 
-      const bytes = await downloadBlockFromStoracha(cid, {
+      const bytes = await downloadBlock(cid, {
         helia: heliaNode.helia,
         unixfs: heliaNode.unixfs,
         useIPFSNetwork: true,
@@ -880,7 +887,7 @@ describe("Network Download Tests", () => {
 
       // Test with gatewayFallback: false
       await expect(
-        downloadBlockFromStoracha(cid, {
+        downloadBlock(cid, {
           helia: heliaNode.helia,
           unixfs: heliaNode.unixfs,
           useIPFSNetwork: true,
@@ -896,7 +903,7 @@ describe("Network Download Tests", () => {
       global.fetch = originalFetch;
     });
 
-    it("downloadBlockFromStoracha should work without Helia instance (gateway only)", async () => {
+    it("downloadBlock should work without Helia instance (gateway only)", async () => {
       const testContent = "Gateway only test";
       const testBytes = new TextEncoder().encode(testContent);
       const cid = await uploadToIPFS(heliaNode.helia, testContent);
@@ -914,7 +921,7 @@ describe("Network Download Tests", () => {
       });
       global.fetch = fetchSpy;
 
-      const bytes = await downloadBlockFromStoracha(cid, {
+      const bytes = await downloadBlock(cid, {
         useIPFSNetwork: true, // Even if true, no helia means gateway only
         gatewayFallback: true,
         timeout: 5000,
@@ -960,7 +967,7 @@ describe("Network Download Tests", () => {
       });
 
       try {
-        gatewayBytes = await downloadBlockFromStoracha(cid, {
+        gatewayBytes = await downloadBlock(cid, {
           useIPFSNetwork: false,
           timeout: 5000,
         });
