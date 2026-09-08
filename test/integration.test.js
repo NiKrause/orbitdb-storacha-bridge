@@ -429,11 +429,17 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       const backupResult = await backupDatabase(
         sourceNode.orbitdb,
         sourceDB.address,
-        getStorachaOptions(),
+        { ...getStorachaOptions(), strategy: "blocks" },
       );
       expect(backupResult.success).toBe(true);
       expect(backupResult.manifestCID).toBeTruthy();
+      expect(backupResult.method).toBe("blocks");
       expect(backupResult.blocksUploaded).toBeGreaterThan(0);
+      // The pair under test here is `cidMappings` in and `restoreDatabase` out,
+      // which only the per-block strategy can produce: a CAR has no per-block
+      // handles to map. Hence the explicit strategy above — the default is a
+      // CAR since 0.5.2 (#54), and `restoreDatabaseFromSpace` is its partner.
+      expect(backupResult.cidMappings).toBeTruthy();
 
       // Close source database and clean up source node completely
       try {
@@ -602,9 +608,14 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       // This is a breakthrough feature - we just need to verify that some data was restored
       expect(restoreResult.entriesRecovered).toBeGreaterThan(0);
       expect(restoreResult.blocksRestored).toBeGreaterThan(0);
-      expect(restoreResult.spaceFilesFound).toBeGreaterThan(0);
-      expect(restoreResult.analysis).toBeTruthy();
-      expect(restoreResult.analysis.manifestBlocks.length).toBeGreaterThan(0);
+      // `spaceFilesFound` counted the files a block scan walked. A CAR
+      // restore fetches one backup by name and walks nothing, so the number
+      // is absent rather than zero. `blocksRestored` above is the assertion
+      // that was doing the real work either way.
+      // Nor `analysis`, for the same reason: it described what a scan walked
+      // past on its way to the blocks. What it was really standing in for —
+      // that a manifest was found and the database opened — is `success` and
+      // `entriesRecovered` above.
 
       // ** CRITICAL: Verify actual data integrity for space restore **
       // Since space restore can find any database in the space, we need to check that
@@ -800,9 +811,14 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       expect(restoreResult.success).toBe(true);
       expect(restoreResult.entriesRecovered).toBeGreaterThan(0);
       expect(restoreResult.blocksRestored).toBeGreaterThan(0);
-      expect(restoreResult.spaceFilesFound).toBeGreaterThan(0);
-      expect(restoreResult.analysis).toBeTruthy();
-      expect(restoreResult.analysis.manifestBlocks.length).toBeGreaterThan(0);
+      // `spaceFilesFound` counted the files a block scan walked. A CAR
+      // restore fetches one backup by name and walks nothing, so the number
+      // is absent rather than zero. `blocksRestored` above is the assertion
+      // that was doing the real work either way.
+      // Nor `analysis`, for the same reason: it described what a scan walked
+      // past on its way to the blocks. What it was really standing in for —
+      // that a manifest was found and the database opened — is `success` and
+      // `entriesRecovered` above.
 
       // ** CRITICAL: Verify key-value data integrity for space restore **
       expect(restoreResult.entries).toBeDefined();
@@ -859,16 +875,13 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       );
 
       // Verify identity and access controller preservation
-      if (restoreResult.analysis.identityBlocks.length > 0) {
+      if (restoreResult.analysis?.identityBlocks?.length > 0) {
         logger.info(
           `✅ Identity preservation: Found ${restoreResult.analysis.identityBlocks.length} identity blocks`,
         );
       }
 
-      if (
-        restoreResult.analysis.accessControllerBlocks &&
-        restoreResult.analysis.accessControllerBlocks.length > 0
-      ) {
+      if (restoreResult.analysis?.accessControllerBlocks?.length > 0) {
         logger.info(
           `✅ Access controller preservation: Found ${restoreResult.analysis.accessControllerBlocks.length} access controller blocks`,
         );
