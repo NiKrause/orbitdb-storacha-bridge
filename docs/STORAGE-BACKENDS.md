@@ -152,10 +152,31 @@ through a vendor API and hash preservation stops being something a service could
 - **Scoped keys over the API** — `keys.create` / `keys.revoke` with scopes such as `org:files:write`,
   so a per-user key can be minted and torn down instead of shared.
 - **MPP server** — account-free uploads with no API key at all: `POST /v1/pin/public?fileSize={bytes}`
-  answers `402 Payment Required`, you pay USDC on Tempo, and it returns a signed upload URL.
-  Priced at `fileSize (GB) × $0.10 × 12 months`, minimum $0.01 — so $0.01 for anything up to ~80 MB
-  and $1.20 for a GB. For a browser with a wallet and no account, this is the shortest path on this
-  page.
+  answers `402 Payment Required`, you pay USDC on Tempo, and it returns a signed upload URL. For a
+  browser with a wallet and no account, this is the shortest path on this page.
+
+  **Measured 2026-09-09**, since the price was previously taken from the published formula. The 402
+  carries a `www-authenticate: Payment …` header whose `request` is base64 JSON — amount, currency
+  contract, `chainId 4217`, recipient:
+
+  | file size | `amount` | at 6 decimals | `GB × $0.10 × 12` |
+  | --- | --- | --- | --- |
+  | 1 KB | 1000 | $0.0010 | $0.0000 |
+  | 100 KB | 1000 | $0.0010 | $0.0001 |
+  | 1 MB | 1200 | $0.0012 | $0.0012 |
+  | 100 MB | 117200 | $0.1172 | $0.1172 |
+  | 1 GB | 1200000 | $1.2000 | $1.2000 |
+
+  The formula holds exactly from 1 MB up, and a gigabyte is $1.20 as stated. **The floor is $0.001,
+  not $0.01** — an earlier reading of this page was out by a factor of ten, and with it the
+  conclusion that "$0.01 covers anything up to ~80 MB": 80 MB quotes about $0.094. The floor bites
+  below roughly 1 MB, which is the size range an OrbitDB backup actually lives in, so the difference
+  matters here more than at the top of the table.
+
+  Two things the probe does not settle: the currency contract's decimals are inferred from the
+  formula matching at 1e6 rather than read from the chain, and each quote carries a `challengeId`
+  with a short `expires`, so a driver has to pay against the quote it was given rather than cache
+  a price.
 
 **Limits.** 60 requests/minute on the free tier (250 Picnic, 500 Fiesta), 30/minute on `data/`
 endpoints; 25 GB per upload, resumable required above 100 MB; 10 MB for `pinJSONToIPFS`.
