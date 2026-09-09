@@ -439,19 +439,18 @@ describe("Integration: Full Backup and Restore Cycle (Mocked)", () => {
 });
 
 describe("Integration: Real Storacha Credentials (when available)", () => {
-  // "When available" now means never: Storacha's upload service stopped
-  // accepting writes on 2026-05-15 and its endpoints are gone. Credentials can
-  // still be *present* — which is what this guard tests — and the backup will
-  // still fail at `Storacha authentication required`, so CI no longer runs this
-  // job on a pull request (see `.github/workflows/ci.yml`).
+  // "When available" now means never. Storacha stopped accepting writes on
+  // 2026-05-15 and its endpoints are gone, so the guard that matters is not
+  // "are there credentials" — there can be, and CI has some — but "is there a
+  // service", and there is not.
   //
-  // Kept rather than deleted. It is the only worked example of the round trip a
-  // replacement driver has to reproduce, and the conformance suite in #54 is
-  // meant to grow out of exactly this shape.
-  const hasRealCredentials =
-    process.env.STORACHA_KEY && process.env.STORACHA_PROOF;
+  // Skipped rather than deleted: it is the only worked example of the round
+  // trip a replacement driver has to reproduce, and #54's conformance suite is
+  // meant to grow out of exactly this shape. `USE_PRODUCTION_STORACHA=true`
+  // still runs it, for whoever is standing in front of a working endpoint.
+  const againstAService = process.env.USE_PRODUCTION_STORACHA === "true";
 
-  const testCondition = hasRealCredentials ? it : it.skip;
+  const testCondition = againstAService ? it : it.skip;
 
   testCondition(
     "should successfully backup and restore with real credentials",
@@ -593,9 +592,9 @@ describe("Integration: Real Storacha Credentials (when available)", () => {
     120000,
   ); // 120 second timeout for backup + restore + network operations
 
-  if (!hasRealCredentials) {
+  if (!againstAService) {
     console.log(
-      "⏭️  Skipping real integration test - STORACHA_KEY and STORACHA_PROOF not found in environment",
+      "⏭️  Skipping the live round trip — Storacha's upload service was decommissioned in May 2026. Set USE_PRODUCTION_STORACHA=true to run it against a working endpoint.",
     );
   }
 });
