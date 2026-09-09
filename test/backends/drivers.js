@@ -10,10 +10,12 @@
 
 import { createMemoryBackend } from "../../lib/backends/memory.js";
 import { createStorachaBackend } from "../../lib/backends/storacha.js";
+import { createAlephBackend } from "../../lib/backends/aleph.js";
 import {
   startInMemoryStorachaService,
   stopInMemoryStorachaService,
 } from "../helpers/in-memory-storacha.js";
+import { startAlephStub } from "../helpers/aleph-stub.js";
 
 export const drivers = [
   {
@@ -44,6 +46,25 @@ export const drivers = [
     },
     async tearDown(context) {
       await stopInMemoryStorachaService(context?.service);
+    },
+  },
+  {
+    name: "aleph (stub host)",
+    async setUp() {
+      const stub = await startAlephStub();
+      const backend = createAlephBackend({
+        ingestUrl: stub.ingestUrl,
+        gateways: [stub.gatewayUrl],
+        // Stands in for the wallet-signed STORE message. A no-op is faithful
+        // rather than lazy: pinning tells Aleph to keep content that is already
+        // on IPFS, so what the caller does beforehand — `publish` here — is the
+        // part that makes it resolvable. The wallet only says "keep it".
+        pin: async () => {},
+      });
+      return { backend, stub, publish: stub.publish };
+    },
+    async tearDown(context) {
+      await context?.stub?.stop();
     },
   },
 ];
