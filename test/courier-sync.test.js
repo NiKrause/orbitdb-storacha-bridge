@@ -11,6 +11,7 @@
  * both libp2p nodes hold ZERO connections.
  */
 
+/* global setImmediate */
 import {
   jest,
   describe,
@@ -579,5 +580,55 @@ describe("Courier Sync — OrbitDB replication over a byte courier, no libp2p", 
     expect(refused.complete).toBe(false);
     expect(refused.joined).toBe(0);
     expect(refused.missing.length).toBeGreaterThan(0);
+  });
+
+  /** Resolve on the next turn of the event loop, after pending I/O callbacks. */
+  const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
+
+  test("a joiner's database is handed out only once the bootstrap is in it", async () => {
+    const db = track(
+      await alice.orbitdb.open("courier-bootstrap-window", {
+        type: "keyvalue",
+      }),
+    );
+    await db.put("one", { text: "already here" });
+    await db.put("two", { text: "also here" });
+
+    const pair = createMemoryCourierPair();
+    const syncA = await createCourierSync({ db, courier: pair.a });
+    const syncB = await createCourierSync({
+      orbitdb: bob.orbitdb,
+      address: db.address,
+      courier: pair.b,
+    });
+    let joined = false;
+    syncB.on("synced", () => {
+      joined = true;
+    });
+
+    // Look at every turn of the event loop. The first time the database is
+    // visible, the bootstrap has to be in it already — an application writes
+    // as soon as it has a database, and a write that races the join is lost.
+    let visibleBeforeJoined = null;
+    let watching = true;
+    const watcher = (async () => {
+      while (watching && visibleBeforeJoined === null) {
+        if (syncB.db) visibleBeforeJoined = !joined;
+        await nextTurn();
+      }
+    })();
+
+    await syncA.start();
+    await syncB.start();
+    await converge(pair, [syncA, syncB]);
+    watching = false;
+    await watcher;
+    track(syncB.db);
+
+    expect(visibleBeforeJoined).toBe(false);
+    expect(await keysOf(syncB.db)).toEqual(["one", "two"]);
+
+    await syncA.stop();
+    await syncB.stop();
   });
 });
