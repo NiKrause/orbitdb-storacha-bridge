@@ -153,5 +153,8 @@
     "moduleNameMapper": {
       "^@peculiar/webcrypto$": "<rootDir>/node_modules/@peculiar/webcrypto/build/webcrypto.js"
     }
+  },
+  "overrides": {
+    "test-exclude": "^8.0.0"
   }
 }
