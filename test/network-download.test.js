@@ -165,7 +165,7 @@ describe("Network Download Tests", () => {
       for (const [, db] of dbs) {
         try {
           await db.close();
-        } catch (e) {
+        } catch {
           // Ignore errors if already closed
         }
       }
@@ -840,7 +840,7 @@ describe("Network Download Tests", () => {
           useIPFSNetwork: false,
           timeout: 5000,
         });
-      } catch (error) {
+      } catch {
         // May fail if gateway is unavailable, but we verify network wasn't used
       }
 
@@ -971,7 +971,7 @@ describe("Network Download Tests", () => {
           useIPFSNetwork: false,
           timeout: 5000,
         });
-      } catch (error) {
+      } catch {
         // Gateway might not have the content yet, that's okay for this test
       }
 

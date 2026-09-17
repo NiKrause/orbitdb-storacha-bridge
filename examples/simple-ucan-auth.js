@@ -189,7 +189,7 @@ export async function authenticateWithUCAN(recipientKey, delegationToken) {
       capabilities: delegation.ok.capabilities.map((cap) => cap.can),
     };
   } catch (error) {
-    throw new Error(`UCAN authentication failed: ${error.message}`);
+    throw new Error(`UCAN authentication failed: ${error.message}`, { cause: error });
   }
 }
 

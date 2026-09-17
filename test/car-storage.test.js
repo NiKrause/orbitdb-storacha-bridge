@@ -26,7 +26,7 @@ try {
   ComposedStorage = storageModules.ComposedStorage;
   MemoryStorage = storageModules.MemoryStorage;
   LRUStorage = storageModules.LRUStorage;
-} catch (error) {
+} catch {
   logger.warn("OrbitDB storage modules not available for integration tests");
 }
 
@@ -92,7 +92,7 @@ describe("CAR Storage", () => {
     // Clean up test directory
     try {
       await fs.rm(testDir, { recursive: true });
-    } catch (error) {
+    } catch {
       // Ignore if directory doesn't exist
     }
   });
@@ -114,7 +114,7 @@ describe("CAR Storage", () => {
     // Clean up test directory
     try {
       await fs.rm(testDir, { recursive: true });
-    } catch (error) {
+    } catch {
       // Ignore if directory doesn't exist
     }
 
@@ -368,7 +368,7 @@ describe("CAR Storage", () => {
       try {
         await fs.stat(carPath);
         carFileExists = true;
-      } catch (error) {
+      } catch {
         // File doesn't exist
       }
       expect(carFileExists).toBe(false);
