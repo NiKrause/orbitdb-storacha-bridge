@@ -66,10 +66,13 @@ jobs:
         env:
           NODE_OPTIONS: '--experimental-vm-modules --no-warnings'
 
+  # The Storacha suites below run against the in-memory service in test/helpers
+  # unless USE_PRODUCTION_STORACHA is set, and the real service was
+  # decommissioned in 2026. So they take no credentials, and nothing clears a
+  # space first: the space they would clear no longer exists.
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
-    environment: STORACHA_KEY
     needs: [lint]
     steps:
       - name: Checkout code
@@ -84,14 +87,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Create .env file for tests
-        run: |
-          echo "STORACHA_KEY=${{ secrets.STORACHA_KEY }}" >> .env
-          echo "STORACHA_PROOF=${{ secrets.STORACHA_PROOF }}" >> .env
-
-      - name: Clear Storacha space before tests
-        run: npm run clear-space
-
       - name: Run integration tests
         run: npm run test:integration
         env:
@@ -105,7 +100,6 @@ jobs:
   car-backup-tests:
     name: CAR Backup Tests
     runs-on: ubuntu-latest
-    environment: STORACHA_KEY
     needs: [integration-tests]
     steps:
       - name: Checkout code
@@ -120,14 +114,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Create .env file for tests
-        run: |
-          echo "STORACHA_KEY=${{ secrets.STORACHA_KEY }}" >> .env
-          echo "STORACHA_PROOF=${{ secrets.STORACHA_PROOF }}" >> .env
-
-      - name: Clear Storacha space before tests
-        run: npm run clear-space
-
       - name: Run CAR backup tests
         run: npm run test:car-backup
         env:
@@ -141,7 +127,6 @@ jobs:
   p256-ucan-tests:
     name: P256 UCAN Security Tests
     runs-on: ubuntu-latest
-    environment: STORACHA_KEY
     needs: [car-backup-tests]
     steps:
       - name: Checkout code
@@ -156,11 +141,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Create .env file for tests
-        run: |
-          echo "STORACHA_KEY=${{ secrets.STORACHA_KEY }}" >> .env
-          echo "STORACHA_PROOF=${{ secrets.STORACHA_PROOF }}" >> .env
-
       - name: Run P256 UCAN tests
         run: npm run test:p256-ucan
         env:
@@ -173,7 +153,6 @@ jobs:
   timestamped-backup-tests:
     name: Timestamped Backup Tests
     runs-on: ubuntu-latest
-    environment: STORACHA_KEY
     needs: [p256-ucan-tests]
     steps:
       - name: Checkout code
@@ -188,14 +167,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Create .env file for tests
-        run: |
-          echo "STORACHA_KEY=${{ secrets.STORACHA_KEY }}" >> .env
-          echo "STORACHA_PROOF=${{ secrets.STORACHA_PROOF }}" >> .env
-
-      - name: Clear Storacha space before tests
-        run: npm run clear-space
-
       - name: Run timestamped backup tests
         run: npm run test:timestamped-backup
         env:
@@ -209,7 +180,6 @@ jobs:
   network-download-tests:
     name: Network Download Tests
     runs-on: ubuntu-latest
-    environment: STORACHA_KEY
     needs: [timestamped-backup-tests]
     steps:
       - name: Checkout code
@@ -223,14 +193,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: Create .env file for tests
-        run: |
-          echo "STORACHA_KEY=${{ secrets.STORACHA_KEY }}" >> .env
-          echo "STORACHA_PROOF=${{ secrets.STORACHA_PROOF }}" >> .env
-
-      - name: Clear Storacha space before tests
-        run: npm run clear-space
 
       - name: Run network download tests
         run: npm test -- test/network-download.test.js
