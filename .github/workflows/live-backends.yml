@@ -74,19 +74,19 @@ jobs:
 
       - run: npm ci
 
-      - name: A Pinata key is configured
-        run: |
-          if [ -z "$PINATA_JWT" ]; then
-            echo "::error::No PINATA_JWT secret. Add a scoped Pinata key (upload, list, delete, pin by CID) as a repository secret."
-            exit 1
-          fi
+      # A bad secret fails here once, with a reason, instead of as a wall of
+      # 401s. Prints the secret's shape and Pinata's status codes, never the value.
+      - name: Pinata accepts the key
+        id: key
+        run: node test/helpers/check-pinata-key.js
 
       # The shared table: every operation the driver declares, and a real
       # database backed up through it and restored on a node that never saw it.
       - name: Pinata in the conformance and restore suites
         run: npx jest test/backends/conformance.test.js test/backends/restore.test.js --forceExit
 
-      # Runs even when the table failed: pin by CID is a separate question.
+      # Runs even when the table failed, since pin by CID is a separate
+      # question — but not without a key Pinata accepts.
       - name: Pinata pin by CID
-        if: success() || failure()
+        if: (success() || failure()) && steps.key.outcome == 'success'
         run: npx jest test/backends/pinata-live.test.js --forceExit
