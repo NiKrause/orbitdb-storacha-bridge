@@ -134,6 +134,20 @@ describe("Pinata driver, reading what the service answers", () => {
     expect(error.message).not.toMatch(/dedicated gateway/);
   });
 
+  test("a gateway's refusal carries the gateway's own reason", async () => {
+    // What lavender-absent-dove-749.mypinata.cloud answered on 2026-09-17 for
+    // content outside the account.
+    const refusal =
+      "The owner of this gateway does not have this content pinned to their Pinata account. " +
+      "In order to view this content, please reach out to the owner. - ERR_ID:00006";
+    replay(() => new Response(refusal, { status: 403 }));
+    const backend = createPinataBackend({ jwt: "t", gateway: "example.mypinata.cloud" });
+
+    const error = await backend.getBlob("bafkreiexample").catch((e) => e);
+    expect(error.code).toBe("NOT_FOUND");
+    expect(error.message).toMatch(/HTTP 403 ".*not have this content pinned.*ERR_ID:00006"/);
+  });
+
   test("a gateway pasted as the dashboard shows it, a bare domain, is read over https", async () => {
     const bytes = new TextEncoder().encode("through the dedicated gateway");
     const calls = replay(() => new Response(bytes));
