@@ -11,6 +11,7 @@
 import { createMemoryBackend } from "../../lib/backends/memory.js";
 import { createStorachaBackend } from "../../lib/backends/storacha.js";
 import { createAlephBackend } from "../../lib/backends/aleph.js";
+import { createPinataBackend } from "../../lib/backends/pinata.js";
 import {
   startInMemoryStorachaService,
   stopInMemoryStorachaService,
@@ -67,4 +68,39 @@ export const drivers = [
       await context?.stub?.stop();
     },
   },
+  // A real Pinata account: real files and a real bill. It joins the table only
+  // when a run opts in twice — a JWT in the environment is not consent to spend
+  // on every test run — and everything it stores is deleted again afterwards,
+  // because a suite that leaves litter in a paid account gets switched off.
+  ...(process.env.PINATA_LIVE === "true" && process.env.PINATA_JWT
+    ? [
+        {
+          name: "pinata (live account)",
+          async setUp() {
+            const real = createPinataBackend({
+              jwt: process.env.PINATA_JWT,
+              gateway: process.env.PINATA_GATEWAY || undefined,
+            });
+            const created = [];
+            const backend = {
+              ...real,
+              putBlob: async (bytes, meta) => {
+                const handle = await real.putBlob(bytes, meta);
+                created.push(handle);
+                return handle;
+              },
+            };
+            // No publish: Pinata pins only what the public IPFS network can
+            // serve, and an in-process map is not that. The pin-by-CID path is
+            // exercised by pinata-live.test.js with a block put on IPFS first.
+            return { backend, real, created, publish: null };
+          },
+          async tearDown(context) {
+            for (const handle of context?.created || []) {
+              await context.real.remove(handle).catch(() => {});
+            }
+          },
+        },
+      ]
+    : []),
 ];

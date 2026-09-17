@@ -19,6 +19,7 @@
     "./backends/storacha": "./lib/backends/storacha.js",
     "./backends/aleph": "./lib/backends/aleph.js",
     "./backends/aleph-pin": "./lib/backends/aleph-pin.js",
+    "./backends/pinata": "./lib/backends/pinata.js",
     "./memory-courier": "./lib/memory-courier.js",
     "./StorachaIntegration.svelte": "./dist/components/StorachaIntegration.svelte",
     "./StorachaTest.svelte": "./dist/components/StorachaTest.svelte",

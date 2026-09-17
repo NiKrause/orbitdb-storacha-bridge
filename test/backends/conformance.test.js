@@ -225,6 +225,10 @@ describe.each(drivers.map((driver) => [driver.name, driver]))(
           console.log(`   ⏭️  ${backend.name} declares no pin-by-CID`);
           return;
         }
+        if (!context.publish) {
+          console.log(`   ⏭️  ${backend.name} pins from the public network, which this table cannot publish to`);
+          return;
+        }
         const block = await makeBlock({ pinned: true, clock: 3 });
         context.publish(block.cid.toString(), block.bytes);
 
