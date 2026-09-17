@@ -1,7 +1,7 @@
 {
-  "name": "orbitdb-storacha-bridge",
+  "name": "orbitdb-storage-bridge",
   "version": "0.6.0",
-  "description": "OrbitDB database replication via Storacha/Filecoin",
+  "description": "Back up, restore and replicate OrbitDB databases through pluggable storage backends, with hash and identity preservation",
   "main": "lib/orbitdb-storacha-bridge.js",
   "svelte": "dist/components/",
   "type": "module",
@@ -55,7 +55,13 @@
     "decentralized",
     "database",
     "cid",
-    "bridge"
+    "bridge",
+    "storage",
+    "restore",
+    "car",
+    "aleph",
+    "pinata",
+    "local-first"
   ],
   "files": [
     "lib",
@@ -130,12 +136,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/NiKrause/orbitdb-storacha-bridge.git"
+    "url": "https://github.com/NiKrause/orbitdb-storage-bridge.git"
   },
   "bugs": {
-    "url": "https://github.com/NiKrause/orbitdb-storacha-bridge/issues"
+    "url": "https://github.com/NiKrause/orbitdb-storage-bridge/issues"
   },
-  "homepage": "https://github.com/NiKrause/orbitdb-storacha-bridge#readme",
+  "homepage": "https://github.com/NiKrause/orbitdb-storage-bridge#readme",
   "jest": {
     "testEnvironment": "node",
     "testTimeout": 60000,

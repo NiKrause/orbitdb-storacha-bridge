@@ -44,7 +44,7 @@ daily that they still hold the data, **Filecoin Pay** streams payment per proven
 the optional CDN.
 
 ```js
-const synapse = Synapse.create({ account, source: 'orbitdb-storacha-bridge', chain: mainnet })
+const synapse = Synapse.create({ account, source: 'orbitdb-storage-bridge', chain: mainnet })
 await synapse.storage.prepare({ pieceSizes: [BigInt(car.byteLength)] })   // deposit + approval, 1 tx
 const { pieceCid, copies } = await synapse.storage.upload(car)            // 2 providers by default
 const bytes = await synapse.storage.download({ pieceCid })
@@ -271,7 +271,7 @@ choosing.
    [`orbitdb-relay-pinner`](https://github.com/NiKrause/orbitdb-relay-pinner) are what made the 504s
    at the top of this page survivable at all. A paid backend is the third copy, not the copy.
 
-The phased plan built on this is [issue 54](https://github.com/NiKrause/orbitdb-storacha-bridge/issues/54), kept out of
+The phased plan built on this is [issue 54](https://github.com/NiKrause/orbitdb-storage-bridge/issues/54), kept out of
 this page so a stale plan cannot be mistaken for a fact.
 
 **Open questions to measure before committing**

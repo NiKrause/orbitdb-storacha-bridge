@@ -1,5 +1,19 @@
 # Changes
 
+## 0.7.0 (unreleased)
+
+### Changed
+- **Renamed to `orbitdb-storage-bridge`** — published as `orbitdb-storacha-bridge` up to 0.6.0.
+  Storacha is no longer the only backend, so the name stopped describing the package. The
+  rename changes no API: replace the dependency and the import specifiers
+  (`orbitdb-storacha-bridge/courier-sync` → `orbitdb-storage-bridge/courier-sync`, and so on).
+  Names that refer to Storacha itself stay — `OrbitDBStorachaBridge`, `StorachaIntegration.svelte`,
+  `backends/storacha`, the `storacha_*` localStorage keys — and so does the debug namespace
+  `libp2p:orbitdb-storacha:*`.
+
+Releases 0.5.0 to 0.6.0 are described in their
+[GitHub release notes](https://github.com/NiKrause/orbitdb-storage-bridge/releases).
+
 ## 0.4.3 (2026-01-23)
 
 ### Added

@@ -19,7 +19,7 @@
 		listSpaces,
 		createSpace
 	} from './storacha-backup.js';
-	import { OrbitDBStorachaBridge, restoreDatabaseFromSpace } from 'orbitdb-storacha-bridge';
+	import { OrbitDBStorachaBridge, restoreDatabaseFromSpace } from 'orbitdb-storage-bridge';
 	import { todosStore } from './db-actions.js';
 	import { initializationStore, orbitDBStore, libp2pStore, peerIdStore } from './p2p.js';
 	import { initializeDatabase, loadTodos, todoDBStore } from './db-actions.js';
