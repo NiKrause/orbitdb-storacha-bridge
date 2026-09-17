@@ -1,34 +1,104 @@
-# Publish to npm when a v* tag is pushed.
+# Release to npm — from a button, or from a tag.
 #
-# The whole release is one command locally:
+# The usual way: Actions → Release → Run workflow, and enter the version,
+# either exact ("0.6.1") or "patch" / "minor" / "major". From a terminal:
 #
-#     npm version minor && git push --follow-tags
+#     gh workflow run release.yml -f version=0.6.1
 #
-# `npm version` writes package.json, commits it and creates the tag, so the tag
-# and the version cannot disagree — but a hand-made tag can, and publishing
-# 0.4.3 as v0.5.0 is the kind of mistake nobody notices for weeks. The job
-# refuses that outright rather than trusting the habit.
+# That run tests main first, and only then commits the version, tags it and
+# pushes both — a version that fails its tests never gets a tag — and then
+# publishes the tag. Nothing has to happen on a laptop.
 #
-# Tests run here before publishing, deliberately narrow: lint and the suites
-# that need no credentials. The Storacha-backed suites live in ci.yml and want
-# secrets a tag push should not have to carry.
+# Pushing a v* tag by hand still works (`npm version minor && git push
+# --follow-tags`) and goes straight to publishing. Either way the publish job
+# refuses a tag that disagrees with package.json: publishing 0.4.3 as v0.5.0 is
+# the kind of mistake nobody notices for weeks.
+#
+# Tests here are deliberately narrow: lint and the suites that need no
+# credentials. The Storacha-backed suites live in ci.yml and want secrets a
+# release should not have to carry.
 name: Release
 
 on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release: exact (0.6.1) or patch, minor, major"
+        required: true
+        type: string
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
+  tag:
+    name: Test, then commit the version and tag it
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # push the version commit and its tag
+    outputs:
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Checkout main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      # courier-sync is the suite downstream projects depend on; the storage
+      # backends ship in the package too, so they gate it as well.
+      - name: Run the tests that need no secrets
+        run: npx jest test/courier-sync.test.js test/car-storage.test.js test/restore-cid.test.js test/backends/ --forceExit
+        env:
+          NODE_OPTIONS: "--experimental-vm-modules --no-warnings"
+
+      # The input reaches the shell as an environment variable, never pasted
+      # into the script, and npm version refuses anything that is not a version
+      # or a bump keyword. The push fails if main moved while the tests ran.
+      - name: Commit the version and tag it
+        id: version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          npm version "$VERSION" -m "%s"
+          TAG="v$(node -p "require('./package.json').version")"
+          git push origin HEAD:main "$TAG"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
   publish:
     name: Publish to npm
+    needs: [tag]
+    # A tag pushed by hand skips the tag job; a tag made by it waits for it.
+    if: always() && (needs.tag.result == 'success' || (needs.tag.result == 'skipped' && github.event_name == 'push'))
     runs-on: ubuntu-latest
     permissions:
       contents: write # create the GitHub release
       id-token: write # npm provenance
+    env:
+      RELEASE_TAG: ${{ needs.tag.outputs.tag || github.ref_name }}
     steps:
-      - name: Checkout code
+      - name: Checkout the release tag
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RELEASE_TAG }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -43,7 +113,7 @@ jobs:
       # The check that earns this file's existence.
       - name: The tag must be the version in package.json
         run: |
-          TAG="${GITHUB_REF_NAME#v}"
+          TAG="${RELEASE_TAG#v}"
           PKG=$(node -p "require('./package.json').version")
           if [ "$TAG" != "$PKG" ]; then
             echo "::error::tag v$TAG does not match package.json $PKG — nothing published"
@@ -51,13 +121,14 @@ jobs:
           fi
           echo "publishing $PKG"
 
+      # A tag made by the tag job was tested moments ago on the same code; a
+      # tag pushed by hand was not.
       - name: Run ESLint
+        if: github.event_name == 'push'
         run: npm run lint
 
-      # Credential-free suites only. courier-sync is the one downstream
-      # projects depend on, and it never ran in CI at all before this. The
-      # storage backends ship in the package too, so they gate it as well.
       - name: Run the tests that need no secrets
+        if: github.event_name == 'push'
         run: npx jest test/courier-sync.test.js test/car-storage.test.js test/restore-cid.test.js test/backends/ --forceExit
         env:
           NODE_OPTIONS: "--experimental-vm-modules --no-warnings"
@@ -68,6 +139,6 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create the GitHub release
-        run: gh release create "$GITHUB_REF_NAME" --generate-notes --verify-tag
+        run: gh release create "$RELEASE_TAG" --generate-notes --verify-tag
         env:
           GH_TOKEN: ${{ github.token }}
