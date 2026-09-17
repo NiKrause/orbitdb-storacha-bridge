@@ -149,6 +149,33 @@ describe("Lighthouse driver, requests and answers", () => {
     expect(error.message).toMatch(/HTTP 401.*Invalid API key/);
   });
 
+  test("an expired plan is UNSUPPORTED, not a bad key, and says so", async () => {
+    // The body a live account answered on 2026-09-17, whose key the listing accepted.
+    replay(() =>
+      Response.json(
+        {
+          success: false,
+          error: "Trial expired",
+          details: "Your trial period has expired. Please upgrade to a paid plan",
+        },
+        { status: 403 },
+      ),
+    );
+    const backend = createLighthouseBackend({ apiKey: "k" });
+
+    const error = await backend.putBlob(new Uint8Array([1])).catch((e) => e);
+    expect(error.code).toBe("UNSUPPORTED");
+    expect(error.message).toMatch(/HTTP 403.*Trial expired.*plan does not include uploads/);
+  });
+
+  test("a 403 without a plan reason is still a misconfigured key", async () => {
+    replay(() => Response.json({ error: "Forbidden" }, { status: 403 }));
+    const backend = createLighthouseBackend({ apiKey: "k" });
+
+    const error = await backend.putBlob(new Uint8Array([1])).catch((e) => e);
+    expect(error.code).toBe("INVALID_BACKEND");
+  });
+
   test("listing reads fileList, with or without a data wrapper, and keeps the file id for deletion", async () => {
     const file = { cid: "bafkreilisted", id: "file-uuid", fileSizeInBytes: "31", createdAt: 1 };
     const calls = replay(() => Response.json({ fileList: [file], totalFiles: 1 }));

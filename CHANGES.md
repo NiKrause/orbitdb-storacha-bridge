@@ -6,7 +6,9 @@
 - **Lighthouse storage driver**, `orbitdb-storage-bridge/backends/lighthouse`: upload, listing
   and deletion over the endpoints `@lighthouse-web3/sdk` 0.4.7 uses, without the SDK. A backup's
   CAR goes up as a plain file and comes back byte for byte; `carImport: true` sends CARs to
-  `dag/import` instead. File names go up without their path, and errors carry Lighthouse's reason.
+  `dag/import` instead. File names go up without their path, and errors carry Lighthouse's reason;
+  an expired plan is `UNSUPPORTED`. **Uploads are not yet verified against a live account**: the
+  key and the listing are, but the test account's trial had expired (2026-09-17, issue #60).
 
 ## 0.7.0 (2026-09-17)
 

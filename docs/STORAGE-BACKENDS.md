@@ -138,6 +138,21 @@ Filecoin deals in perpetuity. Roughly **$2–5/GB, once**.
 - `gateway.lighthouse.storage` answered **402 Payment Required** for a CID not stored with them, so
   treat their gateway as serving their own customers' content, not as a general IPFS gateway.
 
+**Measured 2026-09-17**, with the driver in `lib/backends/lighthouse.js` and the "Live backends"
+workflow, on an account whose trial had run out:
+
+| | Result |
+| --- | --- |
+| The API key, listing (`api/user/files_uploaded`) | accepted, `200` |
+| Any upload (`api/v0/add`) | `403` "Trial expired — Your trial period has expired. Please upgrade to a paid plan" |
+| The gateway, for a CID it does not hold | answers promptly; reported as not found |
+
+So uploads, the CAR round trip and a database restore are **not yet verified against a live
+account** — that waits for a paid plan and is tracked in
+[issue 60](https://github.com/NiKrause/orbitdb-storage-bridge/issues/60). What the offline tests pin
+down instead are the request and answer shapes of `@lighthouse-web3/sdk` 0.4.7. The driver reports
+an expired plan as `UNSUPPORTED`, not as a bad key.
+
 ## 5. Pinata
 
 The only candidate with a **pin-by-CID** endpoint, which for this library is the interesting one:
