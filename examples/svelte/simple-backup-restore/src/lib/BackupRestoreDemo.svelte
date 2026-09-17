@@ -18,7 +18,6 @@
     Shield,
     Key,
   } from "lucide-svelte";
-  import { createLibp2p } from "libp2p";
   import { createHelia } from "helia";
   import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
   import { webSockets } from "@libp2p/websockets";
@@ -26,15 +25,10 @@
   import { noise } from "@chainsafe/libp2p-noise";
   import { yamux } from "@chainsafe/libp2p-yamux";
   import { identify } from "@libp2p/identify";
-  import { gossipsub } from "@chainsafe/libp2p-gossipsub";
-  import { all } from "@libp2p/websockets/filters";
+  import { gossipsub } from "@libp2p/gossipsub";
   import { createOrbitDB, IPFSAccessController } from "@orbitdb/core";
-  import {
-    backupDatabase,
-    restoreLogEntriesOnly,
-    clearStorachaSpace,
-    OrbitDBStorachaBridge,
-  } from "orbitdb-storacha-bridge";
+  import { backupDatabase } from "orbitdb-storage-bridge";
+  import { restoreFromCID } from "orbitdb-storage-bridge/restore-cid";
   import { Identities, useIdentityProvider } from "@orbitdb/core";
   import OrbitDBIdentityProviderDID from "@orbitdb/identity-provider-did";
   import { Ed25519Provider } from "key-did-provider-ed25519";
@@ -53,8 +47,8 @@
     loadWebAuthnCredential
   } from "@le-space/orbitdb-identity-provider-webauthn-did";
 
-  // Import the new Storacha Auth component and Carbon components
-  import StorachaAuth from "./StorachaAuth.svelte";
+  // Where backups go, and the Carbon components
+  import StorageBackendPicker from "./StorageBackendPicker.svelte";
   import {
     Grid,
     Row,
@@ -86,10 +80,9 @@
   } from "carbon-icons-svelte";
   import { logger } from "./logger.js";
 
-  // Storacha authentication state
-  let storachaAuthenticated = false;
-  let storachaClient = null;
-  let storachaCredentials = null;
+  // Where backups go: a storage backend from StorageBackendPicker
+  let storageBackend = null;
+  let storageLabel = "";
 
   // WebAuthn support state
   let webAuthnSupported = false;
@@ -133,11 +126,6 @@
   let restoreResult = null;
   let showDetails = false;
 
-  // Progress tracking state
-  let uploadProgress = null;
-  let downloadProgress = null;
-  let showProgress = false;
-
   // Test data
   let originalTodos = [
     {
@@ -164,7 +152,7 @@
   ];
 
   // Keep track of database addresses
-  let storachaTestDatabaseAddresses = new Set();
+  let demoDatabaseAddresses = new Set();
 
   // Check WebAuthn support on component initialization
   async function initializeWebAuthnSupport() {
@@ -187,134 +175,35 @@
   // Initialize on component mount
   initializeWebAuthnSupport();
 
-  // Create and setup bridge with progress tracking
-  function createStorachaBridge(credentials) {
-    if (!credentials) {
-      throw new Error("Storacha credentials are required but not provided");
-    }
-
-    if (!credentials.method) {
-      throw new Error("Storacha credentials must have a method property");
-    }
-
-    const bridgeOptions = {};
-
-    if (credentials.method === "credentials") {
-      const storachaKey = localStorage.getItem("storacha_key");
-      const storachaProof = localStorage.getItem("storacha_proof");
-
-      if (storachaKey && storachaProof) {
-        bridgeOptions.storachaKey = storachaKey;
-        bridgeOptions.storachaProof = storachaProof;
-      } else {
-        throw new Error("Storacha credentials not found in storage");
-      }
-    } else if (credentials.method === "ucan" || credentials.method === "seed") {
-      // UCAN authentication support
-      if (!storachaClient) {
-        throw new Error("UCAN client is required but not available");
-      }
-
-      bridgeOptions.ucanClient = storachaClient;
-
-      // Get current space DID if available
-      try {
-        const currentSpace = storachaClient.currentSpace();
-        if (currentSpace) {
-          bridgeOptions.spaceDID = currentSpace.did();
-        }
-      } catch (error) {
-        logger.warn("Could not get current space DID:", error.message);
-      }
-    } else {
-      throw new Error(
-        `Bridge with ${credentials.method} authentication not yet implemented`,
-      );
-    }
-
-    const bridge = new OrbitDBStorachaBridge(bridgeOptions);
-
-    // Set up progress event listeners
-    bridge.on("uploadProgress", (progress) => {
-      logger.info("📤 Upload Progress:", progress);
-      if (progress && typeof progress === "object") {
-        uploadProgress = progress;
-        showProgress = true;
-
-        // Update Alice step for upload progress
-        if (progress.status === "starting") {
-          aliceStep = `Starting backup: ${progress.total} blocks to upload`;
-        } else if (progress.status === "uploading") {
-          aliceStep = `Uploading: ${progress.current}/${progress.total} blocks (${progress.percentage}%)`;
+  // backupDatabase reports its steps through an emitter; show them as Alice's step.
+  function createBackupEvents() {
+    return {
+      emit(event, progress) {
+        if (event !== "backupProgress" || !progress) return;
+        logger.info("📤 Backup progress:", progress);
+        if (progress.status === "creating") {
+          aliceStep = `Packing ${progress.totalBlocks} blocks into a CAR`;
+        } else if (progress.status === "uploading-blocks") {
+          aliceStep = `Uploading the CAR (${progress.size} bytes) to ${storageLabel}`;
+        } else if (progress.status === "uploading-metadata") {
+          aliceStep = `Uploading the backup's metadata to ${storageLabel}`;
         } else if (progress.status === "completed") {
-          aliceStep = `Upload completed: ${progress.summary?.successful || 0} successful, ${progress.summary?.failed || 0} failed`;
-          showProgress = false;
+          aliceStep = `Backup uploaded to ${storageLabel}`;
+        } else if (progress.status === "error") {
+          aliceStep = `Backup failed: ${progress.error}`;
         }
-      } else {
-        logger.warn("Invalid upload progress data:", progress);
-      }
-    });
-
-    bridge.on("downloadProgress", (progress) => {
-      logger.info("📥 Download Progress:", progress);
-      if (progress && typeof progress === "object") {
-        downloadProgress = progress;
-        showProgress = true;
-
-        // Update Bob step for download progress
-        if (progress.status === "starting") {
-          bobStep = `Starting restore: ${progress.total} files to download`;
-        } else if (progress.status === "downloading") {
-          bobStep = `Downloading: ${progress.current}/${progress.total} files (${progress.percentage}%)`;
-        } else if (progress.status === "completed") {
-          bobStep = `Download completed: ${progress.summary?.downloaded || 0} downloaded, ${progress.summary?.failed || 0} failed`;
-          showProgress = false;
-        }
-      } else {
-        logger.warn("Invalid download progress data:", progress);
-      }
-    });
-
-    return bridge;
-  }
-
-  // Handle Storacha authentication events
-  function handleStorachaAuthenticated(event) {
-    logger.info("🔐 Storacha authenticated:", event.detail);
-    storachaAuthenticated = true;
-    storachaClient = event.detail.client;
-    storachaCredentials = {
-      method: event.detail.method,
-      spaces: event.detail.spaces,
-      identity: event.detail.identity, // Available if authenticated with seed
+      },
     };
-
-    // Store credentials for backup/restore operations
-    if (event.detail.method === "credentials") {
-      // For key/proof authentication, we need to extract the credentials
-      logger.info(
-        "📝 Credentials-based authentication - storing for backup operations",
-      );
-    } else if (
-      event.detail.method === "ucan" ||
-      event.detail.method === "seed"
-    ) {
-      logger.info(
-        `📝 ${event.detail.method}-based authentication - ready for operations`,
-      );
-    }
   }
 
-  function handleStorachaLogout() {
-    logger.info("🚪 Storacha logged out");
-    storachaAuthenticated = false;
-    storachaClient = null;
-    storachaCredentials = null;
+  function handleStorageConfigured(event) {
+    storageBackend = event.detail.backend;
+    storageLabel = event.detail.label;
   }
 
-  function handleSpaceChanged(event) {
-    logger.info("🔄 Storacha space changed:", event.detail.space);
-    // Update any space-dependent operations
+  function handleStorageCleared() {
+    storageBackend = null;
+    storageLabel = "";
   }
 
   /**
@@ -538,18 +427,13 @@
   ) {
     logger.info(`🔧 Creating OrbitDB instance for ${persona}...`);
 
-    // Use minimal libp2p config to avoid relay connections
-    const config = DefaultLibp2pBrowserOptions;
-
-    // Create libp2p instance
-    const libp2p = await createLibp2p(config);
-    logger.info("libp2p created");
-
-    // Create Helia instance with memory storage for tests to avoid persistence conflicts
+    // Helia 7 builds libp2p itself, from options — it no longer takes a finished
+    // node — and hands back a node that has to be started before OrbitDB reads
+    // helia.libp2p. Memory storage, to avoid persistence conflicts between runs.
     logger.info("🗄️ Initializing Helia with memory storage for testing...");
-    // Use memory storage to avoid filesystem conflicts and faster cleanup
-    const helia = await createHelia({ libp2p });
-    logger.info("Helia created with memory storage");
+    const helia = await createHelia({ libp2p: DefaultLibp2pBrowserOptions }).start();
+    const libp2p = helia.libp2p;
+    logger.info("Helia and libp2p started with memory storage");
 
     // Create OrbitDB instance configuration
     const orbitdbConfig = {
@@ -620,25 +504,25 @@
     return { libp2p, helia, orbitdb, database };
   }
 
-  // Add this new function to set up event listeners for StorachaTest databases only
+  // Add this new function to set up event listeners for the demo databases only
   function setupDatabaseEventListeners(database, persona) {
     if (!database) return;
 
     logger.info(`🎧 Setting up event listeners for ${persona}'s database...`);
-    logger.info(`🎯 [StorachaTest] Database address: ${database.address}`);
+    logger.info(`🎯 [Demo] Database address: ${database.address}`);
 
     // Add this database address to our tracking set
-    storachaTestDatabaseAddresses.add(
+    demoDatabaseAddresses.add(
       database.address?.toString() || database.address,
     );
 
     // Listen for new entries being added (join event)
     database.events.on("join", async (address, entry, heads) => {
-      // Check if this event is for any StorachaTest database
+      // Check if this event is for any demo database
       const eventAddress = address?.toString() || address;
 
-      if (storachaTestDatabaseAddresses.has(eventAddress)) {
-        logger.info(`🔗 [StorachaTest-${persona}] JOIN EVENT:`, {
+      if (demoDatabaseAddresses.has(eventAddress)) {
+        logger.info(`🔗 [Demo-${persona}] JOIN EVENT:`, {
           address: eventAddress,
           entry: {
             hash: entry?.hash?.toString() || entry?.hash,
@@ -683,11 +567,11 @@
 
     // Listen for entries being updated (update event)
     database.events.on("update", async (address, entry, heads) => {
-      // Check if this event is for any StorachaTest database
+      // Check if this event is for any demo database
       const eventAddress = address?.toString() || address;
 
-      if (storachaTestDatabaseAddresses.has(eventAddress)) {
-        logger.info(`🔄 [StorachaTest-${persona}] UPDATE EVENT:`, {
+      if (demoDatabaseAddresses.has(eventAddress)) {
+        logger.info(`🔄 [Demo-${persona}] UPDATE EVENT:`, {
           address: eventAddress,
           entry: {
             hash: entry?.hash?.toString() || entry?.hash,
@@ -731,7 +615,7 @@
     });
 
     logger.info(
-      `✅ [StorachaTest] Event listeners set up for database instance ${persona}`,
+      `✅ [Demo] Event listeners set up for database instance ${persona}`,
     );
   }
 
@@ -796,14 +680,8 @@
   async function initializeAlice() {
     if (aliceRunning) return;
 
-    // Check Storacha authentication first
-    if (!storachaAuthenticated || !storachaClient) {
-      addResult(
-        "alice",
-        "Error",
-        "error",
-        "Please authenticate with Storacha first",
-      );
+    if (!storageBackend) {
+      addResult("alice", "Error", "error", "Choose where backups go first");
       return;
     }
 
@@ -865,7 +743,7 @@
         sync: true,
         // FIXED: Use explicit identity-based access control instead of wildcard
         // This ensures the WebAuthn identity is properly validated
-        accessController: IPFSAccessController({ 
+        AccessController: IPFSAccessController({
           write: writePermissions // Use the actual WebAuthn identity ID
         }),
       };
@@ -1337,14 +1215,8 @@
   async function backupAlice() {
     if (aliceRunning || !aliceDatabase) return;
 
-    // Check Storacha authentication
-    if (!storachaAuthenticated || !storachaClient || !storachaCredentials) {
-      addResult(
-        "alice",
-        "Error",
-        "error",
-        "Storacha authentication required for backup",
-      );
+    if (!storageBackend) {
+      addResult("alice", "Error", "error", "Choose where backups go first");
       return;
     }
 
@@ -1352,29 +1224,14 @@
     aliceStep = "Creating backup...";
 
     try {
-      addResult("alice", "Backup", "running", "Creating backup to Storacha...");
+      addResult("alice", "Backup", "running", `Creating backup on ${storageLabel}...`);
 
-      const databaseConfig = {
-        type: "keyvalue",
-        create: true,
-        sync: true,
-        accessController: IPFSAccessController({ 
-          write: [sharedIdentity.id] // Use the actual WebAuthn identity ID
-        }),
-      };
-
-      // Create bridge with progress tracking
-      const bridge = createStorachaBridge(storachaCredentials);
-
-      // Use bridge for backup with log entries only (fallback reconstruction)
-      backupResult = await bridge.backupLogEntriesOnly(
-        aliceOrbitDB,
-        aliceDatabase.address,
-        {
-          dbConfig: databaseConfig,
-          timeout: 60000,
-        },
-      );
+      // One CAR holding every block of the database, and a small metadata file
+      // that names it. The metadata's CID is all a restore needs.
+      backupResult = await backupDatabase(aliceOrbitDB, aliceDatabase.address, {
+        backend: storageBackend,
+        eventEmitter: createBackupEvents(),
+      });
 
       if (!backupResult.success) {
         throw new Error(`Backup failed: ${backupResult.error}`);
@@ -1383,12 +1240,13 @@
       updateLastResult(
         "alice",
         "success",
-        `Backup created successfully with ${backupResult.blocksUploaded}/${backupResult.blocksTotal} blocks`,
+        `Backup created on ${storageLabel}: ${backupResult.blocksTotal} blocks in one CAR`,
         {
-          manifestCID: backupResult.manifestCID,
+          metadataCID: backupResult.backupFiles.metadataCID,
+          carCID: backupResult.backupFiles.carCID,
           databaseAddress: backupResult.databaseAddress,
           blocksTotal: backupResult.blocksTotal,
-          blocksUploaded: backupResult.blocksUploaded,
+          storage: storageLabel,
           identityType: sharedIdentity.type || identityMethod,
         },
       );
@@ -1408,14 +1266,8 @@
   async function initializeBob() {
     if (bobRunning || !backupResult) return;
 
-    // Check Storacha authentication first
-    if (!storachaAuthenticated || !storachaClient) {
-      addResult(
-        "bob",
-        "Error",
-        "error",
-        "Please authenticate with Storacha first",
-      );
+    if (!storageBackend) {
+      addResult("bob", "Error", "error", "Choose where backups go first");
       return;
     }
 
@@ -1475,7 +1327,7 @@
         type: "keyvalue",
         create: true,
         sync: true,
-        accessController: IPFSAccessController({ 
+        AccessController: IPFSAccessController({
           write: [identityForAccess.id] // Use the appropriate identity ID
         }),
       };
@@ -1522,14 +1374,8 @@
   async function restoreBob() {
     if (bobRunning || !bobOrbitDB || !backupResult) return;
 
-    // Check Storacha authentication
-    if (!storachaAuthenticated || !storachaClient) {
-      addResult(
-        "bob",
-        "Error",
-        "error",
-        "Storacha authentication required for restore",
-      );
+    if (!storageBackend) {
+      addResult("bob", "Error", "error", "Choose where backups go first");
       return;
     }
 
@@ -1545,41 +1391,25 @@
         "bob",
         "Restore",
         "running",
-        `Restoring database from Storacha backup using ${identityInfo}...`,
+        `Restoring the database from ${storageLabel} using ${identityInfo}...`,
       );
 
-      // Use the same identity that Bob is using for restore
-      const identityForAccess = bobUseSameIdentity ? sharedIdentity : bobIdentity;
-      
-      const databaseConfig = {
-        type: "keyvalue",
-        create: true,
-        sync: true,
-        accessController: IPFSAccessController({ 
-          write: [identityForAccess.id] // Use the appropriate identity ID
-        }),
-      };
-
-      // Create bridge with progress tracking
-      const bridge = createStorachaBridge(storachaCredentials);
-
-      // Use bridge for optimized log-entries-only restore
-      restoreResult = await bridge.restoreLogEntriesOnly(bobOrbitDB, {
-        dbName: "shared-todos",
-        dbConfig: databaseConfig,
-        timeout: 120000,
+      // Everything hangs off one CID: the metadata names the CAR, and the CAR
+      // holds the blocks. Bob fetches both through the same backend, and every
+      // block is checked against its own CID before it joins his log.
+      const metadataCID = backupResult.backupFiles.metadataCID;
+      bobStep = `Fetching backup ${metadataCID.slice(0, 16)}… from ${storageLabel}`;
+      restoreResult = await restoreFromCID(bobOrbitDB, {
+        metadataCID,
+        fetchBytes: (cid) => storageBackend.getBlob(cid),
       });
-
-      if (!restoreResult.success) {
-        throw new Error(`Restore failed: ${restoreResult.error}`);
-      }
 
       // Get restored todos
       const restoredDatabase = restoreResult.database;
 
       // Add restored database to tracking
       if (restoredDatabase && restoredDatabase.address) {
-        storachaTestDatabaseAddresses.add(
+        demoDatabaseAddresses.add(
           restoredDatabase.address?.toString() || restoredDatabase.address,
         );
       }
@@ -1588,18 +1418,17 @@
       await new Promise((resolve) => setTimeout(resolve, 5000));
       bobTodos = await restoredDatabase.all();
 
-      const optimizationInfo = restoreResult.optimizationSavings
-        ? `(${restoreResult.optimizationSavings.percentageSaved}% fewer downloads)`
-        : "";
-
       updateLastResult(
         "bob",
         "success",
-        `Database restored successfully with ${restoreResult.entriesRecovered} entries using ${identityInfo} ${optimizationInfo}`,
+        `Database restored from ${storageLabel}: ${bobTodos.length} todos, using ${identityInfo}`,
         {
-          manifestCID: restoreResult.manifestCID,
+          metadataCID,
           databaseAddress: restoreResult.address,
-          entriesRecovered: restoreResult.entriesRecovered,
+          blocks: restoreResult.blocks,
+          entries: restoreResult.entries,
+          headsJoined: restoreResult.joined,
+          storage: storageLabel,
           identityType: identityMethod,
           todosRestored: bobTodos.map((t) => ({
             key: t.key,
@@ -1675,7 +1504,7 @@
     sharedWebAuthnCredential = null;
     backupResult = null;
     restoreResult = null;
-    storachaTestDatabaseAddresses.clear();
+    demoDatabaseAddresses.clear();
   }
 
   // Utility functions
@@ -1710,19 +1539,22 @@
   }
 
   /**
-   * A basic Libp2p configuration for browser nodes.
+   * A basic Libp2p configuration for browser nodes, as options for Helia 7.
+   *
+   * Helia replaces each top-level key it is given and fills every other one with
+   * its own browser defaults, so `peerDiscovery` is spelled out as empty: without
+   * it these nodes would start dialling public bootstrap peers.
    */
   const DefaultLibp2pBrowserOptions = {
     addresses: {
       listen: ["/webrtc", "/p2p-circuit"],
     },
     transports: [
-      webSockets({
-        filter: all,
-      }),
+      webSockets(),
       webRTC(),
       circuitRelayTransport(),
     ],
+    peerDiscovery: [],
     connectionEncrypters: [noise()],
     streamMuxers: [yamux()],
     connectionGater: {
@@ -1736,30 +1568,25 @@
 </script>
 
 <Grid>
-  <!-- Storacha Authentication Section -->
+  <!-- Where backups go -->
   <Row>
     <Column>
-      <Tile style="margin-bottom: 2rem;">
-        <StorachaAuth
-          on:authenticated={handleStorachaAuthenticated}
-          on:logout={handleStorachaLogout}
-          on:spaceChanged={handleSpaceChanged}
-          autoLogin={true}
-          showTitle={true}
-          compact={false}
-          enableSeedAuth={false}
-          enableEmailAuth={false}
+      <div style="margin-bottom: 2rem;">
+        <StorageBackendPicker
+          on:configured={handleStorageConfigured}
+          on:cleared={handleStorageCleared}
         />
 
-        {#if !storachaAuthenticated}
+        {#if !storageBackend}
           <InlineNotification
-            kind="warning"
-            title="Authentication Required"
-            subtitle="Please authenticate with Storacha above to enable backup and restore functionality"
-            style="margin-top: 1rem;"
+            kind="info"
+            lowContrast
+            hideCloseButton
+            title="Choose a storage first"
+            subtitle="Alice backs up to it and Bob restores from it. Aleph works without an account."
           />
         {/if}
-      </Tile>
+      </div>
     </Column>
   </Row>
 
@@ -1857,7 +1684,7 @@
           </h3>
         </div>
         <p style="color:var(--cds-text-secondary);margin:0;">
-          Alice creates todos and backs them up to Storacha using {identityMethod === "webauthn" ? "biometric authentication" : "seed phrase identity"}. 
+          Alice creates todos and backs them up to {storageLabel || "the storage chosen above"} using {identityMethod === "webauthn" ? "biometric authentication" : "seed phrase identity"}.
           Bob restores the data from the backup using either the same identity or his own.
         </p>
       </div>
@@ -1886,86 +1713,6 @@
     </Column>
   </Row>
 
-  <!-- Progress Display -->
-  {#if showProgress && (uploadProgress || downloadProgress)}
-    <Row>
-      <Column>
-        <Tile>
-          {#if uploadProgress}
-            <div style="margin-bottom:1rem;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
-                <div style="display:flex;align-items:center;gap:0.5rem;">
-                  <CloudUpload size={16} />
-                  <h5 style="font-size:0.875rem;font-weight:600;margin:0;">Upload Progress</h5>
-                </div>
-                <span style="font-size:0.875rem;color:var(--cds-text-secondary);"> 
-                  {uploadProgress.current}/{uploadProgress.total} ({uploadProgress.percentage}%)
-                </span>
-              </div>
-              
-              <div style="width:100%;background-color:var(--cds-layer-accent);border-radius:0.25rem;overflow:hidden;height:0.5rem;">
-                <div 
-                  style="width:{uploadProgress.percentage}%;background-color:var(--cds-support-info);height:100%;transition:width 0.3s ease;"
-                ></div>
-              </div>
-              
-              {#if uploadProgress.currentBlock}
-                <div style="margin-top:0.5rem;font-size:0.75rem;color:var(--cds-text-secondary);">
-                  Current block: <code>{uploadProgress.currentBlock.hash?.slice(0, 16)}...</code>
-                  ({uploadProgress.currentBlock.size} bytes)
-                </div>
-              {/if}
-              
-              {#if uploadProgress.error}
-                <InlineNotification 
-                  kind="error" 
-                  title="Upload Error" 
-                  subtitle={uploadProgress.error.message} 
-                  style="margin-top:0.5rem;"
-                />
-              {/if}
-            </div>
-          {/if}
-          
-          {#if downloadProgress}
-            <div>
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
-                <div style="display:flex;align-items:center;gap:0.5rem;">
-                  <CloudDownload size={16} />
-                  <h5 style="font-size:0.875rem;font-weight:600;margin:0;">Download Progress</h5>
-                </div>
-                <span style="font-size:0.875rem;color:var(--cds-text-secondary);">
-                  {downloadProgress.current}/{downloadProgress.total} ({downloadProgress.percentage}%)
-                </span>
-              </div>
-              
-              <div style="width:100%;background-color:var(--cds-layer-accent);border-radius:0.25rem;overflow:hidden;height:0.5rem;">
-                <div 
-                  style="width:{downloadProgress.percentage}%;background-color:var(--cds-support-success);height:100%;transition:width 0.3s ease;"
-                ></div>
-              </div>
-              
-              {#if downloadProgress.currentBlock}
-                <div style="margin-top:0.5rem;font-size:0.75rem;color:var(--cds-text-secondary);">
-                  Current file: <code>{downloadProgress.currentBlock.storachaCID?.slice(0, 16)}...</code>
-                  ({downloadProgress.currentBlock.size} bytes)
-                </div>
-              {/if}
-              
-              {#if downloadProgress.error}
-                <InlineNotification 
-                  kind="error" 
-                  title="Download Error" 
-                  subtitle={downloadProgress.error.message} 
-                  style="margin-top:0.5rem;"
-                />
-              {/if}
-            </div>
-          {/if}
-        </Tile>
-      </Column>
-    </Row>
-  {/if}
 
   <!-- Alice & Bob Responsive Layout -->
   <Row>
@@ -2029,7 +1776,7 @@
             size="sm"
             icon={aliceRunning ? undefined : (identityMethod === "webauthn" ? Fingerprint : DataBase)}
             on:click={initializeAlice}
-            disabled={aliceRunning || aliceOrbitDB || !storachaAuthenticated}
+            disabled={aliceRunning || aliceOrbitDB || !storageBackend}
             style="width:100%;"
           >
             {#if aliceRunning}<Loading withOverlay={false} small />{/if}
@@ -2056,11 +1803,11 @@
             disabled={aliceRunning ||
               aliceTodos.length === 0 ||
               backupResult ||
-              !storachaAuthenticated}
+              !storageBackend}
             style="width:100%;"
           >
             {#if aliceRunning}<Loading withOverlay={false} small />{/if}
-            3. Backup to Storacha
+            3. Backup to {storageLabel || "storage"}
           </Button>
         </div>
 
@@ -2072,7 +1819,7 @@
             >
               Alice's Todos:
             </h5>
-            <div style="display:flex;flex-direction:column;gap:0.25rem;">
+            <div data-testid="alice-todos" style="display:flex;flex-direction:column;gap:0.25rem;">
               {#each aliceTodos as todo}
                 <div
                   style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem;background:var(--cds-layer-accent);border-radius:0.25rem;font-size:0.75rem;"
@@ -2234,7 +1981,7 @@
             disabled={bobRunning ||
               !backupResult ||
               bobOrbitDB ||
-              !storachaAuthenticated}
+              !storageBackend}
             style="width:100%;"
           >
             {#if bobRunning}<Loading withOverlay={false} small />{/if}
@@ -2249,11 +1996,11 @@
             disabled={bobRunning ||
               !bobOrbitDB ||
               restoreResult ||
-              !storachaAuthenticated}
+              !storageBackend}
             style="width:100%;"
           >
             {#if bobRunning}<Loading withOverlay={false} small />{/if}
-            2. Restore from Storacha
+            2. Restore from {storageLabel || "storage"}
           </Button>
         </div>
 
@@ -2282,7 +2029,7 @@
             >
               Bob's Restored Todos:
             </h5>
-            <div style="display:flex;flex-direction:column;gap:0.25rem;">
+            <div data-testid="bob-todos" style="display:flex;flex-direction:column;gap:0.25rem;">
               {#each bobTodos as todo}
                 <div
                   style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem;background:var(--cds-layer-accent);border-radius:0.25rem;font-size:0.75rem;"
@@ -2375,7 +2122,7 @@
         <InlineNotification
           kind="success"
           title="Success! Data Successfully Transferred ✅"
-          subtitle={`Alice created ${aliceTodos.length} todos using ${identityMethod === "webauthn" ? "biometric authentication" : "mnemonic seed"} and backed them up to Storacha. Bob successfully restored all ${bobTodos.length} todos from the backup using ${bobUseSameIdentity ? "the same identity" : "his own identity"}!`}
+          subtitle={`Alice created ${aliceTodos.length} todos using ${identityMethod === "webauthn" ? "biometric authentication" : "mnemonic seed"} and backed them up to ${storageLabel}. Bob successfully restored all ${bobTodos.length} todos from the backup using ${bobUseSameIdentity ? "the same identity" : "his own identity"}!`}
           style="margin-top:2rem;"
         >
           {#if backupResult && restoreResult}

@@ -50,16 +50,18 @@ export default defineConfig({
     __APP_VERSION__: JSON.stringify(pkg.version),
     __BUILD_DATE__: JSON.stringify(buildDate),
   },
-  build: {
-    rollupOptions: {
-      external: [
-        "vite-plugin-node-polyfills/shims/process",
-        "vite-plugin-node-polyfills/shims/buffer",
-        "vite-plugin-node-polyfills/shims/path",
-        "vite-plugin-node-polyfills/shims/util",
-        "vite-plugin-node-polyfills/shims/crypto",
-        "vite-plugin-node-polyfills/shims/stream",
-      ],
-    },
+  optimizeDeps: {
+    // Found only when a backup or an identity first needs them, and the dev
+    // server reloads the page to add them — in the middle of that step.
+    include: ["crypto", "events", "stream"],
+  },
+  resolve: {
+    // The bridge is linked from the repository root (file:../../../), so its
+    // files and their dependencies resolve imports from the root, where the
+    // polyfill plugin is not installed — yet the plugin adds shim imports to
+    // them too. Resolve the plugin from this example instead. Marking the shims
+    // external got the build through, and left the built page blank: the
+    // browser cannot resolve them either.
+    dedupe: ["vite-plugin-node-polyfills"],
   },
 });

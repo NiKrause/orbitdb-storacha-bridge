@@ -226,12 +226,10 @@ jobs:
         working-directory: examples/svelte/simple-backup-restore
 
       - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+        run: npx playwright install --with-deps chromium
         working-directory: examples/svelte/simple-backup-restore
 
       - name: Run E2E tests - simple-backup-restore
-        env:
-          PORT: 5173
         run: npx playwright test
         working-directory: examples/svelte/simple-backup-restore
 

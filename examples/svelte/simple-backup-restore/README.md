@@ -1,38 +1,50 @@
-# sv
+# Backup and restore
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+Alice writes a few todos into an OrbitDB database and backs it up, as one CAR
+file, to Aleph, Pinata or Lighthouse. Bob, a second OrbitDB node in the same
+page, restores the database from the backup's CID. Nothing replicates between
+them: the backup is the only way the todos reach Bob.
 
-## Creating a project
+## Running it
 
-If you're seeing this, you've probably already done this step. Congrats!
-
-```sh
-# create a new project in the current directory
-npx sv create
-
-# create a new project in my-app
-npx sv create my-app
-```
-
-## Developing
-
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+The example uses the library in this checkout (`file:../../../`), so install
+the repository root first:
 
 ```sh
+npm install                               # in the repository root
+cd examples/svelte/simple-backup-restore
+npm install
 npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
 ```
 
-## Building
+`npm run build` writes a static site to `build/`; `npm run preview` serves it.
 
-To create a production version of your app:
+## Where backups go
+
+- **Aleph** needs no account and nothing to paste. The upload is not kept,
+  though: keeping it takes a wallet-signed STORE message, which this demo does
+  not send.
+- **Pinata** needs a JWT, and optionally a dedicated gateway from the same
+  account.
+- **Lighthouse** needs an API key. The driver has not yet been verified against
+  a live account.
+
+A key stays in the tab's memory and is sent from the browser, so use one you
+can revoke.
+
+## Identities
+
+Alice and Bob share one identity, made either from a mnemonic or from a passkey
+(`@le-space/orbitdb-identity-provider-webauthn-did`).
+
+## Tests
 
 ```sh
-npm run build
+npx playwright test                  # builds the site and runs the tests
+ALEPH_LIVE=1 npx playwright test     # the backup test against the real Aleph
 ```
 
-You can preview the production build with `npm run preview`.
+The backup test plays Aleph itself and refuses every other request that would
+leave the machine.
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Debug logs: `localStorage.setItem('debug', 'libp2p:orbitdb-storacha:*')`.

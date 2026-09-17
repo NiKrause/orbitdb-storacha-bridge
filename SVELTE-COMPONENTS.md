@@ -57,7 +57,7 @@ Advanced replication demo with Alice & Bob using shared database and P2P connect
 
 ## StorachaTestWithWebAuthn.svelte
 
-**Location:** [`src/components/StorachaTestWithWebAuthn.svelte`](src/components/StorachaTestWithWebAuthn.svelte) (repository only, not in the npm package; the example app runs its own copy in [`examples/svelte/simple-backup-restore/src/lib/`](examples/svelte/simple-backup-restore/src/lib/))
+**Location:** [`src/components/StorachaTestWithWebAuthn.svelte`](src/components/StorachaTestWithWebAuthn.svelte) (repository only, not in the npm package). The example app started from a copy and has since moved on: [`BackupRestoreDemo.svelte`](examples/svelte/simple-backup-restore/src/lib/BackupRestoreDemo.svelte) backs up to Aleph, Pinata or Lighthouse.
 
 WebAuthn biometric authentication demo with hardware-secured DID identities:
 
@@ -94,7 +94,7 @@ Full integration component for existing OrbitDB Svelte applications:
 
 In the examples/svelte diretory you find three simple to advanced OrbitDB-Storacha examples.
 
-- simple-backup-restore (Alice creates a db and a Storacha backup - Bob restores it into his own - no replication)
+- simple-backup-restore (Alice creates a db and backs it up to Aleph, Pinata or Lighthouse - Bob restores it into his own - no replication)
 - orbitdb-replication (Alice creates a db with todos and creates a backup - Bob replicates it (but cannot add Todo's because of missing access permissions)  )
 - ucan-delegation (P-256 UCAN's currently not supported by Storacha upload-service)
 

@@ -1,5 +1,5 @@
 <script>
-  import StorachaTestWithWebAuthn from "$lib/StorachaTestWithWebAuthn.svelte"
+  import BackupRestoreDemo from "$lib/BackupRestoreDemo.svelte"
   import { theme } from "$lib/theme.js";
   import {
     Content,
@@ -34,17 +34,17 @@
 </script>
 
 <svelte:head>
-  <title>OrbitDB Storacha Backup Restore Test</title>
+  <title>OrbitDB Storage Bridge: Backup & Restore</title>
   <meta
     name="description"
-    content="Test the OrbitDB Storacha Backup Restore functionality"
+    content="Back up an OrbitDB database to Aleph, Pinata or Lighthouse, and restore it on another node"
   />
 </svelte:head>
 
 <!-- Floating particles background -->
 <div class="particles"></div>
 
-<Header company="OrbitDB Storacha Bridge">
+<Header company="OrbitDB Storage Bridge">
   <HeaderUtilities>
     <Button
       kind="ghost"
@@ -141,18 +141,18 @@
       </div>
 
       <h1 class="hero-title gradient-text-purple">
-        OrbitDB × Storacha Bridge
+        OrbitDB Storage Bridge
       </h1>
 
       <p class="hero-subtitle">
         Decentralized Database Backup & Restore via <span
           class="gradient-text-cyan"
-          style="font-weight:600;">Filecoin Storage</span
+          style="font-weight:600;">Aleph, Pinata or Lighthouse</span
         >
       </p>
 
       <p class="hero-description">
-        Bridge local-first peer-to-peer databases with permanent decentralized storage
+        Bridge local-first peer-to-peer databases with decentralized storage
       </p>
 
       <!-- Feature Pills -->
@@ -187,10 +187,6 @@
             <img src="/orbitdb.png" alt="OrbitDB" />
             <span>OrbitDB</span>
           </a>
-          <a href="https://docs.storacha.network/" target="_blank" rel="noopener noreferrer" class="tech-link">
-            <img src="/storacha-logo.jpeg" alt="Storacha" class="rounded" />
-            <span>Storacha</span>
-          </a>
           <a href="https://helia.io/" target="_blank" rel="noopener noreferrer" class="tech-link">
             <img src="/helia.svg" alt="Helia" />
             <span>Helia</span>
@@ -220,7 +216,7 @@
     class="orbital-card"
     style="border-radius:1rem;padding:1rem;margin:0 auto;"
   >
-    <StorachaTestWithWebAuthn />
+    <BackupRestoreDemo />
   </div>
 
   <!-- Footer -->
@@ -229,16 +225,18 @@
       <div class="footer-section">
         <h3>Resources</h3>
         <ul>
-          <li><a href="https://github.com/NiKrause/orbitdb-storacha-bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
-          <li><a href="https://github.com/NiKrause/orbitdb-storacha-bridge#readme" target="_blank" rel="noopener noreferrer">Documentation</a></li>
-          <li><a href="https://github.com/NiKrause/orbitdb-storacha-bridge/issues" target="_blank" rel="noopener noreferrer">Issues</a></li>
+          <li><a href="https://github.com/NiKrause/orbitdb-storage-bridge" target="_blank" rel="noopener noreferrer">GitHub</a></li>
+          <li><a href="https://github.com/NiKrause/orbitdb-storage-bridge#readme" target="_blank" rel="noopener noreferrer">Documentation</a></li>
+          <li><a href="https://github.com/NiKrause/orbitdb-storage-bridge/issues" target="_blank" rel="noopener noreferrer">Issues</a></li>
         </ul>
       </div>
       <div class="footer-section">
         <h3>Learn More</h3>
         <ul>
           <li><a href="https://orbitdb.org/" target="_blank" rel="noopener noreferrer">OrbitDB</a></li>
-          <li><a href="https://docs.storacha.network/" target="_blank" rel="noopener noreferrer">Storacha</a></li>
+          <li><a href="https://aleph.cloud/" target="_blank" rel="noopener noreferrer">Aleph</a></li>
+          <li><a href="https://pinata.cloud/" target="_blank" rel="noopener noreferrer">Pinata</a></li>
+          <li><a href="https://lighthouse.storage/" target="_blank" rel="noopener noreferrer">Lighthouse</a></li>
           <li><a href="https://docs.ipfs.tech/" target="_blank" rel="noopener noreferrer">IPFS</a></li>
         </ul>
       </div>
@@ -251,8 +249,8 @@
         </ul>
       </div>
       <div class="footer-section footer-about">
-        <h3>OrbitDB × Storacha Bridge</h3>
-        <p>Bridging local-first peer-to-peer databases with permanent decentralized storage on Filecoin.</p>
+        <h3>OrbitDB Storage Bridge</h3>
+        <p>Bridging local-first peer-to-peer databases with decentralized storage: Aleph, Pinata and Lighthouse.</p>
         <p class="footer-license">MIT License</p>
       </div>
     </div>
