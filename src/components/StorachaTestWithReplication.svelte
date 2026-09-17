@@ -17,7 +17,6 @@
     Wifi,
     WifiOff,
   } from "lucide-svelte";
-  import { createLibp2p } from "libp2p";
   import { createHelia } from "helia";
   import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
   import { webSockets } from "@libp2p/websockets";
@@ -27,7 +26,7 @@
   import { identify } from "@libp2p/identify";
   import { dcutr } from "@libp2p/dcutr";
   import { autoNAT } from "@libp2p/autonat";
-  import { gossipsub } from "@chainsafe/libp2p-gossipsub";
+  import { gossipsub } from "@libp2p/gossipsub";
   import { pubsubPeerDiscovery } from "@libp2p/pubsub-peer-discovery";
   import { bootstrap } from "@libp2p/bootstrap";
   import { all } from "@libp2p/websockets/filters";
@@ -497,8 +496,12 @@
       enableNetworkConnection: replicationEnabled,
     });
 
-    // Create libp2p instance
-    const libp2p = await createLibp2p(libp2pConfig);
+    // Helia 7 builds libp2p from options, and fills any of the keys it knows
+    // that are left out from its own defaults, which dial the public network.
+    const helia = await createHelia({
+      libp2p: { addresses: { listen: [] }, peerDiscovery: [], services: {}, ...libp2pConfig },
+    }).start();
+    const libp2p = helia.libp2p;
     logger.info({ persona, replicationEnabled }, `${persona} libp2p created with peer discovery enabled:`);
 
     // Set up enhanced connection monitoring (replaces polling)
@@ -516,7 +519,6 @@
     // Create Helia instance
     logger.info({ persona }, `🗄️ Initializing ${persona}'s Helia with memory storage for testing...`);
     logger.info({ persona }, `🗄️ Initializing ${persona}'s Helia with memory storage for testing...`);
-    const helia = await createHelia({ libp2p });
     logger.info({ persona }, `${persona} Helia created with memory storage`);
 
     // Create OrbitDB instance with unique ID

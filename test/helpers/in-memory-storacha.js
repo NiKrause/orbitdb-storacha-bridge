@@ -2,7 +2,6 @@ import http from "node:http";
 import * as client from "@ucanto/client";
 import { createHelia } from "helia";
 import { unixfs } from "@helia/unixfs";
-import { createLibp2p } from "libp2p";
 import { tcp } from "@libp2p/tcp";
 import { webSockets } from "@libp2p/websockets";
 import { noise } from "@chainsafe/libp2p-noise";
@@ -56,21 +55,24 @@ async function ensureHelia() {
   }
   if (!heliaStartPromise) {
     heliaStartPromise = (async () => {
-      const libp2p = await createLibp2p({
-        transports: [tcp(), webSockets()],
-        connectionEncrypters: [noise()],
-        streamMuxers: [yamux()],
-        addresses: {
-          listen: ["/ip4/127.0.0.1/tcp/0", "/ip4/127.0.0.1/tcp/0/ws"],
+      // Helia 7 builds libp2p from options, filling every key left out from
+      // defaults that dial the public network — so peerDiscovery is given, empty.
+      const node = await createHelia({
+        libp2p: {
+          transports: [tcp(), webSockets()],
+          connectionEncrypters: [noise()],
+          streamMuxers: [yamux()],
+          addresses: {
+            listen: ["/ip4/127.0.0.1/tcp/0", "/ip4/127.0.0.1/tcp/0/ws"],
+          },
+          peerDiscovery: [],
+          services: {
+            identify: identify(),
+            ping: ping(),
+            dht: kadDHT({ clientMode: false }),
+          },
         },
-        services: {
-          identify: identify(),
-          ping: ping(),
-          dht: kadDHT({ clientMode: false }),
-        },
-      });
-
-      const node = await createHelia({ libp2p });
+      }).start();
       unixfs(node);
 
       heliaPeerId = node.libp2p.peerId?.toString?.() ?? null;

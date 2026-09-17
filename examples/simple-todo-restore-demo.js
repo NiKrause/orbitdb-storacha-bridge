@@ -13,13 +13,12 @@ import { logger } from "../lib/logger.js";
 
 // Import utilities for creating OrbitDB/Helia instances
 import { createHeliaOrbitDB } from "../lib/utils.js";
-import { createLibp2p } from "libp2p";
 import { identify } from "@libp2p/identify";
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { tcp } from "@libp2p/tcp";
 import { webSockets } from "@libp2p/websockets";
-import { gossipsub } from "@chainsafe/libp2p-gossipsub";
+import { gossipsub } from "@libp2p/gossipsub";
 import { createHelia } from "helia";
 import { createOrbitDB } from "@orbitdb/core";
 import { LevelBlockstore } from "blockstore-level";
@@ -42,7 +41,7 @@ async function createSimpleTodoOrbitDB(suffix = "") {
     "📡 Creating libp2p node with simple-todo relay configuration...",
   );
 
-  const libp2p = await createLibp2p({
+  const libp2pOptions = {
     addresses: {
       listen: ["/ip4/0.0.0.0/tcp/0", "/ip4/127.0.0.1/tcp/0/ws"],
     },
@@ -69,7 +68,7 @@ async function createSimpleTodoOrbitDB(suffix = "") {
         emitSelf: true,
       }),
     },
-  });
+  };
 
   logger.info("🔧 Setting up Helia with persistent storage...");
   const uniqueId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
@@ -80,7 +79,14 @@ async function createSimpleTodoOrbitDB(suffix = "") {
     `./orbitdb-bridge-${uniqueId}${suffix}-data`,
   );
 
-  const helia = await createHelia({ libp2p, blockstore, datastore });
+  // Helia 7 builds libp2p from options, and fills any of the keys it knows
+  // that are left out from its own defaults, which dial the public network.
+  const helia = await createHelia({
+    libp2p: { peerDiscovery: [], ...libp2pOptions },
+    blockstore,
+    datastore,
+  }).start();
+  const libp2p = helia.libp2p;
 
   logger.info("🛸 Creating OrbitDB instance...");
   const orbitdb = await createOrbitDB({
