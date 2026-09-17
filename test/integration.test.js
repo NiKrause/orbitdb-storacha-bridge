@@ -500,7 +500,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       if (sourceDB) {
         try {
           await sourceDB.close();
-        } catch (error) {
+        } catch {
           // Already closed or error
         }
       }
@@ -647,7 +647,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       if (sourceDB) {
         try {
           await sourceDB.close();
-        } catch (error) {
+        } catch {
           // Already closed
         }
       }
@@ -890,7 +890,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       if (sourceDB) {
         try {
           await sourceDB.close();
-        } catch (error) {
+        } catch {
           // Already closed
         }
       }
@@ -1216,7 +1216,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       if (sourceDB) {
         try {
           await sourceDB.close();
-        } catch (error) {
+        } catch {
           // Already closed
         }
       }
@@ -1397,7 +1397,7 @@ describe("OrbitDB Storacha Bridge Integration", () => {
       if (sourceDB) {
         try {
           await sourceDB.close();
-        } catch (error) {
+        } catch {
           // Already closed
         }
       }

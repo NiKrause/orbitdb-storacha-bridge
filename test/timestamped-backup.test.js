@@ -91,7 +91,7 @@ describe("Timestamped backups", () => {
     for (const [, db] of dbs) {
       try {
         await db.close();
-      } catch (e) {
+      } catch {
         // Ignore errors if already closed
       }
     }
