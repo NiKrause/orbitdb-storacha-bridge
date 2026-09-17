@@ -106,6 +106,8 @@
   // Connection state
   let peersConnected = false;
   let replicationEvents = [];
+  // Set when no relay hands out an address, which is otherwise a silent wait.
+  let relayWarning = "";
 
 
   // Test data
@@ -534,18 +536,34 @@
       bobPeerId = libp2p.peerId.toString();
     }
 
+    // A browser cannot listen, so its address comes from the relay. If no relay
+    // answers, say which ones were tried instead of leaving the next step
+    // disabled with nothing to go on.
+    const relayDeadline = setTimeout(() => {
+      const ready = persona === "alice" ? aliceAddressReady : bobAddressReady;
+      if (!ready) {
+        relayWarning = `No relay answered within 20 seconds, so ${persona} has no address other peers could dial. Tried: ${RELAY_BOOTSTRAP_ADDR.join(", ")}. Set VITE_RELAY_ADDRS to a relay you can reach.`;
+        logger.warn(`⚠️ ${relayWarning}`);
+      }
+    }, 20000);
+
     // Monitor peer connectivity for replication demo
     const updateAddressReadiness = () => {
       const currentMultiaddrs = libp2p.getMultiaddrs().map(addr => addr.toString());
-      const hasDialableAddresses = currentMultiaddrs.some(addr => 
-        addr.includes('/p2p-circuit/') || 
+      const hasDialableAddresses = currentMultiaddrs.some(addr =>
+        addr.includes('/p2p-circuit/') ||
         addr.includes('/webrtc') ||
         addr.includes('/ws/') ||
         addr.includes('/wss/') ||
         addr.includes('/tcp/') ||
         (addr.includes('/dns4/') || addr.includes('/dns6/'))
       );
-      
+
+      if (hasDialableAddresses) {
+        clearTimeout(relayDeadline);
+        relayWarning = "";
+      }
+
       if (persona === "alice") {
         const wasReady = aliceAddressReady;
         aliceMultiaddrs = currentMultiaddrs;
@@ -1858,6 +1876,7 @@
       bobMultiaddrs = [];
       aliceAddressReady = false;
       bobAddressReady = false;
+      relayWarning = "";
 
       logger.info("✅ Cleanup completed successfully!");
     } catch (error) {
@@ -1914,6 +1933,16 @@
           kind="info"
           title="Choose storage"
           subtitle="Pick where backups go before Alice and Bob start"
+          style="margin-bottom: 2rem;"
+        />
+      {/if}
+
+      {#if relayWarning}
+        <InlineNotification
+          kind="warning"
+          hideCloseButton
+          title="No relay"
+          subtitle={relayWarning}
           style="margin-bottom: 2rem;"
         />
       {/if}

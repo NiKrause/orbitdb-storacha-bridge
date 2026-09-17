@@ -88,6 +88,9 @@ test("Alice's todos reach Bob by replication and by backup, and his reach her", 
   });
   if (aleph) expect(aleph.uploads.size).toBe(2); // the CAR and its metadata
 
+  // The relay answered, so the page says nothing about relays.
+  await expect(page.getByText(/No relay answered/)).toHaveCount(0);
+
   // Bob can only start once Alice is reachable through the relay.
   const initializeBob = page.getByRole("button", { name: /^1\. Initialize Bob/ });
   await expect(initializeBob).toBeEnabled({ timeout: 60_000 });
