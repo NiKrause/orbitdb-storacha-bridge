@@ -23,6 +23,10 @@ on:
         description: "Pinata: upload, list, delete, database restore; pin by CID on a paid plan"
         type: boolean
         default: true
+      lighthouse:
+        description: "Lighthouse: upload, list, delete, database restore"
+        type: boolean
+        default: true
   pull_request:
     types: [labeled]
 
@@ -103,3 +107,36 @@ jobs:
       - name: Pinata pin by CID
         if: (success() || failure()) && steps.key.outcome == 'success'
         run: npx jest test/backends/pinata-live.test.js --forceExit
+
+  lighthouse:
+    name: Lighthouse (live)
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.lighthouse) ||
+      (github.event_name == 'pull_request' && github.event.label.name == 'live-backends')
+    runs-on: ubuntu-latest
+    env:
+      LIGHTHOUSE_LIVE: "true"
+      LIGHTHOUSE_API_KEY: ${{ secrets.LIGHTHOUSE_API_KEY }}
+      # Optional, not secret: a gateway other than gateway.lighthouse.storage.
+      LIGHTHOUSE_GATEWAY: ${{ vars.LIGHTHOUSE_GATEWAY }}
+      NODE_OPTIONS: "--experimental-vm-modules --no-warnings"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      # A bad secret fails here once, with a reason. Prints the secret's shape
+      # and Lighthouse's status code, never the value.
+      - name: Lighthouse accepts the key
+        run: node test/helpers/check-lighthouse-key.js
+
+      # The shared table: every operation the driver declares, and a real
+      # database backed up through it and restored on a node that never saw it.
+      # Everything uploaded is deleted again in tearDown.
+      - name: Lighthouse in the conformance and restore suites
+        run: npx jest test/backends/conformance.test.js test/backends/restore.test.js --forceExit

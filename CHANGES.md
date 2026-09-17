@@ -1,6 +1,14 @@
 # Changes
 
-## 0.7.0 (unreleased)
+## Unreleased
+
+### Added
+- **Lighthouse storage driver**, `orbitdb-storage-bridge/backends/lighthouse`: upload, listing
+  and deletion over the endpoints `@lighthouse-web3/sdk` 0.4.7 uses, without the SDK. A backup's
+  CAR goes up as a plain file and comes back byte for byte; `carImport: true` sends CARs to
+  `dag/import` instead. File names go up without their path, and errors carry Lighthouse's reason.
+
+## 0.7.0 (2026-09-17)
 
 ### Added
 - **Pinata storage driver**, `orbitdb-storage-bridge/backends/pinata` (#80, #84). Verified against a
