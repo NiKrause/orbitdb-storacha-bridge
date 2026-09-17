@@ -21,7 +21,6 @@
     "./backends/aleph-pin": "./lib/backends/aleph-pin.js",
     "./memory-courier": "./lib/memory-courier.js",
     "./StorachaIntegration.svelte": "./dist/components/StorachaIntegration.svelte",
-    "./StorachaTest.svelte": "./dist/components/StorachaTest.svelte",
     "./StorachaAuth.svelte": "./dist/components/StorachaAuth.svelte",
     "./storacha-backup": "./dist/components/storacha-backup.js",
     "./components/*": "./dist/components/*"
@@ -60,6 +59,9 @@
   "files": [
     "lib",
     "dist",
+    "!dist/components/StorachaTest.svelte",
+    "!dist/components/StorachaTestWithReplication.svelte",
+    "!dist/components/StorachaTestWithWebAuthn.svelte",
     "README.md",
     "LICENSE"
   ],

@@ -21,6 +21,8 @@ This document provides detailed documentation for the Svelte components included
 
 The OrbitDB-Storacha-Bridge project includes **Svelte components** for browser-based demos and integration. These components provide various authentication methods, backup/restore functionality, and P2P replication capabilities.
 
+The three test harnesses — `StorachaTest.svelte`, `StorachaTestWithReplication.svelte` and `StorachaTestWithWebAuthn.svelte` — are **not in the npm package**. They are Storacha-only demos, and no published version could import them: each imports `./orbitdb-storacha-bridge`, a file the package never contained. The example apps run their own copies of the replication and WebAuthn harnesses, which import the bridge by its package name.
+
 ## StorachaAuth.svelte
 
 **Location:** [`src/components/StorachaAuth.svelte`](src/components/StorachaAuth.svelte)
@@ -33,7 +35,7 @@ Authentication component supporting multiple Storacha authentication methods:
 
 ## StorachaTest.svelte
 
-**Location:** [`src/components/StorachaTest.svelte`](src/components/StorachaTest.svelte)
+**Location:** [`src/components/StorachaTest.svelte`](src/components/StorachaTest.svelte) (repository only, not in the npm package)
 
 Basic backup/restore demo with Alice & Bob using independent OrbitDB instances:
 
@@ -44,7 +46,7 @@ Basic backup/restore demo with Alice & Bob using independent OrbitDB instances:
 
 ## StorachaTestWithReplication.svelte
 
-**Location:** [`src/components/StorachaTestWithReplication.svelte`](src/components/StorachaTestWithReplication.svelte)
+**Location:** [`src/components/StorachaTestWithReplication.svelte`](src/components/StorachaTestWithReplication.svelte) (repository only, not in the npm package; the example app runs its own copy in [`examples/svelte/orbitdb-replication/src/lib/`](examples/svelte/orbitdb-replication/src/lib/))
 
 Advanced replication demo with Alice & Bob using shared database and P2P connectivity:
 
@@ -55,7 +57,7 @@ Advanced replication demo with Alice & Bob using shared database and P2P connect
 
 ## StorachaTestWithWebAuthn.svelte
 
-**Location:** [`src/components/StorachaTestWithWebAuthn.svelte`](src/components/StorachaTestWithWebAuthn.svelte)
+**Location:** [`src/components/StorachaTestWithWebAuthn.svelte`](src/components/StorachaTestWithWebAuthn.svelte) (repository only, not in the npm package; the example app runs its own copy in [`examples/svelte/simple-backup-restore/src/lib/`](examples/svelte/simple-backup-restore/src/lib/))
 
 WebAuthn biometric authentication demo with hardware-secured DID identities:
 
