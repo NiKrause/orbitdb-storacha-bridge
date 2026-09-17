@@ -1,5 +1,35 @@
 # Changes
 
+## 0.7.0 (unreleased)
+
+### Added
+- **Pinata storage driver**, `orbitdb-storage-bridge/backends/pinata` (#80, #84). Verified against a
+  live free-plan account on 2026-09-17: upload, listing, deletion, CAR backups and a database
+  restored on a second node. Pin by CID and CAR import are paid-plan features, so both are opt-in
+  (`pinByCid`, `carImport`). Use the dedicated gateway of the key's own account; it may be given as
+  the bare domain Pinata's dashboard shows. Errors carry Pinata's reason.
+
+### Changed
+- `key-did-provider-ed25519`, `@orbitdb/identity-provider-did` and `key-did-resolver` are
+  devDependencies now: nothing the package ships imports them. Installing the package brings no
+  known vulnerability (`npm audit --omit=dev`) (#85).
+- Errors the library rethrows from a `catch` carry the original error as `cause` (#86).
+- **Renamed to `orbitdb-storage-bridge`** — published as `orbitdb-storacha-bridge` up to 0.6.0.
+  Storacha is no longer the only backend, so the name stopped describing the package. The
+  rename changes no API: replace the dependency and the import specifiers
+  (`orbitdb-storacha-bridge/courier-sync` → `orbitdb-storage-bridge/courier-sync`, and so on).
+  Names that refer to Storacha itself stay — `OrbitDBStorachaBridge`, `StorachaIntegration.svelte`,
+  `backends/storacha`, the `storacha_*` localStorage keys — and so does the debug namespace
+  `libp2p:orbitdb-storacha:*`.
+
+### Removed
+- `StorachaTest.svelte`, `StorachaTestWithReplication.svelte` and `StorachaTestWithWebAuthn.svelte`
+  are no longer in the package (#83). Each imported a file no release ever contained, so none of
+  them could be imported.
+
+Releases 0.5.0 to 0.6.0 are described in their
+[GitHub release notes](https://github.com/NiKrause/orbitdb-storage-bridge/releases).
+
 ## 0.4.3 (2026-01-23)
 
 ### Added

@@ -1,5 +1,5 @@
 /**
- * @fileoverview Integration Tests for OrbitDB Storacha Bridge
+ * @fileoverview Integration Tests for OrbitDB Storage Bridge
  *
  * This test suite validates the complete backup and restore cycle of OrbitDB databases
  * using Storacha (Web3.Storage) as the distributed storage backend. It tests the core
@@ -137,9 +137,9 @@ async function waitForPeers(heliaNode, minPeers = 1, timeout = 30000) {
 
 /**
  * @namespace OrbitDBStorachaBridgeIntegration
- * @description Integration test suite for OrbitDB Storacha Bridge functionality
+ * @description Integration test suite for OrbitDB Storage Bridge functionality
  */
-describe("OrbitDB Storacha Bridge Integration", () => {
+describe("OrbitDB Storage Bridge Integration", () => {
   /** @type {Object|null} Source OrbitDB node instance */
   let sourceNode;
   /** @type {Object|null} Target OrbitDB node instance */

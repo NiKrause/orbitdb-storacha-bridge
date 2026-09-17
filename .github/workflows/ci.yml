@@ -292,7 +292,7 @@ jobs:
         if: needs.lint.result == 'success' && needs.courier-sync-tests.result == 'success' && needs.integration-tests.result == 'success' && needs.e2e-tests-simple.result == 'success' && needs.car-backup-tests.result != 'failure' && needs.p256-ucan-tests.result != 'failure' && needs.timestamped-backup-tests.result != 'failure' && needs.network-download-tests.result != 'failure'
         run: |
           echo "✅ All tests passed successfully!"
-          echo "🎉 OrbitDB Storacha Bridge is working correctly"
+          echo "🎉 OrbitDB Storage Bridge is working correctly"
           echo "📋 Test Summary:"
           echo "  - Linting: PASSED"
           echo "  - Courier Sync: PASSED"

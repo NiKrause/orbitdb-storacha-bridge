@@ -1,6 +1,6 @@
 # Storacha Svelte Components
 
-This document provides detailed documentation for the Svelte components included in the OrbitDB-Storacha-Bridge project for browser-based integration.
+This document provides detailed documentation for the Svelte components included in the OrbitDB Storage Bridge project for browser-based integration.
 
 ## Table of Contents
 
@@ -19,7 +19,7 @@ This document provides detailed documentation for the Svelte components included
 
 ## Component Overview
 
-The OrbitDB-Storacha-Bridge project includes **Svelte components** for browser-based demos and integration. These components provide various authentication methods, backup/restore functionality, and P2P replication capabilities.
+The OrbitDB Storage Bridge project includes **Svelte components** for browser-based demos and integration. These components provide various authentication methods, backup/restore functionality, and P2P replication capabilities.
 
 The three test harnesses — `StorachaTest.svelte`, `StorachaTestWithReplication.svelte` and `StorachaTestWithWebAuthn.svelte` — are **not in the npm package**. They are Storacha-only demos, and no published version could import them: each imports `./orbitdb-storacha-bridge`, a file the package never contained. The example apps run their own copies of the replication and WebAuthn harnesses, which import the bridge by its package name.
 

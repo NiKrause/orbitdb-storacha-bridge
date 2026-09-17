@@ -1,5 +1,5 @@
 /**
- * @fileoverview Access Control Integration Tests for OrbitDB Storacha Bridge
+ * @fileoverview Access Control Integration Tests for OrbitDB Storage Bridge
  *
  * This test suite validates that different identities are properly handled during
  * backup and restore operations, including access control enforcement and identity
@@ -35,7 +35,7 @@ async function isStorachaAvailable() {
   try {
     const response = await fetch("https://w3s.link", {
       method: "HEAD",
-      headers: { "User-Agent": "orbitdb-storacha-bridge-test" },
+      headers: { "User-Agent": "orbitdb-storage-bridge-test" },
       signal: AbortSignal.timeout(10000), // 10 second timeout
     });
     return response.status < 500; // Accept any status except 5xx server errors
@@ -96,7 +96,7 @@ async function createHeliaOrbitDBWithIdentity(suffix = "", identityId = null) {
   };
 }
 
-describe("OrbitDB Storacha Bridge - Access Control Integration", () => {
+describe("OrbitDB Storage Bridge - Access Control Integration", () => {
   let aliceNode, bobNode;
   let storachaAvailable = false;
 
