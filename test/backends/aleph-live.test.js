@@ -15,7 +15,11 @@
  */
 
 import { jest, describe, test, expect } from "@jest/globals";
-import { createAlephBackend } from "../../lib/backends/aleph.js";
+import { IPFSAccessController } from "@orbitdb/core";
+import { createAlephBackend, ALEPH_GATEWAYS } from "../../lib/backends/aleph.js";
+import { backupDatabase } from "../../lib/orbitdb-storacha-bridge.js";
+import { restoreFromCID } from "../../lib/restore-cid.js";
+import { createHeliaOrbitDB, cleanupOrbitDBDirectories } from "../../lib/utils.js";
 
 jest.setTimeout(180_000);
 
@@ -59,5 +63,47 @@ maybe("the real Aleph host, as the driver assumes it", () => {
     const backend = createAlephBackend();
     expect(backend.capabilities.pinByCid).toBe(false);
     expect(backend.pinCid).toBeUndefined();
+  });
+
+  // The chain P9 and P11 stand on, end to end: a database goes up to Aleph as
+  // a CAR with no key, and a node that has never seen it gets it back from its
+  // metadata CID over plain HTTPS — no Aleph client, no account, no libp2p —
+  // with every block checked against its own CID on the way in.
+  test("a database backed up to Aleph comes back into a fresh node from its metadata CID alone", async () => {
+    const OFFLINE = { useBootstrap: false, useDHT: false, autoDial: false };
+    const source = await createHeliaOrbitDB("-aleph-live-source", OFFLINE);
+    const target = await createHeliaOrbitDB("-aleph-live-target", OFFLINE);
+    try {
+      const db = await source.orbitdb.open(`aleph-live-${Date.now()}`, {
+        type: "keyvalue",
+        AccessController: IPFSAccessController({ write: ["*"] }),
+      });
+      await db.put("milk", { text: "Milch kaufen", done: false });
+      await db.put("bread", { text: "Brot", done: true });
+      await db.put("milk", { text: "Hafermilch kaufen", done: false });
+
+      const backup = await backupDatabase(source.orbitdb, db.address, {
+        backend: createAlephBackend(),
+      });
+      expect(backup.error).toBeUndefined();
+      expect(backup.method).toBe("car-timestamped");
+      const { metadataCID } = backup.backupFiles;
+
+      const restored = await restoreFromCID(target.orbitdb, { metadataCID, gateways: ALEPH_GATEWAYS });
+      expect(restored.address).toBe(db.address);
+      expect(await restored.database.get("milk")).toEqual({ text: "Hafermilch kaufen", done: false });
+      expect(await restored.database.get("bread")).toEqual({ text: "Brot", done: true });
+      // Three writes, three entries: the history came back, not only the state.
+      expect((await restored.database.log.values()).length).toBe(3);
+
+      await restored.database.close();
+      await db.close();
+    } finally {
+      for (const node of [source, target]) {
+        await node?.orbitdb?.stop?.();
+        await node?.helia?.stop?.();
+      }
+      await cleanupOrbitDBDirectories();
+    }
   });
 });

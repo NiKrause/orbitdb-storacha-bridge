@@ -11,6 +11,12 @@
  * `{ Name, Hash, Size }`, and `GET /ipfs/<id>` returning exactly what went in.
  * The live check lives separately and is opt-in.
  *
+ * One more shape, measured on 2026-09-17 after it broke every real backup:
+ * `add` answers **one JSON object per line**. A file name with a path in it —
+ * which is how `backupDatabase` names every file it writes — makes the host
+ * wrap the file in directories and add a line for each. A stub that always
+ * answered a single object hid that for as long as no test named a file.
+ *
  * The ids it issues are content addresses, which the real host's are not: Aleph
  * returns a CIDv0 for the UnixFS wrapper it makes. That difference does not
  * reach the driver, which treats the id as opaque — and a stub that invented a
@@ -23,7 +29,8 @@ import { sha256 } from "multiformats/hashes/sha2";
 import * as raw from "multiformats/codecs/raw";
 
 /**
- * Pull the single file part out of a multipart body.
+ * Pull the single file part, and the file name it was sent with, out of a
+ * multipart body.
  *
  * Deliberately minimal: the driver sends one part, and a general parser here
  * would be a second implementation to get wrong. It finds the blank line that
@@ -44,8 +51,10 @@ function filePart(body, contentType) {
   const nextBoundary = body.indexOf(boundary, contentStart);
   if (nextBoundary < 0) return null;
 
+  const headers = body.subarray(start, headerEnd).toString("utf8");
+  const filename = /filename="([^"]*)"/i.exec(headers)?.[1] || "blob";
   // The CRLF before the closing boundary belongs to the format, not the file.
-  return body.subarray(contentStart, nextBoundary - 2);
+  return { bytes: body.subarray(contentStart, nextBoundary - 2), filename };
 }
 
 const readBody = (request) =>
@@ -74,17 +83,26 @@ export async function startAlephStub() {
 
       if (request.method === "POST" && url.pathname === "/api/v0/add") {
         const body = await readBody(request);
-        const file = filePart(body, request.headers["content-type"]);
-        if (!file) {
+        const part = filePart(body, request.headers["content-type"]);
+        if (!part) {
           response.writeHead(400).end("no file part");
           return;
         }
-        const bytes = new Uint8Array(file);
+        const bytes = new Uint8Array(part.bytes);
         const id = CID.create(1, raw.code, await sha256.digest(bytes)).toString();
         store.set(id, bytes);
         uploads++;
+        // The file first, then every directory its name made the host create,
+        // innermost first — one JSON object per line, as the live host answers.
+        const lines = [{ Name: part.filename, Hash: id, Size: String(bytes.length) }];
+        const directories = part.filename.split("/").slice(0, -1);
+        for (let depth = directories.length; depth > 0; depth--) {
+          const name = directories.slice(0, depth).join("/");
+          const wrapper = await sha256.digest(new TextEncoder().encode(`directory:${name}`));
+          lines.push({ Name: name, Hash: CID.create(1, raw.code, wrapper).toString(), Size: "0" });
+        }
         response.writeHead(200, { "content-type": "application/json" });
-        response.end(JSON.stringify({ Name: "blob", Hash: id, Size: String(bytes.length) }));
+        response.end(lines.map((line) => `${JSON.stringify(line)}\n`).join(""));
         return;
       }
 

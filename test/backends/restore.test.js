@@ -26,7 +26,7 @@ import { drivers } from "./drivers.js";
 import { createMemoryBackend } from "../../lib/backends/memory.js";
 import { restoreFromCID, readBlocksFromCAR } from "../../lib/restore-cid.js";
 import { createCARFromBlocks } from "../../lib/backup-car.js";
-import { extractDatabaseBlocks } from "../../lib/orbitdb-storacha-bridge.js";
+import { backupDatabase, extractDatabaseBlocks } from "../../lib/orbitdb-storacha-bridge.js";
 import { createHeliaOrbitDB, cleanupOrbitDBDirectories } from "../../lib/utils.js";
 
 jest.setTimeout(180_000);
@@ -93,6 +93,37 @@ describe.each(drivers.map((driver) => [driver.name, driver]))(
     afterAll(async () => {
       await driver.tearDown(context);
     }, TIMEOUT);
+
+    test(
+      "a backup made by backupDatabase itself, with the names it gives its files, opens on the other node",
+      async () => {
+        // The test below hands the backend anonymous blobs. backupDatabase
+        // names every file `<space>/backup-<time>-…`, and a name with a path
+        // is what broke the Aleph driver against the live host — invisible to
+        // any test that never named a file.
+        const db = await alice.orbitdb.open(`backend-named-${name.replace(/\W+/g, "-")}`, {
+          type: "events",
+          AccessController: IPFSAccessController({ write: ["*"] }),
+        });
+        for (const todo of TODOS) await db.add(todo);
+
+        const backup = await backupDatabase(alice.orbitdb, db.address, { backend });
+        expect(backup.error).toBeUndefined();
+        expect(backup.success).toBe(true);
+
+        const result = await restoreFromCID(bob.orbitdb, {
+          metadataCID: backup.backupFiles.metadataCID,
+          fetchBytes: (id) => backend.getBlob(id),
+        });
+        expect(result.address).toBe(db.address);
+        const restored = await result.database.all();
+        expect(restored.map((entry) => entry.value).sort()).toEqual([...TODOS].sort());
+
+        await db.close();
+        await result.database.close();
+      },
+      TIMEOUT,
+    );
 
     test(
       "a database written here opens on a node that has never seen it",
