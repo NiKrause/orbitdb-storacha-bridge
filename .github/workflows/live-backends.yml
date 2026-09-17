@@ -1,0 +1,98 @@
+# Live checks against real storage services — opt-in, never on every push.
+#
+# Two ways to run it:
+#   - Actions → Live backends → Run workflow (pick the backends), or
+#     `gh workflow run live-backends.yml`
+#   - label a pull request `live-backends`, which runs it against that pull
+#     request's code before it is merged
+#
+# It spends real resources — a Pinata account's quota, Aleph ingest — so nothing
+# starts it automatically. Keys come from repository secrets and never leave
+# GitHub; a pull request from a fork gets no secrets, so the Pinata job fails
+# there with a message instead of running.
+name: Live backends
+
+on:
+  workflow_dispatch:
+    inputs:
+      aleph:
+        description: "Aleph: keyless upload, and a database backed up and restored"
+        type: boolean
+        default: true
+      pinata:
+        description: "Pinata: upload, list, delete, database restore; pin by CID on a paid plan"
+        type: boolean
+        default: true
+  pull_request:
+    types: [labeled]
+
+concurrency:
+  group: live-backends-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  aleph:
+    name: Aleph (live)
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.aleph) ||
+      (github.event_name == 'pull_request' && github.event.label.name == 'live-backends')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      - name: Aleph against the real host
+        run: npx jest test/backends/aleph-live.test.js --forceExit
+        env:
+          ALEPH_LIVE: "true"
+          NODE_OPTIONS: "--experimental-vm-modules --no-warnings"
+
+  pinata:
+    name: Pinata (live)
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.pinata) ||
+      (github.event_name == 'pull_request' && github.event.label.name == 'live-backends')
+    runs-on: ubuntu-latest
+    env:
+      PINATA_LIVE: "true"
+      PINATA_JWT: ${{ secrets.PINATA_JWT }}
+      # Not secret, so a repository variable: the account's dedicated gateway,
+      # e.g. https://<name>.mypinata.cloud. Without it reads go through the
+      # shared gateway, whose 429s the driver waits out, slowly.
+      PINATA_GATEWAY: ${{ vars.PINATA_GATEWAY }}
+      # "true" when the account's plan has pin by CID; the free plan does not.
+      PINATA_PAID_PLAN: ${{ vars.PINATA_PAID_PLAN }}
+      NODE_OPTIONS: "--experimental-vm-modules --no-warnings"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+
+      - run: npm ci
+
+      # A bad secret fails here once, with a reason, instead of as a wall of
+      # 401s. Prints the secret's shape and Pinata's status codes, never the value.
+      - name: Pinata accepts the key
+        id: key
+        run: node test/helpers/check-pinata-key.js
+
+      # The shared table: every operation the driver declares, and a real
+      # database backed up through it and restored on a node that never saw it.
+      - name: Pinata in the conformance and restore suites
+        run: npx jest test/backends/conformance.test.js test/backends/restore.test.js --forceExit
+
+      # Runs even when the table failed, since pin by CID is a separate
+      # question — but not without a key Pinata accepts. On a free plan it
+      # checks the refusal instead.
+      - name: Pinata pin by CID
+        if: (success() || failure()) && steps.key.outcome == 'success'
+        run: npx jest test/backends/pinata-live.test.js --forceExit
