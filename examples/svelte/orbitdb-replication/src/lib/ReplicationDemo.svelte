@@ -1,21 +1,10 @@
 <script>
   import {
-    Plus,
-    Upload,
-    Download,
     Database,
     CheckCircle,
     AlertCircle,
     Loader2,
-    Eye,
-    EyeOff,
-    User,
     Users,
-    ArrowRight,
-    ToggleLeft,
-    ToggleRight,
-    Wifi,
-    WifiOff,
   } from "lucide-svelte";
   import { createHelia } from "helia";
   import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
@@ -47,14 +36,10 @@
     Column,
     Button,
     Tile,
-    Accordion,
-    AccordionItem,
     Toggle,
     InlineNotification,
     Loading,
     CodeSnippet,
-    ProgressIndicator,
-    ProgressStep,
   } from "carbon-components-svelte";
   import {
     DataBase,
@@ -65,7 +50,6 @@
     View,
     ViewOff,
     Reset,
-    Checkmark,
     Warning,
     Connect,
   } from "carbon-icons-svelte";
