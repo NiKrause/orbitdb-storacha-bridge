@@ -1,5 +1,5 @@
 /**
- * Test Utilities for OrbitDB Storacha Bridge
+ * Test Utilities for OrbitDB Storage Bridge
  *
  * Utility functions for testing, including cleanup and test data management
  */

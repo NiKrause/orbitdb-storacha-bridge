@@ -1,6 +1,6 @@
 # Tests
 
-This folder contains automated tests for OrbitDB Storacha Bridge. The suites
+This folder contains automated tests for OrbitDB Storage Bridge. The suites
 cover integration flows, CAR-based backups, network download behavior, and
 edge-case handling.
 

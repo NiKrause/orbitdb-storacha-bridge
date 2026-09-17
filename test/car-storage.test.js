@@ -1,5 +1,5 @@
 /**
- * @fileoverview CAR Storage Tests for OrbitDB Storacha Bridge
+ * @fileoverview CAR Storage Tests for OrbitDB Storage Bridge
  *
  * This test suite validates the CAR (Content Addressable Archive) storage implementation
  * that provides persistent file-based storage for OrbitDB databases. It tests the core
