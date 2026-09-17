@@ -12,6 +12,7 @@ import { createMemoryBackend } from "../../lib/backends/memory.js";
 import { createStorachaBackend } from "../../lib/backends/storacha.js";
 import { createAlephBackend } from "../../lib/backends/aleph.js";
 import { createPinataBackend } from "../../lib/backends/pinata.js";
+import { createLighthouseBackend } from "../../lib/backends/lighthouse.js";
 import {
   startInMemoryStorachaService,
   stopInMemoryStorachaService,
@@ -98,6 +99,40 @@ export const drivers = [
           async tearDown(context) {
             for (const handle of context?.created || []) {
               await context.real.remove(handle).catch(() => {});
+            }
+          },
+        },
+      ]
+    : []),
+  // A real Lighthouse account, on the same terms as Pinata above: opted into
+  // twice, and everything it stores deleted again. Lighthouse is paid for once
+  // and meant to keep files forever, which is exactly why a test must not.
+  ...(process.env.LIGHTHOUSE_LIVE === "true" && process.env.LIGHTHOUSE_API_KEY
+    ? [
+        {
+          name: "lighthouse (live account)",
+          async setUp() {
+            const real = createLighthouseBackend({
+              apiKey: process.env.LIGHTHOUSE_API_KEY,
+              gateway: process.env.LIGHTHOUSE_GATEWAY || undefined,
+            });
+            const created = [];
+            const backend = {
+              ...real,
+              putBlob: async (bytes, meta) => {
+                const handle = await real.putBlob(bytes, meta);
+                created.push(handle);
+                return handle;
+              },
+            };
+            // Lighthouse has no pin-by-CID, so there is nothing to publish to.
+            return { backend, real, created, publish: null };
+          },
+          async tearDown(context) {
+            for (const handle of context?.created || []) {
+              await context.real.remove(handle).catch((error) => {
+                console.log(`   cleanup could not remove ${handle.id}: ${error.message}`);
+              });
             }
           },
         },
