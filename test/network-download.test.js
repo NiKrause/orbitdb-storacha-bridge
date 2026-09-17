@@ -195,13 +195,13 @@ describe("Network Download Tests", () => {
     const { unixfs: unixfsModule } = await import("@helia/unixfs");
     const fs = unixfsModule(helia);
 
-    // Create an async iterable from the bytes for unixfs.addFile()
+    // Create an async iterable from the bytes for unixfs.addByteStream()
     async function* contentGenerator() {
       yield bytes;
     }
 
     // Add to IPFS using UnixFS (returns CID)
-    const cid = await fs.addFile({ content: contentGenerator() });
+    const cid = await fs.addByteStream(contentGenerator());
     return cid.toString();
   }
 

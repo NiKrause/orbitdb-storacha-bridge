@@ -18,7 +18,6 @@
     Shield,
     Key,
   } from "lucide-svelte";
-  import { createLibp2p } from "libp2p";
   import { createHelia } from "helia";
   import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
   import { webSockets } from "@libp2p/websockets";
@@ -26,7 +25,7 @@
   import { noise } from "@chainsafe/libp2p-noise";
   import { yamux } from "@chainsafe/libp2p-yamux";
   import { identify } from "@libp2p/identify";
-  import { gossipsub } from "@chainsafe/libp2p-gossipsub";
+  import { gossipsub } from "@libp2p/gossipsub";
   import { all } from "@libp2p/websockets/filters";
   import { createOrbitDB, IPFSAccessController } from "@orbitdb/core";
   import {
@@ -492,14 +491,16 @@
     // Use minimal libp2p config to avoid relay connections
     const config = DefaultLibp2pBrowserOptions;
 
-    // Create libp2p instance
-    const libp2p = await createLibp2p(config);
-    logger.info("libp2p created");
-
     // Create Helia instance with memory storage for tests to avoid persistence conflicts
     logger.info("Initializing Helia with memory storage for testing...");
     // Use memory storage to avoid filesystem conflicts and faster cleanup
-    const helia = await createHelia({ libp2p });
+    // Helia 7 builds libp2p from options, and fills any of the keys it knows
+    // that are left out from its own defaults, which dial the public network.
+    const helia = await createHelia({
+      libp2p: { addresses: { listen: [] }, peerDiscovery: [], services: {}, ...config },
+    }).start();
+    const libp2p = helia.libp2p;
+    logger.info("libp2p created");
     logger.info("Helia created with memory storage");
 
     // Create OrbitDB instance configuration

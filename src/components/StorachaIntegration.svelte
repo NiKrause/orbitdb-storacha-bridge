@@ -25,7 +25,6 @@
 	import { initializeDatabase, loadTodos, todoDBStore } from './db-actions.js';
 	import { logger } from '../lib/logger.js';
 	// Add imports for creating fresh instances
-	import { createLibp2p } from 'libp2p';
 	import { createHelia } from 'helia';
 	import { createOrbitDB } from '@orbitdb/core';
 	import { createLibp2pConfig } from './libp2p-config.js';
@@ -529,15 +528,20 @@
 				enablePersistentStorage: true
 			});
 
-			// Create fresh libp2p instance
-			const newLibp2p = await createLibp2p(config);
-			logger.info('✅ Fresh libp2p instance created');
 
 			// Create fresh Helia instance with persistent initializeDatabasestorage
 			logger.info('🗄️ Initializing fresh Helia with persistent storage...');
 			const blockstore = new LevelBlockstore(`./helia-blocks-restore-${Date.now()}`);
 			const datastore = new LevelDatastore(`./helia-data-restore-${Date.now()}`);
-			const newHelia = await createHelia({ libp2p: newLibp2p, blockstore, datastore });
+			// Helia 7 builds libp2p from options, and fills any of the keys it knows
+			// that are left out from its own defaults, which dial the public network.
+			const newHelia = await createHelia({
+				libp2p: { addresses: { listen: [] }, peerDiscovery: [], services: {}, ...config },
+				blockstore,
+				datastore
+			}).start();
+			const newLibp2p = newHelia.libp2p;
+			logger.info('✅ Fresh libp2p instance created');
 			logger.info('✅ Fresh Helia instance created');
 
 			// Create fresh OrbitDB instance

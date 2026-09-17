@@ -19,12 +19,11 @@ import {
 import { cleanupOrbitDBDirectories } from "../lib/utils.js";
 
 // Import required OrbitDB modules
-import { createLibp2p } from "libp2p";
 import { identify } from "@libp2p/identify";
 import { noise } from "@chainsafe/libp2p-noise";
 import { yamux } from "@chainsafe/libp2p-yamux";
 import { tcp } from "@libp2p/tcp";
-import { gossipsub } from "@chainsafe/libp2p-gossipsub";
+import { gossipsub } from "@libp2p/gossipsub";
 import { createHelia } from "helia";
 import { createOrbitDB, Identities, IPFSAccessController } from "@orbitdb/core";
 import { LevelBlockstore } from "blockstore-level";
@@ -63,7 +62,7 @@ async function createHeliaOrbitDBWithIdentity(
   identity,
   identities,
 ) {
-  const libp2p = await createLibp2p({
+  const libp2pOptions = {
     addresses: {
       listen: ["/ip4/0.0.0.0/tcp/0"],
     },
@@ -74,7 +73,7 @@ async function createHeliaOrbitDBWithIdentity(
       identify: identify(),
       pubsub: gossipsub({ allowPublishToZeroTopicPeers: true }),
     },
-  });
+  };
 
   const uniqueId = `${Date.now()}-${Math.random().toString(36).slice(2, 11)}`;
   const blockstore = new LevelBlockstore(
@@ -84,7 +83,14 @@ async function createHeliaOrbitDBWithIdentity(
     `./orbitdb-bridge-${uniqueId}${suffix}-data`,
   );
 
-  const helia = await createHelia({ libp2p, blockstore, datastore });
+  // Helia 7 builds libp2p from options, and fills any of the keys it knows
+  // that are left out from its own defaults, which dial the public network.
+  const helia = await createHelia({
+    libp2p: { peerDiscovery: [], ...libp2pOptions },
+    blockstore,
+    datastore,
+  }).start();
+  const libp2p = helia.libp2p;
 
   // Create OrbitDB with the provided identity
   const orbitdb = await createOrbitDB({
