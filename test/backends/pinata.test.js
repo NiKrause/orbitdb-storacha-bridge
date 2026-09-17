@@ -92,7 +92,7 @@ describe("Pinata driver, reading what the service answers", () => {
   const replay = (...responses) => {
     const calls = [];
     globalThis.fetch = async (url, init) => {
-      calls.push({ url: String(url), method: init?.method || "GET" });
+      calls.push({ url: String(url), method: init?.method || "GET", body: init?.body });
       const next = responses[Math.min(calls.length - 1, responses.length - 1)];
       return next();
     };
@@ -100,6 +100,23 @@ describe("Pinata driver, reading what the service answers", () => {
   };
   const tooMany = () =>
     new Response("Too Many Requests", { status: 429, headers: { "retry-after": "0" } });
+
+  test("a name with a path goes up as a file, not a folder", async () => {
+    // backupDatabase's naming. On 2026-09-17 Pinata answered such an upload with
+    // a folder CID, and the gateway served the folder's HTML listing.
+    const calls = replay(
+      () => Response.json({ data: { id: "file-1", cid: "bafkreiexample", size: 2 } }),
+    );
+    const backend = createPinataBackend({ jwt: "t" });
+
+    await backend.putBlob(new TextEncoder().encode("{}"), {
+      name: "did:key:z6Mk/backup-2026-09-17T12-30-00-metadata.json",
+    });
+
+    const form = calls[0].body;
+    expect(form.get("file").name).toBe("backup-2026-09-17T12-30-00-metadata.json");
+    expect(form.get("name")).toBe("did:key:z6Mk/backup-2026-09-17T12-30-00-metadata.json");
+  });
 
   test("a gateway 429 is waited out, not reported as missing", async () => {
     const bytes = new TextEncoder().encode("served on the second try");
