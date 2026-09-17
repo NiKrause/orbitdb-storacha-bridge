@@ -186,6 +186,19 @@ endpoints; 25 GB per upload, resumable required above 100 MB; 10 MB for `pinJSON
 - **"Binary files are only allowed on a case by case basis, please contact team@pinata.cloud."**
   A CAR is `application/octet-stream`. This one line could invalidate the whole class-2 path here and
   has to be tested before Pinata is trusted with CAR backups — the pin-by-CID path sidesteps it.
+
+  **Measured 2026-09-17 on the free plan**, with the driver in `lib/backends/pinata.js` and the
+  "Live backends" workflow:
+
+  | | Result |
+  | --- | --- |
+  | Upload, listing, deletion (v3 API) | work |
+  | A CAR uploaded as a plain file | accepted, and comes back byte for byte — the line above did not bite |
+  | Pin by CID | `403` "This feature is not supported by the current plan type" — paid plans only |
+  | Reads through the shared `gateway.pinata.cloud` | `429` during the restore suite, after the conformance suite's reads |
+
+  So the driver makes pin by CID opt-in (`pinByCid: true`) like CAR import, waits out gateway 429s,
+  and wants the account's dedicated gateway as `gateway` for anything beyond a test.
 - A company with an account, a plan and a rate limit. No proofs, no on-chain anything, no way to
   verify a backup exists other than asking them.
 - HTML retrieval needs a dedicated gateway with a custom domain.
@@ -261,7 +274,7 @@ choosing.
 3. **Prefer pin-by-CID wherever it exists.** Pinata's `upload.public.cid` and Aleph's STORE-with-ipfs
    engine let us publish through Helia and ask the service to hold what is already ours. It is the
    only class of backend that cannot silently change our hashes, and the cheapest one to authorise
-   from a browser.
+   from a browser. On Pinata it needs a paid plan (measured 2026-09-17).
 4. **Three drivers, three failure domains.** Pinata for reach and the best delegation primitives
    available, Aleph for keyless browser ingest and because your own tooling already speaks it, FOC
    for the one property none of the others have — an on-chain answer to "is my backup still there?".
@@ -276,8 +289,8 @@ this page so a stale plan cannot be mistaken for a fact.
 
 **Open questions to measure before committing**
 
-- Whether Pinata accepts a CAR at all — "binary files on a case by case basis" is a one-line
-  showstopper for the class-2 path there, and it is untested.
+- ~~Whether Pinata accepts a CAR at all.~~ Answered 2026-09-17: as a plain file, yes, on the free
+  plan — see the table in section 5.
 - The FOC per-operation provider fee, at the backup frequency we actually want.
 - Whether a CAR round-trips byte-identically through Lighthouse's `dag/import` — verify by CID, not
   by trusting the API.
