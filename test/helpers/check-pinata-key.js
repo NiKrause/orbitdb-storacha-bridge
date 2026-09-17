@@ -78,11 +78,16 @@ if (v3 === 200 && problems.length === 0) {
 }
 
 if (v3 === 401 || v3 === 403) {
-  problems.push(
-    legacy === 200
-      ? "Pinata knows the key but refuses it v3 file access — give it the Files scopes (read and write) or use an admin key"
-      : "Pinata does not accept the key at all — it may be revoked or deleted, used up if it was created with a maximum number of uses, or not the JWT",
-  );
+  if (legacy === 200) {
+    problems.push(
+      "Pinata knows the key but refuses it v3 file access — give it the Files scopes (read and write) or use an admin key",
+    );
+  } else if (problems.length === 0) {
+    // Only when nothing above already explains the refusal.
+    problems.push(
+      "Pinata does not accept the key at all — it may be revoked or deleted, or used up if it was created with a maximum number of uses",
+    );
+  }
 } else if (v3 !== 200) {
   // A 429, a 5xx or no answer is about Pinata right now, not about the key.
   problems.push(`the v3 file listing gave ${shown(v3)}, which says nothing about the key — run it again later`);
