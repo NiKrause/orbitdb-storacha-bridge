@@ -57,6 +57,15 @@ jobs:
         env:
           NODE_OPTIONS: '--experimental-vm-modules --no-warnings'
 
+      # The storage backend contract, the Aleph driver against a stub of its
+      # host, CAR-first backup and restore. None of it needs a secret, and none
+      # of it ran in CI — which is how a driver that broke every named backup
+      # passed. aleph-live.test.js skips itself unless ALEPH_LIVE=true.
+      - name: Run storage backend tests
+        run: npx jest test/backends/ --forceExit
+        env:
+          NODE_OPTIONS: '--experimental-vm-modules --no-warnings'
+
   integration-tests:
     name: Integration Tests
     runs-on: ubuntu-latest
