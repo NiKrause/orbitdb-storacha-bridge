@@ -10,6 +10,16 @@
   an expired plan is `UNSUPPORTED`. **Uploads are not yet verified against a live account**: the
   key and the listing are, but the test account's trial had expired (2026-09-17, issue #60).
 
+### Fixed
+- **Backups work in browsers.** `backupDatabase` built its CAR through Node's `Readable.from`,
+  which the stream polyfill a bundler gives the browser does not have, so every browser backup
+  failed before anything was uploaded. The CAR is now read with a plain async loop.
+- **A backup holds the identity of the database's writer, without searching the network for
+  it.** `extractDatabaseBlocks` asked the log's storage for the identity, which does not hold
+  identities made by `Identities()` without `ipfs`: Helia then searched the network until
+  OrbitDB's 30-second timeout, and the backup went up without the identity. The block now comes
+  from the database's own identity.
+
 ## 0.7.0 (2026-09-17)
 
 ### Added
