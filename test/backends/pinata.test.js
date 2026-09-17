@@ -134,6 +134,21 @@ describe("Pinata driver, reading what the service answers", () => {
     expect(error.message).not.toMatch(/dedicated gateway/);
   });
 
+  test("a gateway pasted as the dashboard shows it, a bare domain, is read over https", async () => {
+    const bytes = new TextEncoder().encode("through the dedicated gateway");
+    const calls = replay(() => new Response(bytes));
+    const backend = createPinataBackend({
+      jwt: "t",
+      gateway: " lavender-absent-dove-749.mypinata.cloud/ ",
+    });
+
+    const back = await backend.getBlob("bafkreiexample");
+    expect(calls[0].url).toBe(
+      "https://lavender-absent-dove-749.mypinata.cloud/ipfs/bafkreiexample",
+    );
+    expect(Buffer.from(back).equals(Buffer.from(bytes))).toBe(true);
+  });
+
   test("a plan that lacks pin by CID is UNSUPPORTED, and says so", async () => {
     // The body the free plan returned on 2026-09-17, minus its request id.
     replay(
