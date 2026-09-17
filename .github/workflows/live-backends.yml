@@ -20,7 +20,7 @@ on:
         type: boolean
         default: true
       pinata:
-        description: "Pinata: upload, list, delete, database restore, pin by CID"
+        description: "Pinata: upload, list, delete, database restore; pin by CID on a paid plan"
         type: boolean
         default: true
   pull_request:
@@ -62,7 +62,12 @@ jobs:
     env:
       PINATA_LIVE: "true"
       PINATA_JWT: ${{ secrets.PINATA_JWT }}
-      PINATA_GATEWAY: ${{ secrets.PINATA_GATEWAY }}
+      # Not secret, so a repository variable: the account's dedicated gateway,
+      # e.g. https://<name>.mypinata.cloud. Without it reads go through the
+      # shared gateway, whose 429s the driver waits out, slowly.
+      PINATA_GATEWAY: ${{ vars.PINATA_GATEWAY }}
+      # "true" when the account's plan has pin by CID; the free plan does not.
+      PINATA_PAID_PLAN: ${{ vars.PINATA_PAID_PLAN }}
       NODE_OPTIONS: "--experimental-vm-modules --no-warnings"
     steps:
       - uses: actions/checkout@v4
@@ -86,7 +91,8 @@ jobs:
         run: npx jest test/backends/conformance.test.js test/backends/restore.test.js --forceExit
 
       # Runs even when the table failed, since pin by CID is a separate
-      # question — but not without a key Pinata accepts.
+      # question — but not without a key Pinata accepts. On a free plan it
+      # checks the refusal instead.
       - name: Pinata pin by CID
         if: (success() || failure()) && steps.key.outcome == 'success'
         run: npx jest test/backends/pinata-live.test.js --forceExit
