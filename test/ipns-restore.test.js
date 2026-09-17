@@ -47,7 +47,7 @@ describe.skip("IPNS-based OrbitDB Restoration", () => {
       for (const [, db] of dbs) {
         try {
           await db.close();
-        } catch (e) {
+        } catch {
           // Ignore
         }
       }
@@ -61,7 +61,7 @@ describe.skip("IPNS-based OrbitDB Restoration", () => {
       for (const [, db] of dbs) {
         try {
           await db.close();
-        } catch (e) {
+        } catch {
           // Ignore
         }
       }

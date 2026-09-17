@@ -44,7 +44,7 @@ const getSecureRecipientFromOrbitDBIdentity = async (identityId) => {
         supportsDirectDelegation: true,
         securityModel: "direct-delegation",
       };
-    } catch (parseError) {
+    } catch {
       // Cannot parse as DID
     }
   }

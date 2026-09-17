@@ -196,9 +196,15 @@ endpoints; 25 GB per upload, resumable required above 100 MB; 10 MB for `pinJSON
   | A CAR uploaded as a plain file | accepted, and comes back byte for byte — the line above did not bite |
   | Pin by CID | `403` "This feature is not supported by the current plan type" — paid plans only |
   | Reads through the shared `gateway.pinata.cloud` | `429` during the restore suite, after the conformance suite's reads |
+  | Reads through the account's dedicated gateway | a fresh upload is served within 2–3 s; all 51 conformance and restore tests pass |
+  | A dedicated gateway from a *different* account than the key | `403` "The owner of this gateway does not have this content pinned to their Pinata account" (ERR_ID:00006) for every read, still after 96 s |
+  | A file name with a path (`<space>/backup-…`, as `backupDatabase` names files) | stored as a folder: the upload answers with the folder's CID, and a gateway serves its HTML listing |
 
   So the driver makes pin by CID opt-in (`pinByCid: true`) like CAR import, waits out gateway 429s,
-  and wants the account's dedicated gateway as `gateway` for anything beyond a test.
+  uploads only the last segment of a file name (the full name stays the upload's `name`), accepts a
+  gateway as the bare domain the dashboard shows, and wants the dedicated gateway **of the key's own
+  account** as `gateway` for anything beyond a test. The live workflow checks that pairing before
+  its suites run.
 - A company with an account, a plan and a rate limit. No proofs, no on-chain anything, no way to
   verify a backup exists other than asking them.
 - HTML retrieval needs a dedicated gateway with a custom domain.

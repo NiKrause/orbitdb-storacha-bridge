@@ -92,7 +92,7 @@ describe("Pinata driver, reading what the service answers", () => {
   const replay = (...responses) => {
     const calls = [];
     globalThis.fetch = async (url, init) => {
-      calls.push({ url: String(url), method: init?.method || "GET" });
+      calls.push({ url: String(url), method: init?.method || "GET", body: init?.body });
       const next = responses[Math.min(calls.length - 1, responses.length - 1)];
       return next();
     };
@@ -100,6 +100,23 @@ describe("Pinata driver, reading what the service answers", () => {
   };
   const tooMany = () =>
     new Response("Too Many Requests", { status: 429, headers: { "retry-after": "0" } });
+
+  test("a name with a path goes up as a file, not a folder", async () => {
+    // backupDatabase's naming. On 2026-09-17 Pinata answered such an upload with
+    // a folder CID, and the gateway served the folder's HTML listing.
+    const calls = replay(
+      () => Response.json({ data: { id: "file-1", cid: "bafkreiexample", size: 2 } }),
+    );
+    const backend = createPinataBackend({ jwt: "t" });
+
+    await backend.putBlob(new TextEncoder().encode("{}"), {
+      name: "did:key:z6Mk/backup-2026-09-17T12-30-00-metadata.json",
+    });
+
+    const form = calls[0].body;
+    expect(form.get("file").name).toBe("backup-2026-09-17T12-30-00-metadata.json");
+    expect(form.get("name")).toBe("did:key:z6Mk/backup-2026-09-17T12-30-00-metadata.json");
+  });
 
   test("a gateway 429 is waited out, not reported as missing", async () => {
     const bytes = new TextEncoder().encode("served on the second try");
@@ -132,6 +149,35 @@ describe("Pinata driver, reading what the service answers", () => {
     const error = await backend.getBlob("bafkreiexample").catch((e) => e);
     expect(calls[0].url).toBe("https://example.mypinata.cloud/ipfs/bafkreiexample");
     expect(error.message).not.toMatch(/dedicated gateway/);
+  });
+
+  test("a gateway's refusal carries the gateway's own reason", async () => {
+    // What lavender-absent-dove-749.mypinata.cloud answered on 2026-09-17 for
+    // content outside the account.
+    const refusal =
+      "The owner of this gateway does not have this content pinned to their Pinata account. " +
+      "In order to view this content, please reach out to the owner. - ERR_ID:00006";
+    replay(() => new Response(refusal, { status: 403 }));
+    const backend = createPinataBackend({ jwt: "t", gateway: "example.mypinata.cloud" });
+
+    const error = await backend.getBlob("bafkreiexample").catch((e) => e);
+    expect(error.code).toBe("NOT_FOUND");
+    expect(error.message).toMatch(/HTTP 403 ".*not have this content pinned.*ERR_ID:00006"/);
+  });
+
+  test("a gateway pasted as the dashboard shows it, a bare domain, is read over https", async () => {
+    const bytes = new TextEncoder().encode("through the dedicated gateway");
+    const calls = replay(() => new Response(bytes));
+    const backend = createPinataBackend({
+      jwt: "t",
+      gateway: " lavender-absent-dove-749.mypinata.cloud/ ",
+    });
+
+    const back = await backend.getBlob("bafkreiexample");
+    expect(calls[0].url).toBe(
+      "https://lavender-absent-dove-749.mypinata.cloud/ipfs/bafkreiexample",
+    );
+    expect(Buffer.from(back).equals(Buffer.from(bytes))).toBe(true);
   });
 
   test("a plan that lacks pin by CID is UNSUPPORTED, and says so", async () => {

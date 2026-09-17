@@ -96,8 +96,6 @@ async function createHeliaOrbitDBWithIdentity(suffix = "", identityId = null) {
   };
 }
 
-/* eslint-env jest */
-
 describe("OrbitDB Storage Bridge - Access Control Integration", () => {
   let aliceNode, bobNode;
   let storachaAvailable = false;
@@ -308,7 +306,7 @@ describe("OrbitDB Storage Bridge - Access Control Integration", () => {
       if (aliceDB) {
         try {
           await aliceDB.close();
-        } catch (error) {
+        } catch {
           // Already closed
         }
       }
@@ -430,7 +428,7 @@ describe("OrbitDB Storage Bridge - Access Control Integration", () => {
       if (sourceDB) {
         try {
           await sourceDB.close();
-        } catch (error) {
+        } catch {
           // Already closed
         }
       }

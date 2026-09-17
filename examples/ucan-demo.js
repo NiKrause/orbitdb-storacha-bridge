@@ -384,8 +384,8 @@ async function validateAndDisplayUCAN(options) {
   logger.info("\\n🔍 Validating UCAN Credentials");
   logger.info("=".repeat(70));
 
-  let delegation = null;
-  let source = "";
+  let delegation;
+  let source;
 
   try {
     // Try loading from file first
@@ -445,7 +445,7 @@ async function validateAndDisplayUCAN(options) {
             );
           } catch (proofError) {
             throw new Error(
-              `Both parsing methods failed. ucanto: ${ucantoError.message}, proof: ${proofError.message}`,
+              `Both parsing methods failed. ucanto: ${ucantoError.message}, proof: ${proofError.message}`, { cause: proofError },
             );
           }
         }

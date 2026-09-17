@@ -85,6 +85,13 @@ jobs:
         id: key
         run: node test/helpers/check-pinata-key.js
 
+      # A dedicated gateway serves only its own account's files, so one from a
+      # different account fails every read with 403 — as can the right one
+      # while an upload has not reached it. This tells the two apart before
+      # the suites turn either into a wall of 403s.
+      - name: The gateway serves this account's uploads
+        run: node test/helpers/probe-pinata-gateway.js
+
       # The shared table: every operation the driver declares, and a real
       # database backed up through it and restored on a node that never saw it.
       - name: Pinata in the conformance and restore suites
