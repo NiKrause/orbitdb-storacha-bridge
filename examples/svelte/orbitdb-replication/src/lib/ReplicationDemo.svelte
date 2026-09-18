@@ -54,6 +54,7 @@
     Connect,
   } from "carbon-icons-svelte";
   import { logger } from "./logger.js";
+  import { relayMultiaddrs, relaySource } from "./relay-bootstrap.js";
 
   // Where backups go, chosen in StorageBackendPicker
   let storageBackend = null;
@@ -138,24 +139,13 @@
   // Keep track of database addresses for replication demo
   let replicationTestDatabaseAddresses = new Set();
 
-  // The relay Alice and Bob meet through: a browser cannot listen, so each
-  // reserves a slot on the relay and is reachable at /p2p-circuit until they
-  // upgrade to a direct WebRTC connection.
-  const RELAY_BOOTSTRAP_ADDR_PROD = [
-    '/dns4/159-69-119-82.k51qzi5uqu5dmesgnxu1wjx2r2rk797fre6yxj284fqhcn2dekq3mar5sz63jx.libp2p.direct/tcp/4002/wss/p2p/12D3KooWSdmKqDDpRftU2ayyGH66svXd3P6zuyH7cMyFV1iXRR4p',
-    '/dns6/2a01-4f8-c012-3e86--1.k51qzi5uqu5dmesgnxu1wjx2r2rk797fre6yxj284fqhcn2dekq3mar5sz63jx.libp2p.direct/tcp/4002/wss/p2p/12D3KooWSdmKqDDpRftU2ayyGH66svXd3P6zuyH7cMyFV1iXRR4p'
-  ];
   const PUBSUB_TOPICS = ['todo._peer-discovery._p2p._pubsub'];
 
-  // VITE_RELAY_ADDRS names another relay, comma-separated: the E2E tests start
-  // one on the test machine, so they need neither the public relay nor the net.
-  const relayAddrsFromEnv = (import.meta.env.VITE_RELAY_ADDRS || '')
-    .split(',')
-    .map((addr) => addr.trim())
-    .filter(Boolean);
-  const RELAY_BOOTSTRAP_ADDR = relayAddrsFromEnv.length
-    ? relayAddrsFromEnv
-    : RELAY_BOOTSTRAP_ADDR_PROD;
+  // The relays Alice and Bob meet through: a browser cannot listen, so each
+  // reserves a slot on a relay and is reachable at /p2p-circuit until they
+  // upgrade to a direct WebRTC connection. The addresses come from the relay
+  // registry on Aleph (see relay-bootstrap.js), or from VITE_RELAY_ADDRS.
+  let relayAddrs = [];
 
   /**
    * The libp2p options Helia builds its node from. Every key Helia would fill
@@ -185,17 +175,24 @@
     }
 
     // Peer discovery, not a service: bootstrap dials the relays and keeps the
-    // connections tagged, so the connection manager does not prune them.
+    // connections tagged, so the connection manager does not prune them. The
+    // list is empty when no relay is registered — bootstrap refuses an empty
+    // one, and there would be nothing to dial anyway.
     if (enableNetworkConnection) {
-      peerDiscoveryServices.push(
-        bootstrap({
-          list: RELAY_BOOTSTRAP_ADDR,
-          timeout: 30000,
-          tagName: 'bootstrap',
-          tagValue: 50
-        })
-      );
-      logger.info(`🔗 Relays: ${RELAY_BOOTSTRAP_ADDR.join(', ')}`);
+      relayAddrs = await relayMultiaddrs();
+      if (relayAddrs.length > 0) {
+        peerDiscoveryServices.push(
+          bootstrap({
+            list: relayAddrs,
+            timeout: 30000,
+            tagName: 'bootstrap',
+            tagValue: 50
+          })
+        );
+        logger.info(`🔗 Relays from ${relaySource}: ${relayAddrs.join(', ')}`);
+      } else {
+        logger.warn(`⚠️ No relay found in ${relaySource}`);
+      }
     }
 
     const services = {
@@ -542,7 +539,9 @@
     const relayDeadline = setTimeout(() => {
       const ready = persona === "alice" ? aliceAddressReady : bobAddressReady;
       if (!ready) {
-        relayWarning = `No relay answered within 20 seconds, so ${persona} has no address other peers could dial. Tried: ${RELAY_BOOTSTRAP_ADDR.join(", ")}. Set VITE_RELAY_ADDRS to a relay you can reach.`;
+        relayWarning = relayAddrs.length
+          ? `No relay answered within 20 seconds, so ${persona} has no address other peers could dial. Tried, from ${relaySource}: ${relayAddrs.join(", ")}. Set VITE_RELAY_ADDRS to a relay you can reach.`
+          : `${relaySource} lists no relay, so ${persona} has no address other peers could dial. Deploy one with relay-button, or set VITE_RELAY_ADDRS to a relay you can reach.`;
         logger.warn(`⚠️ ${relayWarning}`);
       }
     }, 20000);
