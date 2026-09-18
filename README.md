@@ -140,7 +140,7 @@ That description is now historical: the gateway infrastructure it relies on was 
 
 ## What This Does
 
-Backup and restore between **OrbitDB databases** and **Storacha/Filecoin** with full hash and identity preservation. Works in both Node.js and browser environments. [See Storacha Integration Widget in Simple Todo Example](https://simple-todo.le-space.de/)
+Backup and restore between **OrbitDB databases** and **Storacha/Filecoin** with full hash and identity preservation. Works in both Node.js and browser environments.
 
 The project includes **Svelte components** for browser-based demos and integration (see [SVELTE-COMPONENTS.md](SVELTE-COMPONENTS.md) for detailed documentation).
 
@@ -217,6 +217,8 @@ npm install orbitdb-storage-bridge
 ### Svelte Components
 
 For browser-based integration, this project includes Svelte components for authentication, backup/restore, P2P replication, and WebAuthn biometric authentication. See [**SVELTE-COMPONENTS.md**](SVELTE-COMPONENTS.md) for complete documentation of all available components and demonstrations.
+
+That browser side is older than this repository's copy of it, and the UCAN delegation work now sits on a branch. [docs/STORACHA-UI-HISTORY.md](docs/STORACHA-UI-HISTORY.md) records what existed, what it could do, and where each piece is today.
 
 ## How It Works
 
