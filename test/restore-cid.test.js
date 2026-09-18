@@ -94,6 +94,45 @@ afterAll(async () => {
 });
 
 describe("restoring from a CID without an account", () => {
+  test("open options reach both opens — a node without pubsub needs sync: false", async () => {
+    // OrbitDB's Sync subscribes to pubsub the moment a database opens, so on a
+    // libp2p built without a pubsub service — funkpost's mesh-only demo, which
+    // opens everything with `sync: false` — the restore used to throw
+    // "Cannot read properties of undefined (reading 'addEventListener')"
+    // before it ever handed the database back.
+    const db = await alice.orbitdb.open("restore-cid-open-options", {
+      type: "events",
+      AccessController: IPFSAccessController({ write: ["*"] }),
+    });
+    await db.add("one");
+
+    const backup = await backupLocally(db);
+
+    const seen = [];
+    const watched = {
+      ...bob.orbitdb,
+      open: (address, options) => {
+        seen.push(options);
+        return bob.orbitdb.open(address, options);
+      },
+    };
+
+    const result = await restoreFromCID(watched, {
+      metadataCID: backup.metadataCID,
+      fetchBytes: backup.fetchBytes,
+      open: { sync: false },
+    });
+
+    expect(seen.length).toBeGreaterThan(0);
+    for (const options of seen) {
+      expect(options).toMatchObject({ type: "events", sync: false });
+    }
+    expect((await result.database.all()).map((entry) => entry.value)).toEqual(["one"]);
+
+    await db.close();
+    await result.database.close();
+  });
+
   test("a peer that has never seen the database reads every entry", async () => {
     const db = await alice.orbitdb.open("restore-cid-todos", {
       type: "events",
