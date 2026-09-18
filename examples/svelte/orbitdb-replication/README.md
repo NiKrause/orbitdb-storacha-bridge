@@ -18,12 +18,27 @@ npm install
 npm run dev
 ```
 
-Out of the box the two nodes meet on a public relay. `VITE_RELAY_ADDRS` names
-another one instead (comma-separated multiaddrs, each with its `/p2p/` id):
+### Which relay
+
+A browser cannot listen, so Alice and Bob are only reachable through a relay.
+The example asks the relay registry on Aleph which ones exist: a relay deployed
+with [`relay-button`](https://github.com/NiKrause/relay-button) posts a signed
+record listing the addresses it is reachable at, and the page dials every relay
+registered under the `orbitdb-relay` profile whose record is still fresh.
+Reading that registry needs no account.
+
+It used to name one relay in its source. That address had been dead for a
+while before anyone noticed — the demo just waited, and said nothing.
+
+`VITE_RELAY_ADDRS` overrides the registry (comma-separated multiaddrs, each
+with its `/p2p/` id), which is how the tests use a relay on this machine:
 
 ```sh
 VITE_RELAY_ADDRS=/ip4/127.0.0.1/tcp/9092/ws/p2p/12D3Koo... npm run dev
 ```
+
+If no relay answers within 20 seconds, the page says so, and names what it
+tried.
 
 Blocks come from the peer, not from public gateways: Helia is started without a
 delegated router or recursive gateways, so a missing block is asked of whoever
