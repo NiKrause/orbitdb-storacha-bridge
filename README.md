@@ -200,19 +200,29 @@ npm install orbitdb-storage-bridge
 
 ### NodeJS Demo Scripts (full backup with Manifest, Identity and AccessController and entries blocks)
 
-- `node` [`examples/demo.js`](examples/demo.js) - Complete backup/restore cycle
-- `node` [`examples/backup-demo.js`](examples/backup-demo.js) - Backup demonstration only  
-- `node` [`examples/restore-demo.js`](examples/restore-demo.js) - Restore demonstration only
-- `node` [`examples/car-backup-demo.js`](examples/car-backup-demo.js) - CAR-based timestamped backups (efficient multi-version backups)
+They back up to Aleph by default, which takes an upload without an account, so
+they run straight after cloning. `STORAGE=pinata` and `STORAGE=lighthouse`
+switch to the paid services and read their keys from the environment — see
+[`examples/storage.js`](examples/storage.js).
+
+```sh
+node examples/backup-demo.js                          # prints the backup's CID
+BACKUP_CID=<cid> node examples/restore-demo.js        # restores it on a fresh node
+```
+
+- `node` [`examples/demo.js`](examples/demo.js) - Complete backup/restore cycle, including what stops the second node from writing
+- `node` [`examples/backup-demo.js`](examples/backup-demo.js) - Backup only; prints the CID the restore needs
+- `node` [`examples/restore-demo.js`](examples/restore-demo.js) - Restore from that CID onto a node that has never seen the database
 - `node` [`examples/demo-different-identity.js`](examples/demo-different-identity.js) - Different identities with access control enforcement
 - `node` [`examples/demo-shared-identities.js`](examples/demo-shared-identities.js) - Shared identity backup/restore scenarios
-- `node` [`examples/simple-todo-restore-demo.js`](examples/simple-todo-restore-demo.js) - Simple todo database restore demonstration
-- `node` [`examples/ucan-demo.js`](examples/ucan-demo.js) - Complete UCAN-based authentication backup/restore
-- `node` [`examples/simple-ucan-auth.js`](examples/simple-ucan-auth.js) - UCAN authentication with existing delegation token
-- `node` [`examples/test-ucan-bridge.js`](examples/test-ucan-bridge.js) - Test UCAN bridge integration
-- `node` [`examples/test-ucan-list.js`](examples/test-ucan-list.js) - Test UCAN file listing after upload
-- `node` [`examples/clear-space.js`](examples/clear-space.js) - Clear all files from Storacha space (utility script)
-- `node` [`examples/timestamped-backup-example.js`](examples/timestamped-backup-example.js) - Timestamped backup implementation helper
+
+An Aleph upload is not kept: staying stored takes a wallet-signed STORE message
+this library does not send, so restore what you back up while the demo is still
+running.
+
+The scripts written against Storacha's space and UCAN model are in
+[`examples/storacha/`](examples/storacha/README.md). None of them runs end to
+end since the uploads stopped, and the README there says what replaced each.
 
 ### Svelte Components
 

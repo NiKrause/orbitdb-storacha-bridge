@@ -1,27 +1,36 @@
 /**
- * OrbitDB Storacha Bridge Demo - Node.js Edition
+ * Backup and restore, end to end - Node.js Edition
  *
- * Demonstrates complete OrbitDB database backup and restoration via Storacha/Filecoin
- * with 100% hash preservation and identity recovery using the refactored library.
+ * One database, backed up to decentralized storage and restored on a second
+ * node that has never seen it: same address, same entries, same hashes, and an
+ * identity that is still Alice's - which is why Bob cannot write to it.
+ *
+ * Storage comes from STORAGE (Aleph by default), see examples/storage.js.
  */
 
 // Import dotenv for Node.js environment variable handling
 import "dotenv/config";
-import {
-  backupDatabase,
-  restoreDatabaseFromSpace,
-} from "../lib/orbitdb-storacha-bridge.js";
+import { backupDatabase } from "../lib/orbitdb-storacha-bridge.js";
+import { restoreFromCID } from "../lib/restore-cid.js";
 
 // Import utilities separately
 import { createHeliaOrbitDB, cleanupOrbitDBDirectories } from "../lib/utils.js";
 
 import { logger } from "../lib/logger.js";
+import { storageFromEnv } from "./storage.js";
+import { enable } from "@libp2p/logger";
+
+// The demos speak through the library's logger, which is off unless DEBUG says
+// otherwise. Running an example should print what it did.
+if (!process.env.DEBUG) enable("libp2p:orbitdb-storacha*");
 
 /**
  * Test complete OrbitDB backup and restore workflow
  */
-async function testOrbitDBStorachaBridge() {
-  logger.info("🚀 Testing OrbitDB Storacha Bridge");
+async function testOrbitDBStorageBridge() {
+  const { backend, label } = storageFromEnv();
+
+  logger.info("🚀 Testing OrbitDB Storage Bridge (%s)", label);
   logger.info("=".repeat(60));
 
   let sourceNode, targetNode;
@@ -56,27 +65,24 @@ async function testOrbitDBStorachaBridge() {
     logger.info(`   Address: ${sourceDB.address}`);
     logger.info(`   Entries: ${(await sourceDB.all()).length}`);
 
-    // Step 2: Backup database to Storacha
-    logger.info("\n📤 Step 2: Backing up database to Storacha...");
+    // Step 2: Backup
+    logger.info(`\n📤 Step 2: Backing up database to ${label}...`);
 
     const backupResult = await backupDatabase(
       sourceNode.orbitdb,
       sourceDB.address,
-      {
-        storachaKey: process.env.STORACHA_KEY,
-        storachaProof: process.env.STORACHA_PROOF,
-      },
+      { backend },
     );
 
     if (!backupResult.success) {
       throw new Error(`Backup failed: ${backupResult.error}`);
     }
 
+    const metadataCID = backupResult.backupFiles.metadataCID;
     logger.info(`✅ Backup completed successfully!`);
     logger.info(`   📋 Manifest CID: ${backupResult.manifestCID}`);
-    logger.info(
-      `   📊 Blocks uploaded: ${backupResult.blocksUploaded}/${backupResult.blocksTotal}`,
-    );
+    logger.info(`   🔑 Backup CID: ${metadataCID}`);
+    logger.info(`   📊 Blocks: ${backupResult.blocksTotal} in one CAR`);
     logger.info(`   📦 Block types:`, backupResult.blockSummary);
 
     // Close source database
@@ -92,28 +98,30 @@ async function testOrbitDBStorachaBridge() {
     logger.info("\n🔄 Step 3: Creating target node...");
     targetNode = await createHeliaOrbitDB("-target");
 
-    logger.info("\n📥 Step 4: Restoring database from Storacha space...");
+    logger.info(`\n📥 Step 4: Restoring database from ${label}...`);
 
-    const restoreResult = await restoreDatabaseFromSpace(targetNode.orbitdb, {
-      storachaKey: process.env.STORACHA_KEY,
-      storachaProof: process.env.STORACHA_PROOF,
+    // One CID is the whole pointer: the metadata names the CAR, the CAR holds
+    // the blocks. The bytes come from the same storage the backup went to.
+    const restoreResult = await restoreFromCID(targetNode.orbitdb, {
+      metadataCID,
+      fetchBytes: (cid) => backend.getBlob(cid),
+      log: logger,
     });
 
-    if (!restoreResult.success) {
-      throw new Error(`Restore failed: ${restoreResult.error}`);
-    }
+    const addressMatch = restoreResult.address === sourceDB.address;
+    const restoredEntries = await restoreResult.database.all();
 
     logger.info(`✅ Restore completed successfully!`);
-    logger.info(`   📋 Restored database: ${restoreResult.name}`);
+    logger.info(`   📋 Restored database: ${restoreResult.database.name}`);
     logger.info(`   📍 Address: ${restoreResult.address}`);
-    logger.info(`   📊 Entries recovered: ${restoreResult.entriesRecovered}`);
-    logger.info(`   🔄 Blocks restored: ${restoreResult.blocksRestored}`);
-    logger.info(`   🎯 Address match: ${restoreResult.addressMatch}`);
+    logger.info(`   📊 Entries recovered: ${restoredEntries.length}`);
+    logger.info(`   🔄 Blocks restored: ${restoreResult.blocks}`);
+    logger.info(`   🎯 Address match: ${addressMatch}`);
 
     // Display restored entries
     logger.info("\n📄 Restored entries:");
-    for (let i = 0; i < restoreResult.entries.length; i++) {
-      const entry = restoreResult.entries[i];
+    for (let i = 0; i < restoredEntries.length; i++) {
+      const entry = restoredEntries[i];
       logger.info(
         `   ${i + 1}. ${entry.hash.substring(0, 16)}... - "${entry.value}"`,
       );
@@ -159,28 +167,28 @@ async function testOrbitDBStorachaBridge() {
     }
 
     const originalCount = sampleData.length;
-    const restoredCount = restoreResult.entriesRecovered;
+    const restoredCount = restoredEntries.length;
 
     // Close Bob's database after identity test
     await restoreResult.database.close();
 
-    logger.info("\n🎉 SUCCESS! OrbitDB Storacha Bridge test completed!");
+    logger.info("\n🎉 SUCCESS! OrbitDB Storage Bridge test completed!");
     logger.info(`   📊 Original entries: ${originalCount}`);
     logger.info(`   📊 Restored entries: ${restoredCount}`);
-    logger.info(`   📋 Manifest CID: ${restoreResult.manifestCID}`);
-    logger.info(`   📍 Address preserved: ${restoreResult.addressMatch}`);
+    logger.info(`   🔑 Backup CID: ${metadataCID}`);
+    logger.info(`   📍 Address preserved: ${addressMatch}`);
     logger.info(
-      `   🌟 100% data integrity: ${originalCount === restoredCount && restoreResult.addressMatch}`,
+      `   🌟 100% data integrity: ${originalCount === restoredCount && addressMatch}`,
     );
 
     return {
       success: true,
-      manifestCID: restoreResult.manifestCID,
+      metadataCID,
       originalEntries: originalCount,
       restoredEntries: restoredCount,
-      addressMatch: restoreResult.addressMatch,
-      blocksUploaded: backupResult.blocksUploaded,
-      blocksRestored: restoreResult.blocksRestored,
+      addressMatch,
+      blocksTotal: backupResult.blocksTotal,
+      blocksRestored: restoreResult.blocks,
     };
   } catch (error) {
     logger.error("\n💥 Test failed:", error.message);
@@ -224,7 +232,7 @@ async function testOrbitDBStorachaBridge() {
 
 // Run test if this file is executed directly
 if (import.meta.url === `file://${process.argv[1]}`) {
-  testOrbitDBStorachaBridge()
+  testOrbitDBStorageBridge()
     .then((result) => {
       if (result?.success) {
         logger.info("\n🎉 Demo completed successfully!");
@@ -240,4 +248,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     });
 }
 
-export { testOrbitDBStorachaBridge };
+export { testOrbitDBStorageBridge };

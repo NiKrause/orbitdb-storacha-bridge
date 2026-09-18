@@ -427,11 +427,16 @@ For very large databases in browsers, consider:
 
 ## 📖 Examples
 
-See `examples/car-backup-demo.js` for complete working examples:
+Every backup is a CAR now, so the ordinary demos are the CAR demos:
 
 ```bash
-node examples/car-backup-demo.js
+node examples/backup-demo.js                      # one CAR, and the CID that names it
+BACKUP_CID=<cid> node examples/restore-demo.js    # read it back on a fresh node
 ```
+
+`examples/storacha/car-backup-demo.js` is the older one. It found its backups by
+listing a Storacha space, which is why it is archived: the backends this library
+speaks to now hand back a CID instead.
 
 ## 🔗 Related Documentation
 
