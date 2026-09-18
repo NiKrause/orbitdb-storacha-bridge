@@ -1,5 +1,18 @@
 # Changes
 
+## Unreleased
+
+### Changed
+- **Backing up no longer carries the Storacha client.** `backup-car.js` imported the main entry,
+  which imports `@storacha/client` at the top, so a page that backs up to Aleph paid for a client
+  it never calls — **88 kB gzipped**, measured in a real bundle (`mesh-todo`: 420.4 → 508.6 kB).
+  The two pieces a backup needs moved out (`lib/extract-blocks.js`, `lib/backends/resolve.js`),
+  the Storacha backend is built through a dynamic import, and the Storacha-space paths inside
+  `backup-car.js` fetch the main entry only when a space is actually consulted. Importing
+  `orbitdb-storage-bridge/backup-car` now costs **4.2 kB gzipped**. No import path changed:
+  everything the main entry exported, it still exports. A test walks the static import graph, so
+  the client cannot creep back in.
+
 ## 0.8.0 (2026-09-18)
 
 ### Added
