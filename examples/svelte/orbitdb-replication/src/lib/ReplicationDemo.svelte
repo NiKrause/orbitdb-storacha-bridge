@@ -196,7 +196,15 @@
     }
 
     const services = {
-      identify: identify(),
+      // A relay announces one libp2p protocol per database it holds open
+      // (`/orbitdb/heads/<address>`, from OrbitDB's own sync), and libp2p
+      // rejects an identify response over 8192 bytes *whole* — so past a few
+      // hundred databases the client learns nothing about the relay, including
+      // that it is one. No HOP, no reservation, no address to be dialled at,
+      // and the page waits with no reason to show. Measured against the
+      // registered relay on 2026-09-18: 611 protocols, identify silently
+      // dropped at the default limit, fine at 64 KiB.
+      identify: identify({ maxMessageSize: 65_536 }),
       pubsub: gossipsub({
         emitSelf: true,
         allowPublishToZeroTopicPeers: true
