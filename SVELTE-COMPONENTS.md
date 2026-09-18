@@ -23,6 +23,8 @@ The OrbitDB Storage Bridge project includes **Svelte components** for browser-ba
 
 The three test harnesses — `StorachaTest.svelte`, `StorachaTestWithReplication.svelte` and `StorachaTestWithWebAuthn.svelte` — are **not in the npm package**. They are Storacha-only demos, and no published version could import them: each imports `./orbitdb-storacha-bridge`, a file the package never contained. The example apps run their own copies of the replication and WebAuthn harnesses, which import the bridge by its package name.
 
+Where this browser side came from, what it could do, and where every piece of it lives today — including the UCAN delegation work, which is on a branch — is recorded in [docs/STORACHA-UI-HISTORY.md](docs/STORACHA-UI-HISTORY.md).
+
 ## StorachaAuth.svelte
 
 **Location:** [`src/components/StorachaAuth.svelte`](src/components/StorachaAuth.svelte)
@@ -96,11 +98,11 @@ In the examples/svelte diretory you find three simple to advanced OrbitDB-Storac
 
 - simple-backup-restore (Alice creates a db and backs it up to Aleph, Pinata or Lighthouse - Bob restores it into his own - no replication)
 - orbitdb-replication (Alice creates a db with todos and creates a backup - Bob replicates it (but cannot add Todo's because of missing access permissions)  )
-- ucan-delegation (P-256 UCAN's currently not supported by Storacha upload-service)
+- ucan-delegation (P-256 UCAN's were not supported by Storacha's upload service; the example left the mainline on 2025-11-23 and lives on the branch [`feature/ucan-delegation-example`](https://github.com/NiKrause/orbitdb-storage-bridge/tree/feature/ucan-delegation-example/examples/svelte/ucan-delegation) — see [docs/STORACHA-UI-HISTORY.md](docs/STORACHA-UI-HISTORY.md))
 
 ## Live Demo
 
-- [See Storacha Integration Widget in Simple Todo Example](https://simple-todo.le-space.de/)
+- The Storacha widget is no longer part of the Simple Todo example: that app removed Storacha on 2026-05-27, deleting the original component this package's copy came from. The app still runs at [simple-todo.le-space.de](https://simple-todo.le-space.de/), without it. See [docs/STORACHA-UI-HISTORY.md](docs/STORACHA-UI-HISTORY.md).
 
 ---
 
