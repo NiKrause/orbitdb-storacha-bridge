@@ -12,7 +12,6 @@
 import "dotenv/config";
 import {
   backupDatabase,
-  restoreDatabaseFromSpace,
 } from "../lib/orbitdb-storacha-bridge.js";
 
 // Import utilities separately
@@ -29,6 +28,13 @@ import { createOrbitDB, Identities, IPFSAccessController } from "@orbitdb/core";
 import { LevelBlockstore } from "blockstore-level";
 import { LevelDatastore } from "datastore-level";
 import { logger } from "../lib/logger.js";
+import { restoreFromCID } from "../lib/restore-cid.js";
+import { storageFromEnv } from "./storage.js";
+import { enable } from "@libp2p/logger";
+
+// The demos speak through the library's logger, which is off unless DEBUG says
+// otherwise. Running an example should print what it did.
+if (!process.env.DEBUG) enable("libp2p:orbitdb-storacha*");
 
 /**
  * Create a Helia/OrbitDB instance with explicit identity
@@ -90,8 +96,11 @@ async function createHeliaOrbitDBWithIdentity(suffix = "", identityId = null) {
  * Test OrbitDB backup and restore with explicit different identities
  */
 async function testDifferentIdentities() {
+  const { backend, label } = storageFromEnv();
+
   logger.info(
-    "🚀 Testing OrbitDB Storacha Bridge - Different Identities Edition",
+    "🚀 Testing OrbitDB Storage Bridge - Different Identities Edition (%s)",
+    label,
   );
   logger.info("=".repeat(60));
 
@@ -165,33 +174,31 @@ async function testDifferentIdentities() {
       `   Owner: ${aliceNode.orbitdb.identity.id}`,
     );
 
-    // Step 4: Backup database to Storacha
-    logger.info("\n📤 Step 4: Backing up Alice's database to Storacha...");
+    // Step 4: Backup
+    logger.info(`\n📤 Step 4: Backing up Alice's database to ${label}...`);
 
     const backupResult = await backupDatabase(
       aliceNode.orbitdb,
       sourceDB.address,
-      {
-        storachaKey: process.env.STORACHA_KEY,
-        storachaProof: process.env.STORACHA_PROOF,
-      },
+      { backend },
     );
 
     if (!backupResult.success) {
       throw new Error(`Backup failed: ${backupResult.error}`);
     }
 
+    const metadataCID = backupResult.backupFiles.metadataCID;
     logger.info("✅ Backup completed successfully!");
     logger.info(
       { manifestCID: backupResult.manifestCID },
       `   📋 Manifest CID: ${backupResult.manifestCID}`,
     );
+    logger.info({ metadataCID }, `   🔑 Backup CID: ${metadataCID}`);
     logger.info(
-      {
-        uploaded: backupResult.blocksUploaded,
-        total: backupResult.blocksTotal,
-      },
-      `   📊 Blocks uploaded: ${backupResult.blocksUploaded}/${backupResult.blocksTotal}`,
+      { blocks: backupResult.blocksTotal, types: backupResult.blockSummary },
+      `   📊 Blocks in the CAR: ${backupResult.blocksTotal} (${Object.entries(backupResult.blockSummary)
+        .map(([type, count]) => `${count} ${type}`)
+        .join(", ")})`,
     );
 
     // Close Alice's database and node
@@ -238,90 +245,80 @@ async function testDifferentIdentities() {
       throw new Error("FAILED: Alice and Bob have the same identity!");
     }
 
-    // Step 7: Restore database from Storacha
-    logger.info("\n📥 Step 7: Bob restoring database from Storacha...");
+    // Step 7: Restore, from the CID the backup returned
+    logger.info(`\n📥 Step 7: Bob restoring database from ${label}...`);
 
-    const restoreResult = await restoreDatabaseFromSpace(bobNode.orbitdb, {
-      storachaKey: process.env.STORACHA_KEY,
-      storachaProof: process.env.STORACHA_PROOF,
+    const restoreResult = await restoreFromCID(bobNode.orbitdb, {
+      metadataCID,
+      fetchBytes: (cid) => backend.getBlob(cid),
+      log: logger,
     });
 
-    if (!restoreResult.success) {
-      throw new Error(`Restore failed: ${restoreResult.error}`);
-    }
+    const restoredEntries = await restoreResult.database.all();
+    const addressMatch = restoreResult.address === sourceDB.address;
 
     logger.info("✅ Restore completed successfully!");
     logger.info(
-      { name: restoreResult.name },
-      `   📋 Restored database: ${restoreResult.name}`,
+      { name: restoreResult.database.name },
+      `   📋 Restored database: ${restoreResult.database.name}`,
     );
     logger.info(
       { address: restoreResult.address },
       `   📍 Address: ${restoreResult.address}`,
     );
     logger.info(
-      { entriesRecovered: restoreResult.entriesRecovered },
-      `   📊 Entries recovered: ${restoreResult.entriesRecovered}`,
+      { entriesRecovered: restoredEntries.length },
+      `   📊 Entries recovered: ${restoredEntries.length}`,
     );
 
     // Step 8: Verify identity block restoration
     logger.info("\n🔐 Step 8: Verifying identity block restoration...");
 
-    if (restoreResult.analysis && restoreResult.analysis.identityBlocks) {
-      logger.info(
-        { count: restoreResult.analysis.identityBlocks.length },
-        `   ✅ Identity blocks restored: ${restoreResult.analysis.identityBlocks.length}`,
-      );
+    // What went into the CAR is what came out of it: the backup counted the
+    // blocks by kind, and the restore put every one of them into Bob's
+    // blockstore.
+    const identityBlocks =
+      (backupResult.blockSummary.identity_own ?? 0) +
+      (backupResult.blockSummary.identity_direct ?? 0) +
+      (backupResult.blockSummary.identity_system ?? 0) +
+      (backupResult.blockSummary.identity_discovered ?? 0);
 
-      if (restoreResult.analysis.identityBlocks.length > 0) {
-        logger.info("   📋 Identity preservation verified!");
-        restoreResult.analysis.identityBlocks.forEach((block, i) => {
-          logger.info(
-            { index: i + 1, cid: block.cid },
-            `      ${i + 1}. ${block.cid} (Identity block)`,
-          );
-        });
-        logger.info(
-          "   🎯 This proves Alice's identity is preserved in the backup",
-        );
-        logger.info(
-          "   🔒 Bob cannot access the data due to access control, not missing identity",
-        );
-      } else {
-        logger.warn(
-          "   ⚠️  No identity blocks found - this could explain access issues",
-        );
-        logger.info(
-          "   📚 Without identity blocks, Bob cannot verify Alice's entries",
-        );
-      }
-    } else {
-      logger.warn("   ❌ No analysis data available for identity verification");
+    if (identityBlocks > 0) {
       logger.info(
-        "   📊 This suggests identity metadata was not captured during backup",
+        { count: identityBlocks },
+        `   ✅ Identity blocks in the backup: ${identityBlocks}`,
+      );
+      logger.info("   📋 Identity preservation verified!");
+      logger.info(
+        "   🎯 This proves Alice's identity is preserved in the backup",
+      );
+      logger.info(
+        "   🔒 Bob cannot write to the data due to access control, not missing identity",
+      );
+    } else {
+      logger.warn(
+        "   ⚠️  No identity blocks found - this could explain access issues",
+      );
+      logger.info(
+        "   📚 Without identity blocks, Bob cannot verify Alice's entries",
       );
     }
 
-    // Also check access controller blocks
-    if (
-      restoreResult.analysis &&
-      restoreResult.analysis.accessControllerBlocks
-    ) {
+    const accessControllerBlocks = backupResult.blockSummary.access_controller ?? 0;
+    logger.info(
+      { count: accessControllerBlocks },
+      `   🔒 Access controller blocks: ${accessControllerBlocks}`,
+    );
+    if (accessControllerBlocks > 0) {
       logger.info(
-        { count: restoreResult.analysis.accessControllerBlocks.length },
-        `   🔒 Access controller blocks: ${restoreResult.analysis.accessControllerBlocks.length}`,
+        "   ✅ Access control rules preserved - which is what stops Bob from writing!",
       );
-      if (restoreResult.analysis.accessControllerBlocks.length > 0) {
-        logger.info(
-          "   ✅ Access control rules preserved - explaining why Bob cannot see Alice's data!",
-        );
-      }
     }
 
     // Step 9: Display restored entries
     logger.info("\n📄 Step 9: Bob viewing restored entries...");
 
-    if (restoreResult.entries.length === 0) {
+    if (restoredEntries.length === 0) {
       logger.info("   ⚠️ Bob sees 0 entries - this is expected!");
       logger.info("   🔒 Why? Bob's identity is not in the write access list");
       logger.info(
@@ -331,8 +328,8 @@ async function testDifferentIdentities() {
         "   👉 Even though the blocks exist, Bob cannot see Alice's data",
       );
     } else {
-      for (let i = 0; i < restoreResult.entries.length; i++) {
-        const entry = restoreResult.entries[i];
+      for (let i = 0; i < restoredEntries.length; i++) {
+        const entry = restoredEntries[i];
         logger.info(
           { index: i + 1, value: entry.value },
           `   ${i + 1}. 👁️  Bob reads: "${entry.value}"`,
@@ -391,13 +388,13 @@ async function testDifferentIdentities() {
         `   📊 Bob can see: ${restoredCount} (expected - access denied)`,
       );
       logger.info(
-        { addressMatch: restoreResult.addressMatch },
-        `   📍 Address preserved: ${restoreResult.addressMatch}`,
+        { addressMatch },
+        `   📍 Address preserved: ${addressMatch}`,
       );
       logger.info("   🔒 Access control working: ✅ Yes");
       logger.info(
-        { blocksRestored: restoreResult.blocksRestored },
-        `   🌟 Blocks downloaded: ✅ Yes (${restoreResult.blocksRestored} blocks)`,
+        { blocksRestored: restoreResult.blocks },
+        `   🌟 Blocks downloaded: ✅ Yes (${restoreResult.blocks} blocks)`,
       );
       logger.info("\n   ✨ Key findings:");
       logger.info("      • Alice and Bob have different identities");
@@ -415,7 +412,7 @@ async function testDifferentIdentities() {
         identitiesDifferent: true,
         originalEntries: originalCount,
         restoredEntries: restoredCount,
-        addressMatch: restoreResult.addressMatch,
+        addressMatch,
         accessControlWorking: true,
         bobCannotRead: true,
       };
@@ -456,7 +453,7 @@ async function testDifferentIdentities() {
 
     // Final summary
     const originalCount = sampleData.length;
-    const restoredCount = restoreResult.entriesRecovered;
+    const restoredCount = restoredEntries.length;
 
     logger.info("\n🎉 SUCCESS! Different Identities Test Completed!");
     logger.info("=".repeat(60));
@@ -478,16 +475,16 @@ async function testDifferentIdentities() {
       `   📊 Restored entries (Bob): ${restoredCount}`,
     );
     logger.info(
-      { addressMatch: restoreResult.addressMatch },
-      `   📍 Address preserved: ${restoreResult.addressMatch}`,
+      { addressMatch },
+      `   📍 Address preserved: ${addressMatch}`,
     );
     logger.info("   🔒 Access control working: ✅ Yes");
     logger.info(
       {
         dataIntegrity:
-          originalCount === restoredCount && restoreResult.addressMatch,
+          originalCount === restoredCount && addressMatch,
       },
-      `   🌟 Data integrity: ${originalCount === restoredCount && restoreResult.addressMatch ? "✅ Perfect" : "❌ Failed"}`,
+      `   🌟 Data integrity: ${originalCount === restoredCount && addressMatch ? "✅ Perfect" : "❌ Failed"}`,
     );
     logger.info("\n   ✨ Key findings:");
     logger.info("      • Alice and Bob have different identities");
@@ -505,7 +502,7 @@ async function testDifferentIdentities() {
       identitiesDifferent: aliceIdentityId !== bobIdentityId,
       originalEntries: originalCount,
       restoredEntries: restoredCount,
-      addressMatch: restoreResult.addressMatch,
+      addressMatch,
       accessControlWorking: true,
     };
   } catch (error) {

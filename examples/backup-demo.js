@@ -1,7 +1,8 @@
 /**
- * OrbitDB Storacha Bridge - Backup Demo
+ * Backup Demo
  *
- * Demonstrates how to backup an OrbitDB database to Storacha
+ * Backs an OrbitDB database up to decentralized storage — Aleph by default,
+ * see examples/storage.js — and prints the CID that restore-demo.js needs.
  */
 
 import "dotenv/config";
@@ -10,9 +11,17 @@ import { backupDatabase } from "../lib/orbitdb-storacha-bridge.js";
 // Import utilities separately
 import { createHeliaOrbitDB } from "../lib/utils.js";
 import { logger } from "../lib/logger.js";
+import { storageFromEnv } from "./storage.js";
+import { enable } from "@libp2p/logger";
+
+// The demos speak through the library's logger, which is off unless DEBUG says
+// otherwise. Running an example should print what it did.
+if (!process.env.DEBUG) enable("libp2p:orbitdb-storacha*");
 
 async function runBackupDemo() {
-  logger.info("🚀 OrbitDB Storacha Bridge - Backup Demo");
+  const { backend, label } = storageFromEnv();
+
+  logger.info("🚀 OrbitDB Storage Bridge - Backup Demo (%s)", label);
   logger.info("=".repeat(50));
 
   let sourceNode;
@@ -44,33 +53,30 @@ async function runBackupDemo() {
     logger.info("   Address: %s", database.address);
     logger.info("   Entries: %d", (await database.all()).length);
 
-    // Step 3: Backup to Storacha
-    logger.info("\n💾 Starting backup...");
+    // Step 3: Backup. The whole database goes up as one CAR file, and the
+    // metadata beside it names that CAR — which is why a single CID is enough
+    // to restore from.
+    logger.info("\n💾 Starting backup to %s...", label);
     const backupResult = await backupDatabase(
       sourceNode.orbitdb,
       database.address,
+      { backend },
     );
 
     if (backupResult.success) {
       logger.info("\n🎉 Backup completed successfully!");
-      logger.info("📋 Manifest CID: %s", backupResult.manifestCID);
-      logger.info(
-        "📊 Blocks uploaded: %d/%d",
-        backupResult.blocksUploaded,
-        backupResult.blocksTotal,
-      );
+      logger.info("📦 Blocks: %d", backupResult.blocksTotal);
+      logger.info("🗜️  CAR: %s", backupResult.backupFiles.carCID);
       logger.info("📈 Block breakdown:");
       for (const [type, count] of Object.entries(backupResult.blockSummary)) {
         logger.info(`   ${type}: %d blocks`, count);
       }
 
-      // Save backup info for restoration demo
-      logger.info("\n💾 Backup information (save this for restore):");
-      logger.info("Manifest CID: %s", backupResult.manifestCID);
-      logger.info("Database Address: %s", backupResult.databaseAddress);
+      logger.info("\n💾 Restore it with:");
       logger.info(
-        "CID Mappings (sample): %o",
-        Object.keys(backupResult.cidMappings).slice(0, 2),
+        "   %sBACKUP_CID=%s node examples/restore-demo.js",
+        process.env.STORAGE ? `STORAGE=${process.env.STORAGE} ` : "",
+        backupResult.backupFiles.metadataCID,
       );
     } else {
       logger.error("\n❌ Backup failed: %o", backupResult.error);
