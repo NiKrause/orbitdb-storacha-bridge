@@ -1,6 +1,6 @@
 # Changes
 
-## Unreleased
+## 0.8.1 (2026-09-18)
 
 ### Fixed
 - **`restoreFromCID` opens the database the way the caller asks.** It hard-coded the type and
