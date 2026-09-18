@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Fixed
+- **`restoreFromCID` opens the database the way the caller asks.** It hard-coded the type and
+  nothing else, so on a node built without a pubsub service — funkpost's mesh-only demo, which
+  opens everything with `sync: false` — OrbitDB's `Sync` subscribed on open and threw
+  `Cannot read properties of undefined (reading 'addEventListener')` before the restore could
+  hand anything back. Pass `open: { sync: false }`, or anything else `orbitdb.open` takes.
+
 ### Changed
 - **Backing up no longer carries the Storacha client.** `backup-car.js` imported the main entry,
   which imports `@storacha/client` at the top, so a page that backs up to Aleph paid for a client
