@@ -1,6 +1,6 @@
 # Changes
 
-## Unreleased
+## 0.8.0 (2026-09-18)
 
 ### Added
 - **Lighthouse storage driver**, `orbitdb-storage-bridge/backends/lighthouse`: upload, listing
@@ -19,6 +19,12 @@
   identities made by `Identities()` without `ipfs`: Helia then searched the network until
   OrbitDB's 30-second timeout, and the backup went up without the identity. The block now comes
   from the database's own identity.
+- **A courier delta carries the writer's identity, for the same reason.** `createDelta` asked
+  the log's storage too, so an app with its own identity provider — a passkey, a DID — would
+  have sent its entries over a mesh without the block a receiver needs to verify them, after
+  waiting out a network search that a courier has no network for. Databases whose identities
+  OrbitDB makes itself were never affected.
+- The library logged "Uploading to Storacha" whatever the backend was; it names the backend now.
 
 ## 0.7.0 (2026-09-17)
 

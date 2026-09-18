@@ -534,6 +534,41 @@ describe("Courier Sync — OrbitDB replication over a byte courier, no libp2p", 
     await syncB.stop();
   });
 
+  test("the delta carries the writer's identity even when the log's storage has never held it", async () => {
+    // An app that makes its own identities — `Identities()` without `ipfs`, which
+    // is what a passkey or DID provider does in a browser — keeps them in memory,
+    // not in the blockstore the log reads. Asking the log for such an identity
+    // finds nothing locally and, over a courier, there is no network to fall back
+    // to: the delta would travel without the block the receiver needs to verify
+    // the entries.
+    const db = track(
+      await alice.orbitdb.open("courier-identity-elsewhere", { type: "keyvalue" }),
+    );
+    await db.put("k1", { n: 1 });
+
+    const identityHash = db.identity.hash;
+    const storage = db.log.storage;
+    const asked = [];
+    db.log.storage = {
+      ...storage,
+      get: async (hash) => {
+        asked.push(hash);
+        return hash === identityHash ? undefined : storage.get(hash);
+      },
+    };
+
+    try {
+      const delta = await createDelta({ db, theirHeads: [] });
+      const identityBlock = delta.blocks.find((block) => block.hash === identityHash);
+
+      expect(identityBlock).toBeDefined();
+      expect(identityBlock.bytes).toEqual(db.identity.bytes);
+      expect(asked).not.toContain(identityHash);
+    } finally {
+      db.log.storage = storage;
+    }
+  });
+
   test("createDelta/applyDelta round-trip carries exactly the missing suffix", async () => {
     const db = track(
       await alice.orbitdb.open("courier-delta-math", { type: "keyvalue" }),
