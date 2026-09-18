@@ -21,7 +21,7 @@ This document provides detailed documentation for the Svelte components included
 
 The OrbitDB Storage Bridge project includes **Svelte components** for browser-based demos and integration. These components provide various authentication methods, backup/restore functionality, and P2P replication capabilities.
 
-The three test harnesses — `StorachaTest.svelte`, `StorachaTestWithReplication.svelte` and `StorachaTestWithWebAuthn.svelte` — are **not in the npm package**. They are Storacha-only demos, and no published version could import them: each imports `./orbitdb-storacha-bridge`, a file the package never contained. The example apps run their own copies of the replication and WebAuthn harnesses, which import the bridge by its package name.
+The three test harnesses — `StorachaTest.svelte`, `StorachaTestWithReplication.svelte` and `StorachaTestWithWebAuthn.svelte` — are **not in the npm package**. They are Storacha-only demos, and no published version could import them: each imports `./orbitdb-storacha-bridge`, a file the package never contained. The example apps started from copies of the replication and WebAuthn harnesses and have since moved on: they import the bridge by its package name and back up to Aleph, Pinata or Lighthouse.
 
 Where this browser side came from, what it could do, and where every piece of it lives today — including the UCAN delegation work, which is on a branch — is recorded in [docs/STORACHA-UI-HISTORY.md](docs/STORACHA-UI-HISTORY.md).
 
@@ -48,7 +48,7 @@ Basic backup/restore demo with Alice & Bob using independent OrbitDB instances:
 
 ## StorachaTestWithReplication.svelte
 
-**Location:** [`src/components/StorachaTestWithReplication.svelte`](src/components/StorachaTestWithReplication.svelte) (repository only, not in the npm package; the example app runs its own copy in [`examples/svelte/orbitdb-replication/src/lib/`](examples/svelte/orbitdb-replication/src/lib/))
+**Location:** [`src/components/StorachaTestWithReplication.svelte`](src/components/StorachaTestWithReplication.svelte) (repository only, not in the npm package). The example app started from a copy and has since moved on: [`ReplicationDemo.svelte`](examples/svelte/orbitdb-replication/src/lib/ReplicationDemo.svelte) backs up to Aleph, Pinata or Lighthouse.
 
 Advanced replication demo with Alice & Bob using shared database and P2P connectivity:
 
@@ -97,7 +97,7 @@ Full integration component for existing OrbitDB Svelte applications:
 In the examples/svelte diretory you find three simple to advanced OrbitDB-Storacha examples.
 
 - simple-backup-restore (Alice creates a db and backs it up to Aleph, Pinata or Lighthouse - Bob restores it into his own - no replication)
-- orbitdb-replication (Alice creates a db with todos and creates a backup - Bob replicates it (but cannot add Todo's because of missing access permissions)  )
+- orbitdb-replication (Alice and Bob replicate one database through a relay, and back it up to Aleph, Pinata or Lighthouse; both may write)
 - ucan-delegation (P-256 UCAN's were not supported by Storacha's upload service; the example left the mainline on 2025-11-23 and lives on the branch [`feature/ucan-delegation-example`](https://github.com/NiKrause/orbitdb-storage-bridge/tree/feature/ucan-delegation-example/examples/svelte/ucan-delegation) — see [docs/STORACHA-UI-HISTORY.md](docs/STORACHA-UI-HISTORY.md))
 
 ## Live Demo

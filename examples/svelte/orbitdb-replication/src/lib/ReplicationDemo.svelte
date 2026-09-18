@@ -1,23 +1,11 @@
 <script>
   import {
-    Plus,
-    Upload,
-    Download,
     Database,
     CheckCircle,
     AlertCircle,
     Loader2,
-    Eye,
-    EyeOff,
-    User,
     Users,
-    ArrowRight,
-    ToggleLeft,
-    ToggleRight,
-    Wifi,
-    WifiOff,
   } from "lucide-svelte";
-  import { createLibp2p } from "libp2p";
   import { createHelia } from "helia";
   import { circuitRelayTransport } from "@libp2p/circuit-relay-v2";
   import { webSockets } from "@libp2p/websockets";
@@ -25,19 +13,13 @@
   import { noise } from "@chainsafe/libp2p-noise";
   import { yamux } from "@chainsafe/libp2p-yamux";
   import { identify } from "@libp2p/identify";
-  import { dcutr } from "@libp2p/dcutr";
-  import { autoNAT } from "@libp2p/autonat";
-  import { gossipsub } from "@chainsafe/libp2p-gossipsub";
+  import { gossipsub } from "@libp2p/gossipsub";
   import { pubsubPeerDiscovery } from "@libp2p/pubsub-peer-discovery";
   import { bootstrap } from "@libp2p/bootstrap";
-  import { all } from "@libp2p/websockets/filters";
+  import { multiaddr } from "@multiformats/multiaddr";
   import { createOrbitDB, IPFSAccessController } from "@orbitdb/core";
-  import {
-    backupDatabase,
-    restoreLogEntriesOnly,
-    clearStorachaSpace,
-    OrbitDBStorachaBridge,
-  } from "orbitdb-storacha-bridge";
+  import { backupDatabase } from "orbitdb-storage-bridge";
+  import { restoreFromCID } from "orbitdb-storage-bridge/restore-cid";
   import { Identities, useIdentityProvider } from "@orbitdb/core";
   import OrbitDBIdentityProviderDID from "@orbitdb/identity-provider-did";
   import { Ed25519Provider } from "key-did-provider-ed25519";
@@ -46,22 +28,18 @@
   import { wordlist as english } from "@scure/bip39/wordlists/english";
   import { createHash } from "crypto";
 
-  // Import the new Storacha Auth component and Carbon components
-  import StorachaAuth from "./StorachaAuth.svelte";
+  // Where backups go, and the Carbon components
+  import StorageBackendPicker from "./StorageBackendPicker.svelte";
   import {
     Grid,
     Row,
     Column,
     Button,
     Tile,
-    Accordion,
-    AccordionItem,
     Toggle,
     InlineNotification,
     Loading,
     CodeSnippet,
-    ProgressIndicator,
-    ProgressStep,
   } from "carbon-components-svelte";
   import {
     DataBase,
@@ -72,16 +50,14 @@
     View,
     ViewOff,
     Reset,
-    Checkmark,
     Warning,
     Connect,
   } from "carbon-icons-svelte";
   import { logger } from "./logger.js";
 
-  // Storacha authentication state
-  let storachaAuthenticated = false;
-  let storachaClient = null;
-  let storachaCredentials = null;
+  // Where backups go, chosen in StorageBackendPicker
+  let storageBackend = null;
+  let storageLabel = "";
 
   // Alice's state (creates data and backs up)
   let aliceRunning = false;
@@ -127,14 +103,11 @@
   let aliceAddressReady = false;
   let bobAddressReady = false;
 
-  // Progress tracking state
-  let uploadProgress = null;
-  let downloadProgress = null;
-  let showProgress = false;
-
   // Connection state
   let peersConnected = false;
   let replicationEvents = [];
+  // Set when no relay hands out an address, which is otherwise a silent wait.
+  let relayWarning = "";
 
 
   // Test data
@@ -148,7 +121,7 @@
     },
     {
       id: "replication_todo_2",
-      text: "Backup database to Storacha",
+      text: "Back the database up to decentralized storage",
       completed: false,
       createdAt: new Date(Date.now() - 1000 * 60 * 60).toISOString(),
       createdBy: "alice",
@@ -165,17 +138,30 @@
   // Keep track of database addresses for replication demo
   let replicationTestDatabaseAddresses = new Set();
 
-  // LibP2P Configuration with updated relay addresses
-  const RELAY_BOOTSTRAP_ADDR_DEV = '/ip4/127.0.0.1/tcp/4001/ws/p2p/12D3KooWAJjbRkp8FPF5MKgMU53aUTxWkqvDrs4zc1VMbwRwfsbE';
+  // The relay Alice and Bob meet through: a browser cannot listen, so each
+  // reserves a slot on the relay and is reachable at /p2p-circuit until they
+  // upgrade to a direct WebRTC connection.
   const RELAY_BOOTSTRAP_ADDR_PROD = [
     '/dns4/159-69-119-82.k51qzi5uqu5dmesgnxu1wjx2r2rk797fre6yxj284fqhcn2dekq3mar5sz63jx.libp2p.direct/tcp/4002/wss/p2p/12D3KooWSdmKqDDpRftU2ayyGH66svXd3P6zuyH7cMyFV1iXRR4p',
     '/dns6/2a01-4f8-c012-3e86--1.k51qzi5uqu5dmesgnxu1wjx2r2rk797fre6yxj284fqhcn2dekq3mar5sz63jx.libp2p.direct/tcp/4002/wss/p2p/12D3KooWSdmKqDDpRftU2ayyGH66svXd3P6zuyH7cMyFV1iXRR4p'
   ];
   const PUBSUB_TOPICS = ['todo._peer-discovery._p2p._pubsub'];
-  
-  // Use production relay for replication demo (now supports both IPv4 and IPv6)
-  const RELAY_BOOTSTRAP_ADDR = RELAY_BOOTSTRAP_ADDR_PROD;
 
+  // VITE_RELAY_ADDRS names another relay, comma-separated: the E2E tests start
+  // one on the test machine, so they need neither the public relay nor the net.
+  const relayAddrsFromEnv = (import.meta.env.VITE_RELAY_ADDRS || '')
+    .split(',')
+    .map((addr) => addr.trim())
+    .filter(Boolean);
+  const RELAY_BOOTSTRAP_ADDR = relayAddrsFromEnv.length
+    ? relayAddrsFromEnv
+    : RELAY_BOOTSTRAP_ADDR_PROD;
+
+  /**
+   * The libp2p options Helia builds its node from. Every key Helia would fill
+   * in itself is spelled out, peerDiscovery included, because its defaults dial
+   * the public network.
+   */
   async function createLibp2pConfig(options = {}) {
     const {
       privateKey = null,
@@ -183,74 +169,56 @@
       enableNetworkConnection = true
     } = options;
 
-    // Configure peer discovery based on enablePeerConnections
+    // How two browsers find each other: each announces itself on a pubsub
+    // topic the other listens to, over the relay they both hold a slot on.
     const peerDiscoveryServices = [];
     if (enablePeerConnections && enableNetworkConnection) {
-      logger.info('🔍 Enabling enhanced peer discovery...');
-      logger.info(`   📬 Pubsub topics: ${PUBSUB_TOPICS.join(', ')}`);
-      
-      // Enhanced pubsub peer discovery
       peerDiscoveryServices.push(
         pubsubPeerDiscovery({
-          interval: 3000, // More frequent broadcasting for faster discovery
+          interval: 3000,
           topics: PUBSUB_TOPICS,
           listenOnly: false,
-          emitSelf: false // Don't emit to self, focus on finding other peers
+          emitSelf: false
         })
       );
-      
-      logger.info('✅ Pubsub peer discovery configured');
-      logger.info(`   🔄 Broadcasting every 3 seconds on topics: ${PUBSUB_TOPICS}`);
+      logger.info(`🔍 Peer discovery on ${PUBSUB_TOPICS.join(', ')}, every 3s`);
     }
 
-    // Configure services based on network connection preference
+    // Peer discovery, not a service: bootstrap dials the relays and keeps the
+    // connections tagged, so the connection manager does not prune them.
+    if (enableNetworkConnection) {
+      peerDiscoveryServices.push(
+        bootstrap({
+          list: RELAY_BOOTSTRAP_ADDR,
+          timeout: 30000,
+          tagName: 'bootstrap',
+          tagValue: 50
+        })
+      );
+      logger.info(`🔗 Relays: ${RELAY_BOOTSTRAP_ADDR.join(', ')}`);
+    }
+
     const services = {
       identify: identify(),
       pubsub: gossipsub({
-        emitSelf: true, // Enable to see our own messages
+        emitSelf: true,
         allowPublishToZeroTopicPeers: true
       })
     };
-
-    // Only add bootstrap service if network connections are enabled
-    if (enableNetworkConnection) {
-      logger.info('🔍 Enabling enhanced libp2p services...');
-      logger.info(`   🔗 Bootstrap peers: ${RELAY_BOOTSTRAP_ADDR.length} configured`);
-      RELAY_BOOTSTRAP_ADDR.forEach((addr, i) => {
-        logger.info(`     ${i + 1}. ${addr}`);
-      });
-      
-      services.bootstrap = bootstrap({ 
-        list: RELAY_BOOTSTRAP_ADDR,
-        timeout: 30000,
-        tagName: 'bootstrap',
-        tagValue: 50
-      });
-      
-      services.autonat = autoNAT();
-      services.dcutr = dcutr();
-      
-      logger.info('✅ Services configured:');
-      logger.info('   🔄 bootstrap: with timeout and tagging');
-      logger.info('   🔍 autonat: NAT detection');
-      logger.info('   🔗 dcutr: Direct connection upgrades');
-    }
 
     return {
       ...(privateKey && { privateKey: privateKey }),
       addresses: {
         listen: enableNetworkConnection
           ? [
-              '/p2p-circuit', // Essential for relay connections
-              '/webrtc' // WebRTC for direct connections
+              '/p2p-circuit', // reachable through the relay
+              '/webrtc' // and directly, once the relay has introduced them
             ]
-          : ['/webrtc'] // Only local WebRTC when network connection is disabled
+          : ['/webrtc']
       },
       transports: enableNetworkConnection
         ? [
-            webSockets({
-              filter: all
-            }),
+            webSockets(),
             webRTC({
               rtcConfiguration: {
                 iceServers: [
@@ -259,12 +227,9 @@
                 ]
               }
             }),
-            circuitRelayTransport({
-              discoverRelays: 2, // Discover more relays
-              maxReservations: 2 // Allow more reservations
-            })
+            circuitRelayTransport()
           ]
-        : [webRTC(), circuitRelayTransport({ discoverRelays: 1 })],
+        : [webRTC(), circuitRelayTransport()],
       connectionEncrypters: [noise()],
       connectionGater: {
         denyDialMultiaddr: () => false,
@@ -286,134 +251,39 @@
     };
   }
 
-  // Create and setup bridge with progress tracking
-  function createStorachaBridge(credentials) {
-    if (!credentials) {
-      throw new Error("Storacha credentials are required but not provided");
-    }
-    
-    if (!credentials.method) {
-      throw new Error("Storacha credentials must have a method property");
-    }
-    
-    const bridgeOptions = {};
-    
-    if (credentials.method === "credentials") {
-      const storachaKey = localStorage.getItem("storacha_key");
-      const storachaProof = localStorage.getItem("storacha_proof");
-      
-      if (storachaKey && storachaProof) {
-        bridgeOptions.storachaKey = storachaKey;
-        bridgeOptions.storachaProof = storachaProof;
-      } else {
-        throw new Error("Storacha credentials not found in storage");
-      }
-    } else if (credentials.method === "ucan" || credentials.method === "seed") {
-      // UCAN authentication support
-      if (!storachaClient) {
-        throw new Error("UCAN client is required but not available");
-      }
-      
-      bridgeOptions.ucanClient = storachaClient;
-      
-      // Get current space DID if available
-      try {
-        const currentSpace = storachaClient.currentSpace();
-        if (currentSpace) {
-          bridgeOptions.spaceDID = currentSpace.did();
+  /**
+   * The backup reports its steps through an event emitter; this turns them into
+   * Alice's status line.
+   */
+  function createBackupEvents() {
+    return {
+      emit(event, progress) {
+        if (event !== "backupProgress" || !progress) return;
+        logger.info("📤 Backup progress:", progress);
+        if (progress.status === "creating") {
+          aliceStep = `Packing ${progress.totalBlocks} blocks into a CAR`;
+        } else if (progress.status === "uploading-blocks") {
+          aliceStep = `Uploading the CAR (${progress.size} bytes) to ${storageLabel}`;
+        } else if (progress.status === "uploading-metadata") {
+          aliceStep = `Uploading the backup's metadata to ${storageLabel}`;
+        } else if (progress.status === "completed") {
+          aliceStep = `Backup uploaded to ${storageLabel}`;
+        } else if (progress.status === "error") {
+          aliceStep = `Backup failed: ${progress.error}`;
         }
-      } catch (error) {
-        logger.warn('Could not get current space DID:', error.message);
-      }
-    } else {
-      throw new Error(
-        `Bridge with ${credentials.method} authentication not yet implemented`,
-      );
-    }
-    
-    const bridge = new OrbitDBStorachaBridge(bridgeOptions);
-    
-    // Set up progress event listeners
-    bridge.on('uploadProgress', (progress) => {
-      logger.info('📤 Upload Progress:', progress);
-      if (progress && typeof progress === 'object') {
-        uploadProgress = progress;
-        showProgress = true;
-        
-        // Update Alice step for upload progress
-        if (progress.status === 'starting') {
-          aliceStep = `Starting backup: ${progress.total} blocks to upload`;
-        } else if (progress.status === 'uploading') {
-          aliceStep = `Uploading: ${progress.current}/${progress.total} blocks (${progress.percentage}%)`;
-        } else if (progress.status === 'completed') {
-          aliceStep = `Upload completed: ${progress.summary?.successful || 0} successful, ${progress.summary?.failed || 0} failed`;
-          showProgress = false;
-        }
-      } else {
-        logger.warn('Invalid upload progress data:', progress);
-      }
-    });
-    
-    bridge.on('downloadProgress', (progress) => {
-      logger.info('📥 Download Progress:', progress);
-      if (progress && typeof progress === 'object') {
-        downloadProgress = progress;
-        showProgress = true;
-        
-        // Update Bob step for download progress
-        if (progress.status === 'starting') {
-          bobStep = `Starting restore: ${progress.total} files to download`;
-        } else if (progress.status === 'downloading') {
-          bobStep = `Downloading: ${progress.current}/${progress.total} files (${progress.percentage}%)`;
-        } else if (progress.status === 'completed') {
-          bobStep = `Download completed: ${progress.summary?.downloaded || 0} downloaded, ${progress.summary?.failed || 0} failed`;
-          showProgress = false;
-        }
-      } else {
-        logger.warn('Invalid download progress data:', progress);
-      }
-    });
-    
-    return bridge;
-  }
-
-  // Handle Storacha authentication events
-  function handleStorachaAuthenticated(event) {
-    logger.info("🔐 Storacha authenticated:", event.detail);
-    storachaAuthenticated = true;
-    storachaClient = event.detail.client;
-    storachaCredentials = {
-      method: event.detail.method,
-      spaces: event.detail.spaces,
-      identity: event.detail.identity, // Available if authenticated with seed
+      },
     };
-
-    // Store credentials for backup/restore operations
-    if (event.detail.method === "credentials") {
-      // For key/proof authentication, we need to extract the credentials
-      logger.info(
-        "📝 Credentials-based authentication - storing for backup operations",
-      );
-    } else if (
-      event.detail.method === "ucan" ||
-      event.detail.method === "seed"
-    ) {
-      logger.info(
-        `📝 ${event.detail.method}-based authentication - ready for operations`,
-      );
-    }
   }
 
-  function handleStorachaLogout() {
-    logger.info("🚪 Storacha logged out");
-    storachaAuthenticated = false;
-    storachaClient = null;
-    storachaCredentials = null;
+  function handleStorageConfigured(event) {
+    storageBackend = event.detail.backend;
+    storageLabel = event.detail.label;
+    logger.info(`🗄️ Backups go to ${storageLabel}`);
   }
 
-  function handleSpaceChanged(event) {
-    logger.info("🔄 Storacha space changed:", event.detail.space);
-    // Update any space-dependent operations
+  function handleStorageCleared() {
+    storageBackend = null;
+    storageLabel = "";
   }
 
   /**
@@ -638,9 +508,20 @@
       enableNetworkConnection: replicationEnabled,
     });
 
-    // Create libp2p instance
-    const libp2p = await createLibp2p(libp2pConfig);
-    logger.info(`${persona} libp2p created with peer discovery enabled:`, replicationEnabled);
+    // Helia 7 builds libp2p itself, from options — it no longer takes a
+    // finished node — and hands back a node that has to be started before
+    // helia.libp2p is there to listen to.
+    logger.info(`🗄️ Initializing ${persona}'s Helia...`);
+    const helia = await createHelia({
+      libp2p: libp2pConfig,
+      // No delegated router and no gateways: a missing block is asked of the
+      // peer we replicate with, over the connection this demo is about. Helia
+      // would otherwise send every CID it cannot find to public infrastructure,
+      // and wait on it.
+      http: { delegatedRouters: [], recursiveGateways: [] },
+    }).start();
+    const libp2p = helia.libp2p;
+    logger.info(`${persona} Helia and libp2p started; peer discovery:`, replicationEnabled);
     logger.info(`🆔 ${persona} Peer ID:`, libp2p.peerId.toString());
     
     // Store multiaddrs for potential direct dialing
@@ -655,18 +536,34 @@
       bobPeerId = libp2p.peerId.toString();
     }
 
+    // A browser cannot listen, so its address comes from the relay. If no relay
+    // answers, say which ones were tried instead of leaving the next step
+    // disabled with nothing to go on.
+    const relayDeadline = setTimeout(() => {
+      const ready = persona === "alice" ? aliceAddressReady : bobAddressReady;
+      if (!ready) {
+        relayWarning = `No relay answered within 20 seconds, so ${persona} has no address other peers could dial. Tried: ${RELAY_BOOTSTRAP_ADDR.join(", ")}. Set VITE_RELAY_ADDRS to a relay you can reach.`;
+        logger.warn(`⚠️ ${relayWarning}`);
+      }
+    }, 20000);
+
     // Monitor peer connectivity for replication demo
     const updateAddressReadiness = () => {
       const currentMultiaddrs = libp2p.getMultiaddrs().map(addr => addr.toString());
-      const hasDialableAddresses = currentMultiaddrs.some(addr => 
-        addr.includes('/p2p-circuit/') || 
+      const hasDialableAddresses = currentMultiaddrs.some(addr =>
+        addr.includes('/p2p-circuit/') ||
         addr.includes('/webrtc') ||
         addr.includes('/ws/') ||
         addr.includes('/wss/') ||
         addr.includes('/tcp/') ||
         (addr.includes('/dns4/') || addr.includes('/dns6/'))
       );
-      
+
+      if (hasDialableAddresses) {
+        clearTimeout(relayDeadline);
+        relayWarning = "";
+      }
+
       if (persona === "alice") {
         const wasReady = aliceAddressReady;
         aliceMultiaddrs = currentMultiaddrs;
@@ -792,11 +689,6 @@
       }
     }, 15000); // Every 15 seconds
 
-    // Create Helia instance
-    logger.info(`🗄️ Initializing ${persona}'s Helia with memory storage for testing...`);
-    const helia = await createHelia({ libp2p });
-    logger.info(`${persona} Helia created with memory storage`);
-
     // Create OrbitDB instance with unique ID and persona-specific identity
     const personaIdentity = persona === "alice" ? aliceIdentity : bobIdentity;
     const personaIdentities = persona === "alice" ? aliceIdentities : bobIdentities;
@@ -829,8 +721,10 @@
         logger.info('🔐 Setting up database with write access for both peers');
         const multiAccessConfig = {
           ...databaseConfig,
-          accessController: IPFSAccessController({ 
-            write: [aliceIdentity.id, bobIdentity.id] 
+          // Capital A: what OrbitDB 4 reads. Spelled the old way, the option is
+          // ignored and the database ends up writable by its creator alone.
+          AccessController: IPFSAccessController({
+            write: [aliceIdentity.id, bobIdentity.id]
           })
         };
         
@@ -1112,305 +1006,53 @@
     }
   }
   
-  // Enhanced function to force connection between Alice and Bob with multiple strategies
+  /**
+   * Bob dials Alice. Both run in this page, so her addresses are at hand, and
+   * the WebRTC ones come first: a relayed connection is limited, and OrbitDB
+   * syncs over a direct one. The relay is the introduction, not the channel.
+   */
   async function forceDirectConnection() {
-    logger.info("🔗 [FORCE_CONNECTION] Starting enhanced connection attempt...");
-    
-    // Detailed prerequisite checking
-    logger.info("🔗 [FORCE_CONNECTION] Checking prerequisites:");
-    logger.info(`   aliceLibp2p: ${!!aliceLibp2p}`);
-    logger.info(`   bobLibp2p: ${!!bobLibp2p}`);
-    logger.info(`   alicePeerId: ${alicePeerId}`);
-    logger.info(`   bobPeerId: ${bobPeerId}`);
-    logger.info(`   aliceAddressReady: ${aliceAddressReady}`);
-    logger.info(`   bobAddressReady: ${bobAddressReady}`);
-    
-    if (!aliceLibp2p || !bobLibp2p || !alicePeerId || !bobPeerId) {
-      logger.warn("⚠️  [FORCE_CONNECTION] Cannot force connection - missing libp2p instances or peer IDs");
+    if (!aliceLibp2p || !bobLibp2p) {
+      logger.warn("⚠️ Cannot connect: one of the two nodes is missing");
       return false;
     }
-    
-    if (!aliceAddressReady || !bobAddressReady) {
-      logger.warn("⚠️  [FORCE_CONNECTION] Cannot force connection - addresses not ready yet");
-      logger.info(`   Alice ready: ${aliceAddressReady}, Bob ready: ${bobAddressReady}`);
+
+    const addresses = aliceLibp2p
+      .getMultiaddrs()
+      .map((addr) => addr.toString())
+      .filter((addr) => addr.includes("/webrtc") || addr.includes("/p2p-circuit"))
+      .sort((a, b) => Number(b.includes("/webrtc")) - Number(a.includes("/webrtc")));
+
+    if (addresses.length === 0) {
+      logger.warn("⚠️ Alice has no address Bob could dial yet");
       return false;
     }
-    
-    logger.info("✅ [FORCE_CONNECTION] Prerequisites met, proceeding with connection strategies...");
-    
-    // Strategy 0: Try dialing with PeerId objects directly (libp2p's preferred method)
-    logger.info("🎯 [FORCE_CONNECTION] Strategy 0: Direct PeerId dialing (no multiaddr)...");
-    
-    let connectionEstablished = false;
-    
-    // Get PeerId objects (not strings)
-    const alicePeerIdObj = aliceLibp2p.peerId;
-    const bobPeerIdObj = bobLibp2p.peerId;
-    
-    logger.info(`🆔 [FORCE_CONNECTION] Using PeerId objects:`);
-    logger.info(`   Alice PeerId type: ${typeof alicePeerIdObj}, toString: ${alicePeerIdObj.toString().slice(-12)}`);
-    logger.info(`   Bob PeerId type: ${typeof bobPeerIdObj}, toString: ${bobPeerIdObj.toString().slice(-12)}`);
-    
-    // Try Bob dialing Alice using PeerId object
-    try {
-      logger.info(`📞 [FORCE_CONNECTION] Bob dialing Alice using PeerId object...`);
-      
-      const connection = await Promise.race([
-        bobLibp2p.dial(alicePeerIdObj),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('PeerId dial timeout')), 8000))
-      ]);
-      
-      logger.info(`✅ [FORCE_CONNECTION] PeerId dial SUCCESS!`, {
-        remotePeer: connection.remotePeer.toString().slice(-12),
-        direction: connection.direction,
-        transient: connection.transient,
-        limited: connection.limits != null,
-        status: connection.status,
-        remoteAddr: connection.remoteAddr?.toString() || 'unknown'
-      });
-      
-      connectionEstablished = true;
-    } catch (error) {
-      logger.info(`❌ [FORCE_CONNECTION] Bob->Alice PeerId dial failed: ${error.message}`);
-      
-      // Try Alice dialing Bob using PeerId object
+
+    for (const address of addresses) {
       try {
-        logger.info(`📞 [FORCE_CONNECTION] Alice dialing Bob using PeerId object...`);
-        
-        const connection = await Promise.race([
-          aliceLibp2p.dial(bobPeerIdObj),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('PeerId dial timeout')), 8000))
-        ]);
-        
-        logger.info(`✅ [FORCE_CONNECTION] PeerId dial SUCCESS!`, {
-          remotePeer: connection.remotePeer.toString().slice(-12),
-          direction: connection.direction,
-          transient: connection.transient,
+        logger.info(`📞 Bob dialing Alice at ${address}`);
+        const connection = await bobLibp2p.dial(multiaddr(address), {
+          signal: AbortSignal.timeout(20000),
+        });
+        logger.info("✅ Bob connected to Alice", {
+          remoteAddr: connection.remoteAddr.toString(),
           limited: connection.limits != null,
-          status: connection.status,
-          remoteAddr: connection.remoteAddr?.toString() || 'unknown'
         });
-        
-        connectionEstablished = true;
-      } catch (error2) {
-        logger.info(`❌ [FORCE_CONNECTION] Alice->Bob PeerId dial failed: ${error2.message}`);
-      }
-    }
-    
-    if (connectionEstablished) {
-      logger.info("🎉 [FORCE_CONNECTION] Strategy 0 SUCCESS: PeerId direct connection established!");
-      return true;
-    }
-    
-    // Strategy 1: Try direct dialing with multiaddrs (fallback)
-    logger.info("🚀 [FORCE_CONNECTION] Strategy 1: Direct multiaddr dialing (fallback)...");
-    
-    // Get Alice's multiaddrs for Bob to dial
-    const aliceDialableAddrs = aliceMultiaddrs.filter(addr => 
-      addr.includes('/p2p-circuit/') || 
-      addr.includes('/webrtc') ||
-      addr.includes('/ws/') ||
-      addr.includes('/wss/')
-    );
-    
-    logger.info(`📍 [FORCE_CONNECTION] Alice's dialable addresses (${aliceDialableAddrs.length}):`);
-    aliceDialableAddrs.forEach((addr, i) => {
-      logger.info(`   ${i + 1}. ${addr}`);
-    });
-    
-    // Try Bob dialing Alice's addresses (connectionEstablished already declared above)
-    for (let i = 0; i < Math.min(aliceDialableAddrs.length, 3); i++) { // Try up to 3 addresses
-      const addr = aliceDialableAddrs[i];
-      try {
-        logger.info(`📞 [FORCE_CONNECTION] Bob dialing Alice: ${addr}`);
-        
-        // Use timeout to prevent hanging
-        const connection = await Promise.race([
-          bobLibp2p.dial(addr),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Dial timeout')), 5000))
-        ]);
-        
-        logger.info(`✅ [FORCE_CONNECTION] Direct dial successful!`, {
-          remotePeer: connection.remotePeer.toString(),
-          direction: connection.direction,
-          transient: connection.transient,
-          status: connection.status
+        addReplicationEvent({
+          type: "peers_connected",
+          peer: "bob",
+          data: { address, limited: connection.limits != null },
         });
-        
-        connectionEstablished = true;
-        break;
+        return true;
       } catch (error) {
-        logger.info(`❌ [FORCE_CONNECTION] Direct dial ${i + 1} failed: ${error.message}`);
+        logger.info(`❌ ${address} did not work: ${error.message}`);
       }
     }
-    
-    if (connectionEstablished) {
-      logger.info("🎉 [FORCE_CONNECTION] Strategy 1 SUCCESS: Direct connection established!");
-      return true;
-    }
-    
-    // Strategy 2: Cross-dialing (Alice dials Bob too)
-    logger.info("🔄 [FORCE_CONNECTION] Strategy 2: Cross-dialing approach...");
-    
-    const bobDialableAddrs = bobMultiaddrs.filter(addr => 
-      addr.includes('/p2p-circuit/') || 
-      addr.includes('/webrtc') ||
-      addr.includes('/ws/') ||
-      addr.includes('/wss/')
-    );
-    
-    logger.info(`📍 [FORCE_CONNECTION] Bob's dialable addresses (${bobDialableAddrs.length}):`);
-    bobDialableAddrs.forEach((addr, i) => {
-      logger.info(`   ${i + 1}. ${addr}`);
-    });
-    
-    // Try both directions simultaneously
-    const dialPromises = [];
-    
-    // Bob dials Alice
-    if (aliceDialableAddrs.length > 0) {
-      dialPromises.push(
-        bobLibp2p.dial(aliceDialableAddrs[0]).then(conn => ({ dialer: 'bob', target: 'alice', connection: conn })).catch(err => ({ error: err.message, dialer: 'bob' }))
-      );
-    }
-    
-    // Alice dials Bob
-    if (bobDialableAddrs.length > 0) {
-      dialPromises.push(
-        aliceLibp2p.dial(bobDialableAddrs[0]).then(conn => ({ dialer: 'alice', target: 'bob', connection: conn })).catch(err => ({ error: err.message, dialer: 'alice' }))
-      );
-    }
-    
-    if (dialPromises.length > 0) {
-      logger.info(`🔀 [FORCE_CONNECTION] Attempting ${dialPromises.length} simultaneous dials...`);
-      
-      try {
-        const results = await Promise.allSettled(dialPromises);
-        
-        for (const result of results) {
-          if (result.status === 'fulfilled' && result.value.connection) {
-            logger.info(`✅ [FORCE_CONNECTION] Cross-dial success: ${result.value.dialer} connected to ${result.value.target}`);
-            connectionEstablished = true;
-            break;
-          } else {
-            logger.info(`❌ [FORCE_CONNECTION] Cross-dial failed:`, result.value || result.reason);
-          }
-        }
-      } catch (error) {
-        logger.info(`❌ [FORCE_CONNECTION] Cross-dial error:`, error.message);
-      }
-    }
-    
-    if (connectionEstablished) {
-      logger.info("🎉 [FORCE_CONNECTION] Strategy 2 SUCCESS: Cross-dial connection established!");
-      return true;
-    }
-    
-    // Strategy 3: Enhanced peer discovery with pubsub
-    logger.info("📡 [FORCE_CONNECTION] Strategy 3: Enhanced peer discovery...");
-    
-    // Use pubsub to help peers find each other
-    try {
-      // Publish Alice's peer info to pubsub topics
-      const alicePeerInfo = {
-        peerId: alicePeerId,
-        multiaddrs: aliceMultiaddrs,
-        timestamp: Date.now()
-      };
-      
-      const bobPeerInfo = {
-        peerId: bobPeerId, 
-        multiaddrs: bobMultiaddrs,
-        timestamp: Date.now()
-      };
-      
-      // Try to publish peer info on discovery topics
-      if (aliceLibp2p.services.pubsub && bobLibp2p.services.pubsub) {
-        logger.info(`📻 [FORCE_CONNECTION] Publishing peer discovery messages...`);
-        
-        const discoveryTopic = 'alice-bob-discovery';
-        
-        // Alice announces herself
-        await aliceLibp2p.services.pubsub.publish(discoveryTopic, new TextEncoder().encode(JSON.stringify({
-          type: 'peer-announce',
-          peer: alicePeerInfo
-        })));
-        
-        // Bob announces himself 
-        await bobLibp2p.services.pubsub.publish(discoveryTopic, new TextEncoder().encode(JSON.stringify({
-          type: 'peer-announce',
-          peer: bobPeerInfo
-        })));
-        
-        logger.info(`📡 [FORCE_CONNECTION] Peer announcements sent via pubsub`);
-      }
-    } catch (error) {
-      logger.info(`❌ [FORCE_CONNECTION] Pubsub discovery failed:`, error.message);
-    }
-    
-    // Strategy 4: Wait and check for natural discovery
-    logger.info("⏳ [FORCE_CONNECTION] Strategy 4: Natural discovery monitoring...");
-    
-    const discoveryTimeout = 15000; // 15 seconds for natural discovery
-    const discoveryStartTime = Date.now();
-    let peersDiscovered = false;
-    
-    while (!peersDiscovered && (Date.now() - discoveryStartTime) < discoveryTimeout) {
-      // Check current connections
-      const aliceConnections = aliceLibp2p.getConnections();
-      const bobConnections = bobLibp2p.getConnections();
-      
-      // Check if Alice and Bob can see each other as connected peers
-      const aliceConnectedToBob = aliceConnectedPeers.includes(bobPeerId);
-      const bobConnectedToAlice = bobConnectedPeers.includes(alicePeerId);
-      peersDiscovered = aliceConnectedToBob || bobConnectedToAlice;
-      
-      // Enhanced logging every 3 seconds
-      if ((Date.now() - discoveryStartTime) % 3000 < 1000) {
-        logger.info(`🔍 [FORCE_CONNECTION] Discovery progress:`, {
-          elapsed: Math.round((Date.now() - discoveryStartTime) / 1000) + 's',
-          aliceConnections: aliceConnections.length,
-          bobConnections: bobConnections.length,
-          aliceConnectedToBob,
-          bobConnectedToAlice,
-          discovered: peersDiscovered
-        });
-        
-        // Log connection details
-        if (aliceConnections.length > 0) {
-          logger.info(`   Alice connected to: ${aliceConnections.map(c => c.remotePeer.toString().slice(-8)).join(', ')}`);
-        }
-        if (bobConnections.length > 0) {
-          logger.info(`   Bob connected to: ${bobConnections.map(c => c.remotePeer.toString().slice(-8)).join(', ')}`);
-        }
-      }
-      
-      if (!peersDiscovered) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      }
-    }
-    
-    if (peersDiscovered) {
-      logger.info("🎉 [FORCE_CONNECTION] Strategy 4 SUCCESS: Natural discovery worked!");
-      return true;
-    }
-    
-    // Final assessment
-    const finalAliceConnections = aliceLibp2p.getConnections().length;
-    const finalBobConnections = bobLibp2p.getConnections().length;
-    
-    logger.info(`📊 [FORCE_CONNECTION] Final assessment:`);
-    logger.info(`   Alice connections: ${finalAliceConnections}`);
-    logger.info(`   Bob connections: ${finalBobConnections}`);
-    logger.info(`   Both have relay connections: ${finalAliceConnections > 0 && finalBobConnections > 0}`);
-    
-    if (finalAliceConnections > 0 && finalBobConnections > 0) {
-      logger.info("✨ [FORCE_CONNECTION] PARTIAL SUCCESS: Both peers connected to relay - OrbitDB replication may still work!");
-      return true;
-    } else {
-      logger.warn("⚠️  [FORCE_CONNECTION] All strategies failed - but proceeding anyway");
-      return false;
-    }
+
+    // Both hold a reservation on the relay and keep announcing themselves on
+    // the pubsub topic, so discovery may still introduce them.
+    logger.warn("⚠️ Bob could not dial Alice; leaving it to peer discovery");
+    return false;
   }
 
 
@@ -1608,14 +1250,8 @@
   async function initializeAlice() {
     if (aliceRunning) return;
 
-    // Check Storacha authentication first
-    if (!storachaAuthenticated || !storachaClient) {
-      addResult(
-        "alice",
-        "Error",
-        "error",
-        "Please authenticate with Storacha first",
-      );
+    if (!storageBackend) {
+      addResult("alice", "Error", "error", "Choose where backups go first");
       return;
     }
 
@@ -1738,45 +1374,28 @@
   async function backupAlice() {
     if (aliceRunning || !aliceDatabase) return;
 
-    // Check Storacha authentication
-    if (!storachaAuthenticated || !storachaClient || !storachaCredentials) {
-      addResult(
-        "alice",
-        "Error",
-        "error",
-        "Storacha authentication required for backup",
-      );
+    if (!storageBackend) {
+      addResult("alice", "Error", "error", "Choose where backups go first");
       return;
     }
 
     aliceRunning = true;
-    aliceStep = "Creating backup while maintaining replication...";
+    aliceStep = `Creating backup on ${storageLabel}...`;
 
     try {
-      addResult("alice", "Backup", "running", "Creating backup to Storacha while preserving replication...");
-
-      const databaseConfig = {
-        type: "keyvalue",
-        create: true,
-        sync: true,
-        AccessController: IPFSAccessController({ 
-          write: [aliceIdentity.id, bobIdentity.id] 
-        }),
-      };
-      
-
-      // Create bridge with progress tracking
-      const bridge = createStorachaBridge(storachaCredentials);
-
-      // Use bridge for backup with log entries only (fallback reconstruction)
-      backupResult = await bridge.backupLogEntriesOnly(
-        aliceOrbitDB,
-        aliceDatabase.address,
-        {
-          dbConfig: databaseConfig,
-          timeout: 60000,
-        },
+      addResult(
+        "alice",
+        "Backup",
+        "running",
+        `Creating backup on ${storageLabel} while replication keeps running...`,
       );
+
+      // The whole database in one CAR: the entries, the manifest, the access
+      // controller, and the identity that signed the entries.
+      backupResult = await backupDatabase(aliceOrbitDB, aliceDatabase.address, {
+        backend: storageBackend,
+        eventEmitter: createBackupEvents(),
+      });
 
       if (!backupResult.success) {
         throw new Error(`Backup failed: ${backupResult.error}`);
@@ -1785,17 +1404,18 @@
       updateLastResult(
         "alice",
         "success",
-        `Backup created successfully with ${backupResult.blocksUploaded}/${backupResult.blocksTotal} blocks - replication preserved`,
+        `Backup created on ${storageLabel}: ${backupResult.blocksTotal} blocks in one CAR - replication preserved`,
         {
-          manifestCID: backupResult.manifestCID,
+          metadataCID: backupResult.backupFiles?.metadataCID,
+          carCID: backupResult.backupFiles?.carCID,
           databaseAddress: backupResult.databaseAddress,
           blocksTotal: backupResult.blocksTotal,
-          blocksUploaded: backupResult.blocksUploaded,
+          storage: storageLabel,
           replicationStillActive: true,
         },
       );
 
-      aliceStep = "Alice backup complete - Bob can restore while maintaining replication";
+      aliceStep = `Alice backup complete - Bob can restore from ${storageLabel} while replication continues`;
     } catch (error) {
       logger.error("❌ Backup failed:", error);
       aliceError = error.message;
@@ -1819,14 +1439,9 @@
     }
 
     // Check requirements
-    if (!storachaAuthenticated || !storachaClient) {
-      logger.info("🚫 initializeBob() exiting - not authenticated");
-      addResult(
-        "bob",
-        "Error",
-        "error",
-        "Please authenticate with Storacha first",
-      );
+    if (!storageBackend) {
+      logger.info("🚫 initializeBob() exiting - no storage chosen");
+      addResult("bob", "Error", "error", "Choose where backups go first");
       return;
     }
 
@@ -2045,56 +1660,37 @@
   async function restoreBob() {
     if (bobRunning || !bobOrbitDB || !backupResult) return;
 
-    // Check Storacha authentication
-    if (!storachaAuthenticated || !storachaClient) {
-      addResult(
-        "bob",
-        "Error",
-        "error",
-        "Storacha authentication required for restore",
-      );
+    if (!storageBackend) {
+      addResult("bob", "Error", "error", "Choose where backups go first");
       return;
     }
 
     bobRunning = true;
-    bobStep = "Restoring from backup while preserving replication...";
+    bobStep = `Restoring from the backup on ${storageLabel}...`;
 
     try {
       addResult(
         "bob",
         "Restore",
         "running",
-        "Restoring database from Storacha backup while maintaining P2P replication...",
+        `Restoring the database from ${storageLabel} while replication keeps running...`,
       );
 
-      const databaseConfig = {
-        type: "keyvalue",
-        create: true,
-        sync: true,
-        AccessController: IPFSAccessController({ 
-          write: [aliceIdentity.id, bobIdentity.id] 
-        }),
-      };
+      // The metadata CID is the whole pointer: it names the CAR, and the CAR
+      // carries the blocks. The bytes come from the same storage Alice used.
+      const metadataCID = backupResult.backupFiles.metadataCID;
+      restoreResult = await restoreFromCID(bobOrbitDB, {
+        metadataCID,
+        fetchBytes: (cid) => storageBackend.getBlob(cid),
+      });
 
-      // Create bridge with progress tracking
-      const bridge = createStorachaBridge(storachaCredentials);
-
-      // Use bridge for optimized log-entries-only restore
-      restoreResult = await bridge.restoreLogEntriesOnly(
-        bobOrbitDB,
-        {
-          dbName: "shared-todos-replication",
-          dbConfig: databaseConfig,
-          timeout: 120000,
-        },
-      );
-
-      if (!restoreResult.success) {
-        throw new Error(`Restore failed: ${restoreResult.error}`);
-      }
-
-      // Get restored database and wait for replication to sync
+      // The restore reopens the log to read what it put underneath, and OrbitDB
+      // hands out one instance per address — so the database Bob opened for
+      // replication is the one that was closed. This is his handle now; writing
+      // through the old one fails on an aborted signal.
       const restoredDatabase = restoreResult.database;
+      bobDatabase = restoredDatabase;
+      setupDatabaseEventListeners(bobDatabase, "bob");
 
       // Add restored database to tracking
       if (restoredDatabase && restoredDatabase.address) {
@@ -2105,20 +1701,18 @@
 
       // Wait for indexing and potential replication sync
       await new Promise((resolve) => setTimeout(resolve, 5000));
-      bobTodos = await (bobDatabase || restoredDatabase).all();
-
-      const optimizationInfo = restoreResult.optimizationSavings
-        ? `(${restoreResult.optimizationSavings.percentageSaved}% fewer downloads)`
-        : "";
+      bobTodos = await bobDatabase.all();
 
       updateLastResult(
         "bob",
         "success",
-        `Database restored successfully with ${restoreResult.entriesRecovered} entries - replication maintained ${optimizationInfo}`,
+        `Database restored from ${storageLabel}: ${restoreResult.entries} entries, ${restoreResult.blocks} blocks - replication maintained`,
         {
-          manifestCID: restoreResult.manifestCID,
+          metadataCID,
           databaseAddress: restoreResult.address,
-          entriesRecovered: restoreResult.entriesRecovered,
+          entriesRecovered: restoreResult.entries,
+          blocksRestored: restoreResult.blocks,
+          headsJoined: restoreResult.joined,
           todosRestored: bobTodos.map((t) => ({
             key: t.key,
             text: t.value.text,
@@ -2282,11 +1876,7 @@
       bobMultiaddrs = [];
       aliceAddressReady = false;
       bobAddressReady = false;
-      
-      // Reset progress states
-      uploadProgress = null;
-      downloadProgress = null;
-      showProgress = false;
+      relayWarning = "";
 
       logger.info("✅ Cleanup completed successfully!");
     } catch (error) {
@@ -2330,30 +1920,32 @@
 </script>
 
 <Grid>
-  <!-- Storacha Authentication Section -->
+  <!-- Where backups go -->
   <Row>
     <Column>
-      <Tile style="margin-bottom: 2rem;">
-        <StorachaAuth
-          on:authenticated={handleStorachaAuthenticated}
-          on:logout={handleStorachaLogout}
-          on:spaceChanged={handleSpaceChanged}
-          autoLogin={true}
-          showTitle={true}
-          compact={false}
-          enableSeedAuth={false}
-          enableEmailAuth={false}
-        />
+      <StorageBackendPicker
+        on:configured={handleStorageConfigured}
+        on:cleared={handleStorageCleared}
+      />
 
-        {#if !storachaAuthenticated}
-          <InlineNotification
-            kind="warning"
-            title="Authentication Required"
-            subtitle="Please authenticate with Storacha above to enable backup and restore functionality"
-            style="margin-top: 1rem;"
-          />
-        {/if}
-      </Tile>
+      {#if !storageBackend}
+        <InlineNotification
+          kind="info"
+          title="Choose storage"
+          subtitle="Pick where backups go before Alice and Bob start"
+          style="margin-bottom: 2rem;"
+        />
+      {/if}
+
+      {#if relayWarning}
+        <InlineNotification
+          kind="warning"
+          hideCloseButton
+          title="No relay"
+          subtitle={relayWarning}
+          style="margin-bottom: 2rem;"
+        />
+      {/if}
     </Column>
   </Row>
 
@@ -2371,7 +1963,7 @@
         </div>
         <p style="color:var(--cds-text-secondary);margin:0;">
           Alice & Bob connect via libp2p, share the same database address for real-time replication,
-          and can backup/restore to Storacha while preserving P2P connections.
+          and back up and restore to Aleph, Pinata or Lighthouse while the P2P connection keeps running.
         </p>
       </div>
     </Column>
@@ -2503,87 +2095,6 @@
     </Column>
   </Row>
 
-  <!-- Progress Display -->
-  {#if showProgress && (uploadProgress || downloadProgress)}
-    <Row>
-      <Column>
-        <Tile>
-          {#if uploadProgress}
-            <div style="margin-bottom:1rem;">
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
-                <div style="display:flex;align-items:center;gap:0.5rem;">
-                  <CloudUpload size={16} />
-                  <h5 style="font-size:0.875rem;font-weight:600;margin:0;">Upload Progress</h5>
-                </div>
-                <span style="font-size:0.875rem;color:var(--cds-text-secondary);"> 
-                  {uploadProgress.current}/{uploadProgress.total} ({uploadProgress.percentage}%)
-                </span>
-              </div>
-              
-              <div style="width:100%;background-color:var(--cds-layer-accent);border-radius:0.25rem;overflow:hidden;height:0.5rem;">
-                <div 
-                  style="width:{uploadProgress.percentage}%;background-color:var(--cds-support-info);height:100%;transition:width 0.3s ease;"
-                ></div>
-              </div>
-              
-              {#if uploadProgress.currentBlock}
-                <div style="margin-top:0.5rem;font-size:0.75rem;color:var(--cds-text-secondary);">
-                  Current block: <code>{uploadProgress.currentBlock.hash?.slice(0, 16)}...</code>
-                  ({uploadProgress.currentBlock.size} bytes)
-                </div>
-              {/if}
-              
-              {#if uploadProgress.error}
-                <InlineNotification 
-                  kind="error" 
-                  title="Upload Error" 
-                  subtitle={uploadProgress.error.message} 
-                  style="margin-top:0.5rem;"
-                />
-              {/if}
-            </div>
-          {/if}
-          
-          {#if downloadProgress}
-            <div>
-              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0.5rem;">
-                <div style="display:flex;align-items:center;gap:0.5rem;">
-                  <CloudDownload size={16} />
-                  <h5 style="font-size:0.875rem;font-weight:600;margin:0;">Download Progress</h5>
-                </div>
-                <span style="font-size:0.875rem;color:var(--cds-text-secondary);">
-                  {downloadProgress.current}/{downloadProgress.total} ({downloadProgress.percentage}%)
-                </span>
-              </div>
-              
-              <div style="width:100%;background-color:var(--cds-layer-accent);border-radius:0.25rem;overflow:hidden;height:0.5rem;">
-                <div 
-                  style="width:{downloadProgress.percentage}%;background-color:var(--cds-support-success);height:100%;transition:width 0.3s ease;"
-                ></div>
-              </div>
-              
-              {#if downloadProgress.currentBlock}
-                <div style="margin-top:0.5rem;font-size:0.75rem;color:var(--cds-text-secondary);">
-                  Current file: <code>{downloadProgress.currentBlock.storachaCID?.slice(0, 16)}...</code>
-                  ({downloadProgress.currentBlock.size} bytes)
-                </div>
-              {/if}
-              
-              {#if downloadProgress.error}
-                <InlineNotification 
-                  kind="error" 
-                  title="Download Error" 
-                  subtitle={downloadProgress.error.message} 
-                  style="margin-top:0.5rem;"
-                />
-              {/if}
-            </div>
-          {/if}
-        </Tile>
-      </Column>
-    </Row>
-  {/if}
-
   <!-- Alice & Bob Responsive Layout -->
   <Row>
     <!-- Alice's Section -->
@@ -2672,7 +2183,7 @@
             size="sm"
             icon={aliceRunning ? undefined : DataBase}
             on:click={initializeAlice}
-            disabled={aliceRunning || aliceOrbitDB || !storachaAuthenticated}
+            disabled={aliceRunning || aliceOrbitDB || !storageBackend}
             style="width:100%;"
           >
             {#if aliceRunning}<Loading withOverlay={false} small />{/if}
@@ -2701,11 +2212,11 @@
             disabled={aliceRunning ||
               aliceTodos.length === 0 ||
               backupResult ||
-              !storachaAuthenticated}
+              !storageBackend}
             style="width:100%;"
           >
             {#if aliceRunning}<Loading withOverlay={false} small />{/if}
-            3. Backup to Storacha
+            3. Backup to {storageLabel || "storage"}
           </Button>
         </div>
 
@@ -2717,7 +2228,7 @@
             >
               Alice's Todos:
             </h5>
-            <div style="display:flex;flex-direction:column;gap:0.25rem;">
+            <div data-testid="alice-todos" style="display:flex;flex-direction:column;gap:0.25rem;">
               {#each aliceTodos as todo}
                 <div
                   style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem;background:var(--cds-layer-accent);border-radius:0.25rem;font-size:0.75rem;"
@@ -2883,7 +2394,7 @@
               !bothIdentitiesGenerated ||
               !sharedDatabaseAddress ||
               bobOrbitDB ||
-              !storachaAuthenticated ||
+              !storageBackend ||
               !aliceAddressReady}
             style="width:100%;"
           >
@@ -2917,11 +2428,11 @@
               !bobOrbitDB ||
               !backupResult ||
               restoreResult ||
-              !storachaAuthenticated}
+              !storageBackend}
             style="width:100%;"
           >
             {#if bobRunning}<Loading withOverlay={false} small />{/if}
-            3. Restore from Storacha
+            3. Restore from {storageLabel || "storage"}
           </Button>
         </div>
 
@@ -2998,7 +2509,7 @@
             >
               Bob's Replicated Todos:
             </h5>
-            <div style="display:flex;flex-direction:column;gap:0.25rem;">
+            <div data-testid="bob-todos" style="display:flex;flex-direction:column;gap:0.25rem;">
               {#each bobTodos as todo}
                 <div
                   style="display:flex;align-items:center;gap:0.5rem;padding:0.5rem;background:var(--cds-layer-accent);border-radius:0.25rem;font-size:0.75rem;"
