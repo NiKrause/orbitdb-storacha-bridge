@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Added
+- **`orbitdb-storage-bridge/pointer-ipns`: a pointer a second device can find with nothing but a
+  key.** A backup's CID is enough to fetch it from anywhere — but a device that has lost
+  everything cannot be *told* a CID, because there is nobody left to tell it. So the name is
+  computed instead: `derivePointerKey(seed)` stretches a secret (a passkey's PRF output is the
+  case this was written for, funkpost#93) into an Ed25519 key, and the IPNS name follows from it,
+  so two devices holding the same seed reach the same name without exchanging anything.
+  `publishPointer()` writes the record over **delegated routing** (`PUT /routing/v1/ipns/{name}`),
+  since a browser cannot join the DHT and `w3name` was Storacha's; `resolvePointer()` reads it
+  back and **validates every record against the name it asked for**, so an endpoint cannot hand
+  back somebody else's pointer or an altered one without being caught. Several endpoints are
+  allowed, and one that answers is enough.
+
+  Verified against `delegated-ipfs.dev` from Node and from a browser page on a foreign origin:
+  preflight 204 with `PUT` allowed from anywhere, PUT 200, GET 200 byte for byte. Two things that
+  could not be established, and which the module therefore does not promise: that a record travels
+  beyond the endpoint that took it, and how long it is kept.
+
+
 ### Fixed
 - **One stuck send no longer stalls the whole sync.** `handlePayload` put every incoming message
   on one promise chain, and the handlers awaited `courier.send`, which resolves on *delivery* —
