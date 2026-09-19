@@ -51,6 +51,8 @@ async function converge(pair, syncs, rounds = 25) {
 /** keyvalue all() returns [{ key, value, hash }]; the sorted keys tell the story. */
 const keysOf = async (db) => (await db.all()).map((entry) => entry.key).sort();
 
+const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
+
 describe("Courier Sync — OrbitDB replication over a byte courier, no libp2p", () => {
   let alice;
   let bob;
@@ -622,7 +624,6 @@ describe("Courier Sync — OrbitDB replication over a byte courier, no libp2p", 
   });
 
   /** Resolve on the next turn of the event loop, after pending I/O callbacks. */
-  const nextTurn = () => new Promise((resolve) => setImmediate(resolve));
 
   test("a joiner's database is handed out only once the bootstrap is in it", async () => {
     const db = track(
@@ -863,5 +864,120 @@ describe("Courier Sync — OrbitDB replication over a byte courier, no libp2p", 
     await sync.hello();
     const hello = sizes.find((event) => event.type === "hello");
     expect(hello.bytes).toBeLessThan(40);
+  });
+
+  /**
+   * funkpost#83, from two radios on a public channel: a joiner asked fourteen
+   * times and got one answer. The creator's first reply was still in flight,
+   * and `courier.send` resolves on *delivery* — so every later message sat
+   * behind it on the same chain and was never even looked at.
+   */
+  test("a send that never settles does not stop the sync from listening", async () => {
+    const db = track(
+      await alice.orbitdb.open("courier-head-of-line", { type: "keyvalue" }),
+    );
+    await db.put("one", { text: "Buy groceries" });
+
+    const pair = createMemoryCourierPair();
+    let holding = false;
+    const held = [];
+    const release = () => held.splice(0).forEach((resolve) => resolve());
+    // A courier that takes a message and then says nothing — neither delivered
+    // nor failed, which is exactly what the hardware log showed.
+    const stuck = {
+      send: async (bytes) => {
+        if (holding) await new Promise((resolve) => held.push(resolve));
+        return pair.a.send(bytes);
+      },
+      onPayload: (cb) => pair.a.onPayload(cb),
+    };
+
+    const syncA = await createCourierSync({ db, courier: stuck });
+    const syncB = await createCourierSync({
+      orbitdb: bob.orbitdb,
+      address: db.address,
+      courier: pair.b,
+    });
+    const heard = [];
+    const sentBlocks = [];
+    syncA.on("message", (event) => {
+      if (event.direction === "in") heard.push(event.type);
+      if (event.direction === "out" && event.type === "blocks")
+        sentBlocks.push(event);
+    });
+
+    await syncA.start(); // the announce gets out; everything after it hangs
+    holding = true;
+    await syncB.start();
+
+    // The joiner keeps asking, the way its rejoin timer does on the air.
+    for (let round = 0; round < 4; round += 1) {
+      await syncB.announce();
+      await pair.idle();
+      await syncB.idle();
+    }
+    // Not `syncA.idle()`: the creator's outbox is stuck on purpose, and that
+    // is the whole point — so wait for the evidence instead of for quiet.
+    const until = async (check, ms = 5000) => {
+      const deadline = Date.now() + ms;
+      while (!check() && Date.now() < deadline) await nextTurn();
+    };
+    await until(() => heard.length >= 4 && sentBlocks.length >= 1);
+
+    // The point: every one of those was heard and handled while the first
+    // reply was still stuck. Before the outbox, this was exactly 1.
+    expect(heard.length).toBeGreaterThanOrEqual(4);
+    expect(syncB.db).toBeNull(); // nothing could reach it, which is honest
+
+    // And one reply is in flight, not five: the asks that arrived while it was
+    // stuck superseded each other, so the radio does not pay for four copies
+    // of the same answer.
+    expect(sentBlocks.length).toBe(1);
+
+    release();
+    holding = false;
+    await converge(pair, [syncA, syncB]);
+
+    // The one that was in flight and could not be taken back, plus the single
+    // one that was waiting behind it — and whatever the bootstrap still needs
+    // after that, which is the protocol doing its ordinary repair.
+    expect(sentBlocks.length).toBeGreaterThanOrEqual(2);
+    expect(track(syncB.db)).toBeTruthy();
+    expect(await syncB.db.get("one")).toEqual({ text: "Buy groceries" });
+
+    await syncA.stop();
+    await syncB.stop();
+  });
+
+  test("a courier that never answers at all is given up on, and the next message still goes", async () => {
+    const db = track(
+      await alice.orbitdb.open("courier-send-timeout", { type: "keyvalue" }),
+    );
+
+    let answering = false;
+    const sent = [];
+    const mute = {
+      send: async (bytes) => {
+        sent.push(bytes);
+        if (!answering) await new Promise(() => {}); // never settles, ever
+      },
+      onPayload: () => () => {},
+    };
+
+    const sync = await createCourierSync({
+      db,
+      courier: mute,
+      sendTimeoutMs: 50,
+    });
+
+    // start() announces, and says so rather than hanging for good.
+    await expect(sync.start()).rejects.toThrow(/neither delivered nor failed/);
+
+    // The outbox is not wedged: the carrier comes back, the next message goes.
+    answering = true;
+    await sync.announce();
+    expect(sent.length).toBe(2);
+
+    await sync.stop();
   });
 });

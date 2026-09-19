@@ -1,5 +1,27 @@
 # Changes
 
+## Unreleased
+
+### Fixed
+- **One stuck send no longer stalls the whole sync.** `handlePayload` put every incoming message
+  on one promise chain, and the handlers awaited `courier.send`, which resolves on *delivery* —
+  an end-to-end ARQ over a carrier that is slow by law. On two radios that meant a joiner asked
+  fourteen times and got one answer: the first reply was still in flight and every later message
+  sat behind it, never even looked at ([funkpost#83](https://github.com/NiKrause/funkpost/issues/83)).
+  Outgoing messages now wait in an **outbox** of their own, in order, while the receive path keeps
+  running; a test reproduces the field case and fails against the old shape with exactly the
+  symptom from the log — one message heard instead of four.
+
+### Added
+- **A reply that has not gone out yet is superseded by a newer one of the same kind to the same
+  peer.** The peer asked again, so the older answer would spend airtime on what it already has.
+  Peers without a sender id (an older version) are never superseded, because they cannot be told
+  apart.
+- **`sendTimeoutMs`** (default 300 000) — a way out of a courier that neither delivers nor fails,
+  deliberately far outside any honest delivery; `0` waits for ever. **`maxOutbox`** (default 32)
+  bounds what a carrier that cannot keep up may make us hold; the oldest waiting message goes, and
+  everything here is re-derivable.
+
 ## 0.9.0 (2026-09-19)
 
 ### Added
