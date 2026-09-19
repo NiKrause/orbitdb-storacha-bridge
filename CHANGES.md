@@ -1,5 +1,20 @@
 # Changes
 
+## Unreleased
+
+### Added
+- **Presence in `courier-sync`: who is out there, not which radios are.** A carrier can tell you
+  a radio is in range; it cannot tell you whether a program on the other end keeps the same
+  database, and that is the question an app has to answer before spending airtime. Every message
+  now carries a four-byte sender id (**7 bytes of dag-cbor**, counted in the tests), so ordinary
+  traffic already answers it for free, and `hello()` asks outright for the silence in between —
+  two messages that each fit in a single 200-byte LoRa frame. `presence()` reports the peers heard
+  lately and how long ago the air last carried anything for this database at all; `forgetPeers()`
+  drops it when the carrier itself changes underneath, as a radio switching channel does.
+  A peer on an older version sends no id and answers no `hello`, so its traffic counts as
+  "somebody is out there" but not as a peer — and a mesh repeating our own message counts as
+  nothing, which is what an app alone in a valley needs it to be.
+
 ## 0.8.1 (2026-09-18)
 
 ### Fixed
