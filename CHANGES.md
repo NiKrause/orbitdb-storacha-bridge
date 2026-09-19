@@ -3,6 +3,24 @@
 ## Unreleased
 
 ### Added
+- **`orbitdb-storage-bridge/dehydrate`: put a database where a second device can find it, and get
+  it back.** `dehydrate()` backs the database up as a CAR, uploads it, and publishes an IPNS
+  pointer to it under a name derived from a seed; `hydrate()` finds that pointer with the same
+  seed and nothing else, checks the record against the name it asked for, fetches the backup and
+  opens the database. Between the two devices there is no CID, no address and no file — only a
+  secret both can produce, which is a passkey's PRF output in the case this was written for
+  (funkpost#93, P11 steps 3 and 4).
+
+  **There is no encrypted identity archive, and that is not an oversight**: with a signing key
+  derived from the same secret (`@le-space/orbitdb-identity-provider-webauthn-did` 0.6.0) the new
+  device recomputes the identity instead of carrying it, so the restored copy can *write* and
+  there is nothing secret to store in the open.
+
+  The whole procedure, including what it does not promise, is written up in
+  [docs/RECOVERY-ON-A-SECOND-DEVICE.md](docs/RECOVERY-ON-A-SECOND-DEVICE.md).
+
+
+### Added
 - **`orbitdb-storage-bridge/pointer-ipns`: a pointer a second device can find with nothing but a
   key.** A backup's CID is enough to fetch it from anywhere — but a device that has lost
   everything cannot be *told* a CID, because there is nobody left to tell it. So the name is
