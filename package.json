@@ -12,6 +12,7 @@
     },
     "./backup-car": "./lib/backup-car.js",
     "./courier-sync": "./lib/courier-sync.js",
+    "./pointer-ipns": "./lib/pointer-ipns.js",
     "./restore-cid": "./lib/restore-cid.js",
     "./gateway-fetch": "./lib/gateway-fetch.js",
     "./backends/types": "./lib/backends/types.js",
