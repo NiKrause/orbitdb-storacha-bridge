@@ -1,6 +1,6 @@
 # Changes
 
-## Unreleased
+## 0.9.0 (2026-09-19)
 
 ### Added
 - **Presence in `courier-sync`: who is out there, not which radios are.** A carrier can tell you
