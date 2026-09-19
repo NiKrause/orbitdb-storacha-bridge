@@ -542,7 +542,9 @@ describe("Courier Sync — OrbitDB replication over a byte courier, no libp2p", 
     // to: the delta would travel without the block the receiver needs to verify
     // the entries.
     const db = track(
-      await alice.orbitdb.open("courier-identity-elsewhere", { type: "keyvalue" }),
+      await alice.orbitdb.open("courier-identity-elsewhere", {
+        type: "keyvalue",
+      }),
     );
     await db.put("k1", { n: 1 });
 
@@ -559,7 +561,9 @@ describe("Courier Sync — OrbitDB replication over a byte courier, no libp2p", 
 
     try {
       const delta = await createDelta({ db, theirHeads: [] });
-      const identityBlock = delta.blocks.find((block) => block.hash === identityHash);
+      const identityBlock = delta.blocks.find(
+        (block) => block.hash === identityHash,
+      );
 
       expect(identityBlock).toBeDefined();
       expect(identityBlock.bytes).toEqual(db.identity.bytes);
@@ -665,5 +669,199 @@ describe("Courier Sync — OrbitDB replication over a byte courier, no libp2p", 
 
     await syncA.stop();
     await syncB.stop();
+  });
+
+  test("presence: the question gets an answer even from a peer that never speaks", async () => {
+    // The distinction the whole thing exists for. A carrier can report the
+    // radios in range; it cannot report whether a program on the other end
+    // keeps this database. Only that program can answer.
+    //
+    // Everything B says is dropped until the hello, so the answer is the only
+    // message that can prove anything — otherwise B's own announce on start
+    // would have told A, and this test would pass with the hello broken.
+    const db = track(
+      await alice.orbitdb.open("courier-presence", { type: "keyvalue" }),
+    );
+    let deaf = true;
+    const pair = createMemoryCourierPair({
+      dropFn: ({ from }) => deaf && from === "b",
+    });
+    const syncA = await createCourierSync({ db, courier: pair.a });
+    const syncB = await createCourierSync({
+      orbitdb: bob.orbitdb,
+      address: db.address,
+      courier: pair.b,
+    });
+
+    // Before anybody has said anything: nothing heard, nobody present.
+    expect(syncA.presence()).toEqual({ peers: [], lastHeardAgoMs: null });
+
+    await syncA.start();
+    await syncB.start();
+    await converge(pair, [syncA, syncB]);
+    expect(syncA.presence()).toEqual({ peers: [], lastHeardAgoMs: null });
+
+    deaf = false;
+    await syncA.hello();
+    await converge(pair, [syncA, syncB]);
+
+    const seen = syncA.presence();
+    expect(seen.peers.map((peer) => peer.id)).toEqual([syncB.peerId]);
+    expect(seen.lastHeardAgoMs).toBeLessThan(5000);
+
+    await syncA.stop();
+    await syncB.stop();
+  });
+
+  test("presence: ordinary traffic counts, so the silence is what costs extra", async () => {
+    // Nobody should pay airtime for a heartbeat while the two are talking
+    // anyway: every message carries the sender id, so a sync round is already
+    // an answer to "is anybody there".
+    const db = track(
+      await alice.orbitdb.open("courier-presence-traffic", {
+        type: "keyvalue",
+      }),
+    );
+    await db.put("seed", { text: "hello" });
+
+    const pair = createMemoryCourierPair();
+    const syncA = await createCourierSync({ db, courier: pair.a });
+    const syncB = await createCourierSync({
+      orbitdb: bob.orbitdb,
+      address: db.address,
+      courier: pair.b,
+    });
+    await syncA.start();
+    await syncB.start();
+    await converge(pair, [syncA, syncB]);
+
+    // No hello was ever sent — the bootstrap alone told both sides.
+    expect(syncA.presence().peers.map((peer) => peer.id)).toEqual([
+      syncB.peerId,
+    ]);
+    expect(syncB.presence().peers.map((peer) => peer.id)).toEqual([
+      syncA.peerId,
+    ]);
+
+    await syncA.stop();
+    await syncB.stop();
+  });
+
+  test("presence: a peer keeping another database is not company", async () => {
+    // Same air, same courier, different conversation. Hearing it proves a
+    // radio is in range, which is exactly the answer this API refuses to give.
+    const mine = track(
+      await alice.orbitdb.open("courier-presence-mine", { type: "keyvalue" }),
+    );
+    const theirs = track(
+      await bob.orbitdb.open("courier-presence-theirs", { type: "keyvalue" }),
+    );
+    await theirs.put("theirs", { text: "not your conversation" });
+
+    const pair = createMemoryCourierPair();
+    const syncA = await createCourierSync({ db: mine, courier: pair.a });
+    const syncB = await createCourierSync({ db: theirs, courier: pair.b });
+    await syncA.start();
+    await syncB.start();
+
+    await syncA.hello();
+    await theirs.put("more", { text: "chatter on the same air" });
+    await converge(pair, [syncA, syncB]);
+
+    expect(syncA.presence()).toEqual({ peers: [], lastHeardAgoMs: null });
+
+    await syncA.stop();
+    await syncB.stop();
+  });
+
+  test("presence: a mesh repeating our own message is not company", async () => {
+    // A LoRa mesh rebroadcasts what it carries, so a node hears itself. That
+    // must never read as "somebody is out there", or an app alone in a valley
+    // would be told it has company.
+    const db = track(
+      await alice.orbitdb.open("courier-presence-echo", { type: "keyvalue" }),
+    );
+    const listeners = new Set();
+    const repeater = {
+      send: async (bytes) => {
+        for (const cb of listeners) cb(bytes);
+      },
+      onPayload: (cb) => {
+        listeners.add(cb);
+        return () => listeners.delete(cb);
+      },
+    };
+    const sync = await createCourierSync({ db, courier: repeater });
+    await sync.start();
+    await sync.hello();
+    await sync.idle();
+
+    expect(sync.presence()).toEqual({ peers: [], lastHeardAgoMs: null });
+
+    await sync.stop();
+  });
+
+  test("presence: a peer that has gone quiet stops counting", async () => {
+    const db = track(
+      await alice.orbitdb.open("courier-presence-timeout", {
+        type: "keyvalue",
+      }),
+    );
+    const pair = createMemoryCourierPair();
+    const syncA = await createCourierSync({
+      db,
+      courier: pair.a,
+      peerTimeoutMs: 1,
+    });
+    const syncB = await createCourierSync({
+      orbitdb: bob.orbitdb,
+      address: db.address,
+      courier: pair.b,
+    });
+    await syncA.start();
+    await syncB.start();
+    await converge(pair, [syncA, syncB]);
+    expect(syncA.presence().peers.length).toBe(1);
+
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    const later = syncA.presence();
+    expect(later.peers).toEqual([]);
+    // Still true, and still useful: the air did carry something once.
+    expect(later.lastHeardAgoMs).not.toBeNull();
+
+    // And a carrier that changed underneath — another channel, another room —
+    // makes even that meaningless.
+    syncA.forgetPeers();
+    expect(syncA.presence()).toEqual({ peers: [], lastHeardAgoMs: null });
+
+    await syncA.stop();
+    await syncB.stop();
+  });
+
+  test("presence costs seven bytes a message, and the question itself one frame", async () => {
+    // The price, counted rather than asserted to be small: the sender id is
+    // seven bytes of dag-cbor on every message, and asking outright is two
+    // messages that each fit in a single 200-byte LoRa frame with room over.
+    const db = track(
+      await alice.orbitdb.open("courier-presence-cost", { type: "keyvalue" }),
+    );
+    const tag = await databaseTag(db.address);
+    const withId = dagCbor.encode({
+      v: 1,
+      tag,
+      p: new Uint8Array(4),
+      t: "announce",
+      heads: [],
+    });
+    const withoutId = dagCbor.encode({ v: 1, tag, t: "announce", heads: [] });
+    expect(withId.length - withoutId.length).toBe(7);
+
+    const sizes = [];
+    const courier = { send: async () => {}, onPayload: () => () => {} };
+    const sync = await createCourierSync({ db, courier });
+    sync.on("message", (event) => sizes.push(event));
+    await sync.hello();
+    const hello = sizes.find((event) => event.type === "hello");
+    expect(hello.bytes).toBeLessThan(40);
   });
 });
