@@ -44,10 +44,13 @@ let discovery = null;
  *
  * `discoverAlephBootstrapMultiaddrs` would be the one-line version, and it
  * keeps a single record per `registrationId`. The relays deployed from one
- * profile share that id, so it hands back whichever registered last: measured
- * on 2026-09-18, that was a relay which accepts connections and never answers
- * identify, while the other one was healthy. Dialling both costs one failed
- * dial and is the difference between a demo that connects and one that waits.
+ * profile share that id, so it hands back whichever registered last — one
+ * relay, and no second chance if that one is unreachable from here. Dialling
+ * every registered relay costs a failed dial when one is down, which is the
+ * cheaper side of that trade for a demo.
+ *
+ * (The relay that looked broken on 2026-09-18 was not: its identify response
+ * is larger than libp2p's default limit, which is why this node raises it.)
  */
 async function registeredRelays() {
   const posts = filterRelayBootstrapPostsByProfile(
